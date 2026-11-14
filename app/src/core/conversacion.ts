@@ -1,7 +1,10 @@
 /**
  * MODO CONVERSACIONAL — interpreta frases en español (de voz o de texto).
  * Es un intérprete por palabras clave, liviano y sin conexión. Se puede ampliar con más intenciones.
+ * Lo esencial para la seguridad (pedir ayuda, avisar a otros, reportar un síntoma, "estoy bien")
+ * funciona aquí sin IA: la IA mejora la conversación, pero no es imprescindible para pedir ayuda.
  */
+import type { Accion, DestinoPedido, SeccionApp } from './acciones';
 import type { NucleoSalud } from './nucleo';
 import { redactar } from './personalizador';
 import { ORDEN_NIVEL, type Lectura, type TipoSensor } from './tipos';
@@ -10,6 +13,8 @@ export interface Respuesta {
   texto: string;
   /** Lecturas a registrar en el núcleo (si la frase era un registro). */
   lecturas: Lectura[];
+  /** Acciones a ejecutar en la app (pedir ayuda, navegar, confirmar…). */
+  acciones: Accion[];
 }
 
 const NUMEROS: Record<string, number> = {
@@ -37,20 +42,103 @@ const CONSULTAS: { claves: RegExp; riesgoId: string; nombre: string }[] = [
   { claves: /radiacion|dosis/, riesgoId: 'radiacion.dosis', nombre: 'radiación' },
 ];
 
+/** A quién se refiere una frase ("a Tierra", "al médico", "a Kai"…). */
+function destinoEn(f: string, companeros: string[]): DestinoPedido | null {
+  if (/\btierra\b|control de mision|houston/.test(f)) return 'tierra';
+  if (/\bbase\b|habitat/.test(f)) return 'base';
+  if (/medic|doctor/.test(f)) return 'medico';
+  if (/companer|tripula|\bcolega/.test(f)) return 'companero';
+  if (companeros.some((n) => f.includes(normalizar(n.split(' ')[0])))) return 'companero';
+  if (/\btodos\b/.test(f)) return 'todos';
+  return null;
+}
+
+const SECCION_POR_PALABRA: [RegExp, SeccionApp][] = [
+  [/resumen|cuerpo|figura/, 'resumen'], [/mensaje|alerta|aviso/, 'mensajes'], [/comunicaci|contacto/, 'comunicaciones'],
+  [/perfil|historia|clinic|ficha/, 'perfil'], [/entorno|camara|contexto/, 'entorno'], [/reporte/, 'reportes'], [/asistente|chat|conversa/, 'asistente'],
+];
+
+/** Síntomas que el astronauta puede contar y que Higia convierte en aviso o alerta. */
+const SINTOMAS: { claves: RegExp; alerta: Extract<Accion, { tipo: 'emitir_alerta' }> }[] = [
+  { claves: /dolor (en el|de) pecho|duele (el|mucho el) pecho|opresion en el pecho/, alerta: { tipo: 'emitir_alerta', nivel: 'alerta', sistema: 'corazon', titulo: 'Dolor en el pecho', detalle: 'El astronauta reporta dolor u opresión en el pecho.' } },
+  { claves: /no puedo respirar|me falta el aire|me ahogo|falta de aire/, alerta: { tipo: 'emitir_alerta', nivel: 'alerta', sistema: 'pulmones', titulo: 'Dificultad para respirar', detalle: 'El astronauta reporta falta de aire.' } },
+  { claves: /me voy a desmayar|me desmayo|perdi el conocimiento/, alerta: { tipo: 'emitir_alerta', nivel: 'alerta', sistema: 'cerebro', titulo: 'Sensación de desmayo', detalle: 'El astronauta reporta sensación de desmayo.' } },
+  { claves: /mareo|mareado|mareada|vertigo|todo me da vueltas/, alerta: { tipo: 'emitir_alerta', nivel: 'aviso', sistema: 'oidoInterno', titulo: 'Mareo', detalle: 'El astronauta reporta mareo o vértigo.' } },
+  { claves: /duele (la|mucho la) cabeza|dolor de cabeza|jaqueca|migrana/, alerta: { tipo: 'emitir_alerta', nivel: 'aviso', sistema: 'cerebro', titulo: 'Dolor de cabeza', detalle: 'El astronauta reporta dolor de cabeza.' } },
+  { claves: /veo borroso|vision borrosa|no veo bien/, alerta: { tipo: 'emitir_alerta', nivel: 'aviso', sistema: 'ojos', titulo: 'Visión borrosa', detalle: 'El astronauta reporta visión borrosa.' } },
+  { claves: /me (cai|golpee)|me lastime|me torci/, alerta: { tipo: 'emitir_alerta', nivel: 'aviso', sistema: 'huesos', titulo: 'Golpe o caída', detalle: 'El astronauta reporta un golpe o una caída.' } },
+  { claves: /nauseas|ganas de vomitar|vomite/, alerta: { tipo: 'emitir_alerta', nivel: 'aviso', sistema: 'intestino', titulo: 'Náuseas', detalle: 'El astronauta reporta náuseas.' } },
+];
+
+const NOMBRE_DESTINO_PEDIDO: Record<DestinoPedido, string> = {
+  companero: 'tu compañero', medico: 'el equipo médico', base: 'la base', tierra: 'Tierra', todos: 'todos los que están al alcance',
+};
+
 export function interpretar(frase: string, nucleo: NucleoSalud, ahora = Date.now()): Respuesta {
-  const f = normalizar(frase).trim();
+  const f = normalizar(frase).replace(/[.,;:]/g, ' ').replace(/\s+/g, ' ').trim();
   const lectura = (sensor: TipoSensor, valor: number): Lectura => ({ sensor, valor, timestamp: ahora, fuente: 'voz' });
+  const r = (texto: string, acciones: Accion[] = [], lecturas: Lectura[] = []): Respuesta => ({ texto, lecturas, acciones });
+
+  // ── Emergencia: pedir ayuda (siempre primero) ──
+  if (/\b(ayuda|ayudenme|auxilio|socorro|emergencia|mayday)\b/.test(f) && !/que (es|significa)/.test(f)) {
+    const destino = destinoEn(f, nucleo.companeros) ?? 'todos';
+    // Si además cuenta un síntoma ("me duele el pecho, pide ayuda"), queda también la alerta.
+    const sintoma = SINTOMAS.find((s) => s.claves.test(f));
+    return r(`Pido ayuda a ${NOMBRE_DESTINO_PEDIDO[destino]}. Quédate en un lugar seguro, sigo contigo.`,
+      [{ tipo: 'pedir_ayuda', destino, motivo: `Pedido de voz: "${frase.trim()}"` }, ...(sintoma ? [sintoma.alerta] : [])]);
+  }
+
+  // ── Síntomas: generan un aviso o una alerta ──
+  for (const s of SINTOMAS) {
+    if (s.claves.test(f)) {
+      const grave = s.alerta.nivel === 'alerta';
+      return r(grave
+        ? `${s.alerta.titulo}: lo registro como alerta. Detente y ponte en un lugar seguro. Si no respondes, aviso a otros.`
+        : `${s.alerta.titulo}: lo registro como aviso y lo sigo de cerca. Avísame si empeora.`, [s.alerta]);
+    }
+  }
+
+  // ── "Estoy bien" ──
+  if (/estoy bien|me encuentro bien|todo bien|falsa alarma/.test(f)) {
+    const n = nucleo.confirmacionesPendientes().size;
+    return r(n ? 'Entendido, me alegra. Cancelo el aviso a otros.' : 'Me alegra. No hay alertas esperando respuesta.', [{ tipo: 'confirmar_bien' }]);
+  }
+
+  // ── Mensajes a otros: "dile a Tierra que…", "avísale a mi compañero que…" ──
+  const msj = f.match(/(?:dile|digale|dile a|avisa|avisale|envia(?:le)?|manda(?:le)?|mensaje|comunica(?:le)?|llama)\b(.*)/);
+  if (msj) {
+    const destino = destinoEn(msj[1], nucleo.companeros);
+    if (destino) {
+      const contenido = frase.replace(/^.*?\b(que|:)\s*/i, '').trim();
+      const mensaje = contenido && contenido !== frase.trim() ? contenido : `${nucleo.perfil.nombre} pide comunicarse.`;
+      return r(`Listo, le envío el mensaje a ${NOMBRE_DESTINO_PEDIDO[destino]}.`, [{ tipo: 'enviar_mensaje', destino, mensaje }]);
+    }
+  }
+
+  // ── Control de la app ──
+  if (/silencia|callate|sin voz|silencio/.test(f)) return r('Silencio la voz.', [{ tipo: 'voz', estado: 'silenciar' }]);
+  if (/activa la voz|habla de nuevo/.test(f)) return r('Vuelvo a hablar.', [{ tipo: 'voz', estado: 'activar' }]);
+  if (/^(ve|ir|abre|abrir|muestra|muestrame|llevame|pasa|cambia)\b/.test(f)) {
+    const destino = SECCION_POR_PALABRA.find(([re]) => re.test(f));
+    if (destino) return r('Listo.', [{ tipo: 'ir_a', seccion: destino[1] }]);
+  }
+  if (/salgo a (una )?eva|voy a (salir|hacer una eva)/.test(f)) return r('Anotado: saliste a EVA. Ajusto los avisos.', [{ tipo: 'cambiar_contexto', ubicacion: 'eva', actividad: 'trabajo' }]);
+  if (/volvi al habitat|estoy en el habitat|entre al habitat/.test(f)) return r('Bienvenido al hábitat.', [{ tipo: 'cambiar_contexto', ubicacion: 'habitat' }]);
+  if (/(empiezo|voy) a (hacer )?(ejercicio|entrenar)/.test(f)) return r('Anotado: estás haciendo ejercicio.', [{ tipo: 'cambiar_contexto', actividad: 'ejercicio' }]);
+  if (/(termine|deje) (el |de hacer )?(ejercicio|entrenar)|voy a descansar/.test(f)) return r('Anotado: en reposo.', [{ tipo: 'cambiar_contexto', actividad: 'reposo' }]);
+  const alergia = f.match(/soy alergic[oa] a (?:la |el |los |las )?(.+)/);
+  if (alergia) return r(`Anoto la alergia a ${alergia[1]} en tu historia clínica.`, [{ tipo: 'actualizar_historia', campo: 'alergias', valor: alergia[1] }]);
 
   // ── Registros ──
   let m = f.match(/dormi\s+(\S+)\s+horas?/);
   if (m && numero(m[1]) !== null) {
     const v = numero(m[1])!;
-    return { texto: `Anotado: dormiste ${v} horas.`, lecturas: [lectura('horasSueno', v)] };
+    return r(`Anotado: dormiste ${v} horas.`, [], [lectura('horasSueno', v)]);
   }
   m = f.match(/animo\s+(?:es\s+|de\s+|esta\s+en\s+|en\s+)?(\S+)/);
   if (m && numero(m[1]) !== null) {
     const v = Math.min(10, Math.max(1, numero(m[1])!));
-    return { texto: `Anotado tu ánimo: ${v} de 10. Gracias por registrarlo.`, lecturas: [lectura('animo', v)] };
+    return r(`Anotado tu ánimo: ${v} de 10. Gracias por registrarlo.`, [], [lectura('animo', v)]);
   }
   m = f.match(/(?:hice|entrene)\s+(\S+)\s+minutos/);
   if (m && numero(m[1]) !== null) {
@@ -58,25 +146,22 @@ export function interpretar(frase: string, nucleo: NucleoSalud, ahora = Date.now
     const previo = nucleo.historial.ultima('minutosEjercicio');
     const mismoDia = previo && new Date(previo.timestamp).toDateString() === new Date(ahora).toDateString();
     const total = (mismoDia ? previo.valor : 0) + v;
-    return { texto: `Anotado: ${v} minutos. Llevas ${total} hoy.`, lecturas: [lectura('minutosEjercicio', total)] };
+    return r(`Anotado: ${v} minutos. Llevas ${total} hoy.`, [], [lectura('minutosEjercicio', total)]);
   }
 
   // ── Consultas ──
   if (/como estoy|resumen|estado general/.test(f)) {
     const problemas = nucleo.hallazgosActuales().filter((h) => ORDEN_NIVEL[h.nivel] >= ORDEN_NIVEL.aviso);
-    if (!problemas.length) return { texto: 'Todo en orden. No hay avisos activos.', lecturas: [] };
-    return { texto: `Hay ${problemas.length} punto(s) a atender: ${problemas.map((h) => h.titulo).join('; ')}.`, lecturas: [] };
+    if (!problemas.length) return r('Todo en orden. No hay avisos activos.');
+    return r(`Hay ${problemas.length} punto(s) a atender: ${problemas.map((h) => h.titulo).join('; ')}.`);
   }
   for (const c of CONSULTAS) {
     if (c.claves.test(f)) {
       const h = nucleo.hallazgo(c.riesgoId);
-      if (!h) return { texto: `Todavía no tengo datos de ${c.nombre}.`, lecturas: [] };
-      return { texto: redactar(h, nucleo.perfil, nucleo.contexto), lecturas: [] };
+      if (!h) return r(`Todavía no tengo datos de ${c.nombre}.`);
+      return r(redactar(h, nucleo.perfil, nucleo.contexto));
     }
   }
 
-  return {
-    texto: 'No te entendí. Puedes preguntar «¿cómo está mi presión?» o decir «dormí cinco horas».',
-    lecturas: [],
-  };
+  return r('No te entendí. Puedes preguntar «¿cómo está mi presión?», decir «dormí cinco horas» o «pide ayuda».');
 }

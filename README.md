@@ -35,9 +35,11 @@ Higia vigila la salud de astronautas que viven en hábitats permanentes (base lu
 | **Hablar solo cuando hace falta** | Avisa cuando algo cambia, no repite y respeta el horario de sueño |
 | **Personalizar el mensaje** | Cifras para quien es médico, indicaciones claras para quien no, tono calmado para quien es propenso al pánico |
 | **Elegir el canal** | Lo privado nunca va a la pantalla compartida; fuera del hábitat, mensajes breves por auricular |
-| **Escalar emergencias** | Si una alerta no recibe "Estoy bien", avisa al compañero cercano, al médico, a la base o a Tierra; si no hay nadie, activa una baliza |
+| **Escalar emergencias** | Si una alerta no recibe "Estoy bien", primero lo advierte por voz y luego **se comunica con otros** (compañero, médico, base o Tierra) enviando qué pasó, dónde está el astronauta y su historia clínica; si no hay nadie, activa una baliza. Las respuestas se ven en vivo |
+| **Asistente al centro** | Higia es la base de la app: se activa al oír su nombre ("Higia, …") y desde la conversación consulta el estado, **pide ayuda**, **envía mensajes** a otros astronautas o a Tierra, **emite alertas** por síntomas que cuenta el astronauta y maneja toda la app |
+| **Historia clínica previa** | Cada astronauta tiene su historia (alergias, antecedentes, medicación, cirugías). La usan la IA, los mensajes y las comunicaciones de emergencia |
 | **Funcionar sin médico** | Si no hay médico a bordo, da guías paso a paso y dirige los reportes a la base o a Tierra |
-| **Conversar** | Chat por voz o texto; con IA entiende frases libres y registra los datos que menciona el astronauta |
+| **Conversar** | Por voz (diciendo "Higia") o texto; con IA entiende frases libres y registra los datos que menciona el astronauta |
 | **Ver el entorno** | Con IA, analiza una foto de la cámara para detectar peligros y confirmar el contexto |
 | **Integrarse** | Exporta hallazgos en formato HL7 FHIR hacia sistemas médicos (interfaz de ejemplo) |
 | **Mostrarlo todo** | Figura anatómica detallada coloreada por estado, mensajes explicados, historial de escaladas y reportes |
@@ -78,18 +80,22 @@ La IA solo existe con `npm run dev`, porque el servidor de desarrollo es el que 
 
 ## Guion para la demo
 
-Abre el panel de demo con el botón **Demo** de la barra superior o la tecla **D**. Se abre al costado sin tapar la interfaz, así que el efecto de cada escenario se ve en vivo.
+La app abre en **Higia**, el asistente. Abre el panel de demo con el botón **Demo** de la barra superior o la tecla **D**. Se abre al costado sin tapar la interfaz, así que el efecto de cada escenario se ve en vivo.
 
 1. **Día normal en el hábitat**: en **Resumen**, la figura se pinta de verde y aparece "Todo en orden".
 2. **EVA: golpe en la estación**: llega un mensaje breve por auricular. En **Mensajes**, abre "Por qué este mensaje" para ver el canal elegido, la base científica y cómo lo recibiría cada astronauta.
 3. En la pestaña **Astronauta**, cambia a Luis Pérez (novato, propenso al pánico) y repite el escenario: el texto no nombra el pánico.
 4. **Sesión de ejercicio**: 125 lpm no dispara alarma, porque el contexto dice que está entrenando.
 5. **Descenso del ánimo**: va a la pantalla personal, nunca a la compartida, y se marca como "Privado".
-6. **Crisis sin respuesta**: aparece la franja roja arriba, en cualquier sección. No presiones "Estoy bien": a los 15 s Higia avisa al compañero cercano. Queda registrado en **Reportes**.
+6. **Crisis sin respuesta**: aparece la franja roja arriba, en cualquier sección. No presiones "Estoy bien": a 10 s del plazo Higia advierte por voz que va a avisar a otros, y a los 15 s se comunica con el compañero cercano. Aparece el aviso de comunicación con su respuesta en vivo; el detalle (con la historia clínica enviada) queda en **Comunicaciones**.
 7. **Aviso de madrugada**: queda retenido. En **Contexto**, cambia la hora a 08:00 y se entrega.
 8. En **Contexto**, apaga **Médico a bordo** y ejecuta **Hipoxia**: aparece la guía paso a paso.
-9. Activa **Conexión con el hábitat**: se vacía la cola de reportes (**Reportes**). Si hay clave, prueba el **Asistente** con "anoche dormí como cinco horas y me siento cansado" y mira la **Evaluación de Higia · IA** en cada mensaje.
-10. Para presentar, cierra el panel de demo (Esc o D): queda solo la interfaz del astronauta.
+9. Activa **Conexión con el hábitat**: se vacía la cola de reportes (**Reportes**) y sale lo que estaba en cola en **Comunicaciones**.
+10. En **Higia**, di (o escribe) "Higia, anoche dormí como cinco horas y me siento cansado": registra el dato. Con clave, mira la **Evaluación de Higia · IA** en cada mensaje.
+11. "Higia, dile a Tierra que terminé la reparación": el mensaje aparece en **Comunicaciones** (en cola si no hay enlace con Tierra).
+12. "Higia, me duele mucho el pecho, pide ayuda": avisa a todos los que están al alcance al instante, deja una alerta en el corazón (se ve en la figura) y muestra el aviso de comunicación. Luego "Higia, estoy bien" cancela la alerta.
+13. En **Perfil**, revisa la historia clínica de cada astronauta; prueba "Higia, soy alérgico al látex" para agregar un dato hablando.
+14. Para presentar, cierra el panel de demo (Esc o D): queda solo la interfaz del astronauta.
 
 ---
 
@@ -101,7 +107,9 @@ La interfaz separa **lo que ve el astronauta** de **los controles de la demo**.
 
 | Zona | Qué contiene |
 |---|---|
-| **Barra superior** | Indicadores de estado (conexión, IA, astronauta, ubicación y destino, hora y, si la hay, tormenta solar), control de voz y botón **Demo** |
+| **Barra superior** | Indicadores de estado (conexión, IA, escucha de «Higia», astronauta, ubicación y destino, hora y, si la hay, tormenta solar), control de voz y botón **Demo** |
+| **Aviso de comunicación** | Aparece cuando Higia se comunicó con otros (alerta sin respuesta o pedido de ayuda): a quién avisó y, en vivo, si ya respondió |
+| **Acceso a Higia** | Botón flotante en todas las secciones: estado de la escucha, última respuesta, escribir o dictar |
 | **Franja de alerta** | Aparece cuando una alerta espera "Estoy bien": título, cuenta regresiva, botón **Estoy bien** y **Ver detalle**. Se ve en cualquier sección y nada la tapa |
 | **Navegación** | Barra lateral en escritorio, solo íconos en pantallas medianas, barra inferior en el celular. Mensajes muestra cuántos hay nuevos |
 
@@ -109,9 +117,11 @@ La interfaz separa **lo que ve el astronauta** de **los controles de la demo**.
 
 | Sección | Para qué sirve |
 |---|---|
+| **Higia** (inicio) | El asistente: estado rápido (salud, alertas, última comunicación), botón **Pedir ayuda**, conversación con lo que Higia hizo en cada respuesta, micrófono y el interruptor **Escuchar «Higia»** |
 | **Resumen** | Figura anatómica del cuerpo, lista de lo que **requiere atención** (avisos y alertas activos, de más grave a menos) y lista de **sistemas del cuerpo**, que se despliega para ver el detalle. La lista y la figura están sincronizadas |
 | **Mensajes** | Todo lo que Higia comunicó. Filtros: Todos, Alertas, Retenidos, Escalados. Cada mensaje muestra nivel, canal, si es privado, retenido o recordatorio, a quién se reportó y la guía paso a paso si corresponde. **"Por qué este mensaje"** abre el canal elegido, la base científica, el dato técnico y la comparación entre los tres astronautas |
-| **Asistente** | Chat con Higia por voz o texto. Sugerencias para empezar, micrófono, modo **manos libres** e indicación de si respondió la IA o el intérprete local |
+| **Comunicaciones** | Quién está al alcance ahora y todo lo que Higia envió a otros: emergencias y mensajes, automáticos o pedidos al asistente, estado (enviado, en cola, respondió), retardo con Tierra, el texto enviado y la respuesta |
+| **Perfil** | Ficha del astronauta e **historia clínica previa** editable: edad, sexo, grupo sanguíneo, alergias, antecedentes (asociables a un sistema del cuerpo), medicación, cirugías, antecedentes familiares y notas |
 | **Entorno** | El contexto actual en fichas: ubicación y destino, actividad, clima espacial, hora, a quién se puede avisar y canales de salida. Debajo, la **cámara** |
 | **Reportes** | Historial de **escaladas** (a quién se avisó y por qué) y envíos a **sistemas médicos**: estado del enlace, cola, enviados y el registro FHIR de cada uno |
 
@@ -133,7 +143,7 @@ El navegador recuerda si el panel quedó abierto.
 
 ### Navegación y atajos
 
-- Cada sección tiene su dirección (`#/resumen`, `#/mensajes`, `#/asistente`, `#/entorno`, `#/reportes`): funciona el botón "atrás" y se puede compartir un enlace directo. El título de la pestaña cambia con la sección.
+- Cada sección tiene su dirección (`#/asistente`, `#/resumen`, `#/mensajes`, `#/comunicaciones`, `#/perfil`, `#/entorno`, `#/reportes`); sin dirección se abre el asistente: funciona el botón "atrás" y se puede compartir un enlace directo. El título de la pestaña cambia con la sección.
 
 | Tecla | Acción |
 |---|---|
@@ -220,14 +230,16 @@ Para ahorrar energía, cuando llega una lectura **solo se evalúan las reglas qu
 ### 5. Confirmación y escalada
 
 - Toda **alerta** pide confirmación: aparece la franja roja con **"Estoy bien"** y una cuenta regresiva, y el mismo botón dentro del mensaje.
-- Si el astronauta no responde a tiempo, Higia **avisa a otros**: a los 30 s en general, o a los **15 s** si el riesgo puede dejarlo sin capacidad de pedir ayuda (hipoxia, presión muy baja, pulso extremo).
+- Si el astronauta no responde a tiempo, Higia **se comunica con otros**: a los 30 s en general, o a los **15 s** si el riesgo puede dejarlo sin capacidad de pedir ayuda (hipoxia, presión muy baja, pulso extremo). A 10 s del plazo lo advierte por voz, para que pueda responder "Higia, estoy bien".
+- Cada destinatario recibe un mensaje con qué pasó, dónde está el astronauta, sus otros hallazgos activos y su **historia clínica** (edad, grupo sanguíneo, alergias, antecedentes, medicación).
 - Destinos, del más cercano al más lejano, según lo que esté disponible:
   1. Compañero cercano (radio de proximidad)
   2. Médico de a bordo (si lo hay y si el astronauta no es el médico)
   3. Base más cercana (con conexión al hábitat)
   4. Control en Tierra (con conexión, indicando el retardo según el destino)
   5. Si no hay nadie al alcance: **baliza de emergencia**, que se reintenta al recuperar enlace
-- La escalada siempre interrumpe, por voz si hay auricular, y queda registrada en **Reportes**.
+- La escalada siempre interrumpe, por voz si hay auricular. Aparece el **aviso de comunicación** (a quién se avisó y su respuesta, en vivo) y queda registrada en **Comunicaciones** y **Reportes**. Sin enlace, el mensaje queda en cola y sale al reconectar.
+- El astronauta también puede pedir ayuda en cualquier momento: botón **Pedir ayuda** o "Higia, pide ayuda".
 
 ### 6. Personalización por perfil
 
@@ -275,7 +287,27 @@ Los mensajes retenidos se entregan solos cuando cambia el contexto (al despertar
   - **Sin médico ni conexión** → "avisa a un compañero"; el reporte espera en la cola hasta reconectar.
 - **Guía paso a paso:** sin médico a bordo, quien no tiene formación médica recibe una guía numerada en las alertas de hipoxia, presión, pulso y estrés.
 
-### 9. Asistente: conversación natural con IA híbrida
+### 9. Asistente: la base de la app
+
+**Se activa al oír su nombre.** Con **Escuchar «Higia»** encendido (por defecto), Higia escucha de forma continua pero solo actúa cuando la nombran al principio de la frase: "Higia, pide ayuda", "Oye Higia, ¿cómo estoy?". Si solo se dice "Higia", espera la frase siguiente (8 s). Mientras Higia habla no se escucha a sí misma. El botón del micrófono permite dictar una frase sin decir el nombre.
+
+**Puede hacer cosas, no solo responder:**
+
+| Pedido (ejemplo) | Qué hace |
+|---|---|
+| "Higia, pide ayuda" / "necesito ayuda, llama a la base" | Avisa de inmediato a todos los que están al alcance (o al destino nombrado) y deja una alerta. Sin IA también funciona |
+| "Dile a Tierra que terminé la reparación" / "avísale a Kai que voy para allá" | Envía el mensaje; si no hay enlace, queda en cola y sale al reconectar |
+| "Me duele el pecho" / "estoy mareado" | Emite una alerta o un aviso nuevo en el sistema del cuerpo que corresponde (se ve en la figura y en Mensajes) |
+| "Higia, estoy bien" | Responde a las alertas que esperan confirmación y cancela el aviso a otros |
+| "Abre mi historia clínica", "muéstrame el corazón", "silencia la voz" | Navega y controla la app |
+| "Salgo a EVA", "empiezo a entrenar" | Actualiza el contexto |
+| "Soy alérgico al látex" | Lo agrega a la historia clínica |
+
+Lo urgente (pedir ayuda, "estoy bien", un síntoma grave) lo ejecuta primero el intérprete local, sin esperar a la IA ni depender de la red. La IA solo puede pedir acciones de una lista cerrada, y la app valida cada una antes de ejecutarla.
+
+**Comunicación con otros tras falta de respuesta:** cuando una alerta espera "Estoy bien", a 10 s del plazo Higia lo advierte por voz ("En 10 segundos aviso a…"). Si no hay respuesta, envía a cada destinatario qué pasó, dónde está el astronauta, sus otros hallazgos y su historia clínica (alergias, antecedentes, medicación). El aviso global muestra a quién se comunicó y sus respuestas (simuladas en la demo).
+
+#### Conversación con IA híbrida
 
 | Situación | Quién responde | Qué entiende |
 |---|---|---|
@@ -284,7 +316,7 @@ Los mensajes retenidos se entregan solos cuando cambia el contexto (al despertar
 
 - La IA recibe el estado actual (perfil, contexto, hallazgos, últimas lecturas) **sin el nombre del astronauta**. Se le indica no diagnosticar ni inventar datos, y tratar con tacto los temas privados.
 - Recuerda los últimos 6 intercambios de la conversación.
-- **Manos libres:** después de cada respuesta hablada, el micrófono se vuelve a abrir solo. Si el astronauta habla mientras Higia habla, la interrumpe.
+- La IA también recibe la historia clínica previa (sin nombre) y el estado de la app (sección, alertas pendientes, comunicaciones, a quién se puede avisar) para poder controlarla.
 - Cada respuesta indica si vino de la IA o del intérprete local y, si la IA falló, por qué.
 - **Evaluaciones con IA:** cada hallazgo nuevo (aviso, alerta o información) recibe en **Mensajes** una "Evaluación de Higia · IA": qué significa en el contexto actual, cómo se relaciona con el resto del estado y el siguiente paso. El mensaje del motor local sale al instante; la evaluación llega después, así la seguridad nunca espera a la red. No se evalúan escaladas ni recordatorios.
 
@@ -383,7 +415,8 @@ app/
 │       ├── navegacion.ts      Secciones y direcciones (#/…)
 │       ├── iconos.tsx         Íconos SVG
 │       ├── componentes/       Barra superior, navegación, franja de alerta, panel de demo, piezas básicas
-│       ├── vistas/            Resumen, Mensajes, Asistente, Entorno, Reportes
+│       ├── asistente.ts       Estado del asistente: conversación y escucha por «Higia»
+│       ├── vistas/            Higia, Resumen, Mensajes, Comunicaciones, Perfil, Entorno, Reportes
 │       ├── FiguraCorporal.tsx      Figura anatómica 2D (SVG)
 │       └── estilos.css        Sistema de diseño
 ```
@@ -430,6 +463,7 @@ app/
 | "IA inactiva" | No hay clave configurada | Crear `app/.env.local` (o `app/.env`) con `DEEPSEEK_API_KEY` y reiniciar `npm run dev` |
 | El asistente dice "IA no disponible (…)" | Error de la API (clave inválida, límite de uso, sin internet) | El mensaje indica el motivo; mientras tanto responde el intérprete local |
 | No aparece el botón del micrófono | El navegador no tiene reconocimiento de voz | Usar Chrome |
+| "Sin micrófono" / Higia no responde a su nombre | Permiso de micrófono denegado o escucha apagada | Permitir el micrófono para `localhost` y encender **Escuchar «Higia»** en la sección Higia |
 | No se escucha la voz | Voz silenciada o volumen en 0 | Revisar el control de voz de la barra superior |
 | "No se pudo acceder a la cámara" | Permiso denegado en el navegador | Habilitar la cámara para `localhost` en la configuración del navegador |
 | La IA no funciona después de `npm run build` | El build estático no incluye el servidor de IA | Usar `npm run dev` para la demo con IA |

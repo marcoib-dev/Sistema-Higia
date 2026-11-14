@@ -43,18 +43,22 @@ export function peticionEvaluacion(m: Mensaje, n: NucleoSalud): PeticionEvaluaci
   };
 }
 
-/** Arma la foto del estado para la IA. Sin el nombre del astronauta (privacidad). */
-export function estadoParaIA(n: NucleoSalud): EstadoParaIA {
-  const { formacionMedica, experiencia, toleranciaEstres, propensoPanico } = n.perfil;
+/**
+ * Arma la foto del estado para la IA. Sin el nombre del astronauta (privacidad).
+ * `app` agrega lo que el asistente necesita para controlar la app (sección, alertas, comunicaciones…).
+ */
+export function estadoParaIA(n: NucleoSalud, app?: EstadoParaIA['app']): EstadoParaIA {
+  const { formacionMedica, experiencia, toleranciaEstres, propensoPanico, historiaClinica } = n.perfil;
   const ultimasLecturas: Record<string, number> = {};
   for (const s of ['frecuenciaCardiaca', 'presionSistolica', 'presionDiastolica', 'spo2', 'horasSueno', 'animo', 'estres', 'minutosEjercicio', 'dosisRadiacion'] as const) {
     const l = n.historial.ultima(s);
     if (l) ultimasLecturas[s] = l.valor;
   }
   return {
-    perfil: { formacionMedica, experiencia, toleranciaEstres, propensoPanico },
+    perfil: { formacionMedica, experiencia, toleranciaEstres, propensoPanico, historiaClinica },
     contexto: { ...n.contexto },
     hallazgos: n.hallazgosActuales().map((h) => ({ titulo: h.titulo, nivel: h.nivel, detalle: h.detalleTecnico, sensible: h.sensible })),
     ultimasLecturas,
+    app,
   };
 }

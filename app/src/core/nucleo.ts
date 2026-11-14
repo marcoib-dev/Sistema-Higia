@@ -6,10 +6,22 @@
 import { elegirCanal } from './canales';
 import { Historial } from './historial';
 import { intervaloRecordatorioMs, redactar } from './personalizador';
+import type { DestinoPedido } from './acciones';
 import {
-  ORDEN_NIVEL, RETARDO_TIERRA, SISTEMAS,
-  type Contexto, type EstadoCorporal, type Hallazgo, type Lectura, type Mensaje, type Nivel, type Perfil, type Regla,
+  NOMBRE_DESTINO_COMUNICACION, NOMBRE_SISTEMA, ORDEN_NIVEL, RETARDO_TIERRA, SISTEMAS, resumenClinico,
+  type Comunicacion, type Contexto, type DestinoComunicacion, type EstadoCorporal, type Hallazgo, type Lectura,
+  type Mensaje, type Nivel, type Perfil, type Regla, type SistemaCorporal,
 } from './tipos';
+
+/** Cómo llega una comunicación a su destino con el contexto actual. */
+interface Ruteo {
+  destino: DestinoComunicacion;
+  destinatario: string;
+  estado: 'enviado' | 'enCola';
+  retardo?: string;
+}
+
+const UBICACION_TEXTO: Record<Contexto['ubicacion'], string> = { habitat: 'en el hábitat', eva: 'en EVA (fuera del hábitat)', rover: 'en el rover' };
 
 /** Tiempo para responder "Estoy bien" antes de escalar (cortos para la demo). */
 export const PLAZO_CONFIRMACION_MS = 30_000;
@@ -22,7 +34,10 @@ export class NucleoSalud {
   private diferidos: Mensaje[] = [];
   private pendientesReporte: Hallazgo[] = [];
   private porConfirmar = new Map<string, { mensaje: Mensaje; vence: number }>();
+  private comunicacionesEnviadas: Comunicacion[] = [];
   private seq = 0;
+  /** Nombres de los compañeros de tripulación (para dirigir las comunicaciones). */
+  companeros: string[] = [];
 
   constructor(
     private readonly reglas: Regla[],
@@ -92,13 +107,84 @@ export class NucleoSalud {
 
   /** A quién se puede avisar ahora mismo, del más cercano al más lejano. */
   destinosEscalamiento(): string[] {
+    return this.disponibles().map((r) => (r.retardo ? `${r.destinatario} (retardo de ${r.retardo})` : r.destinatario));
+  }
+
+  // ── Comunicaciones con otros ─────────────────────────────────────────
+
+  /** Todo lo que Higia envió a otras personas, del más nuevo al más viejo. */
+  comunicaciones(): Comunicacion[] {
+    return [...this.comunicacionesEnviadas].reverse();
+  }
+
+  /** Marca que un destinatario respondió (lo usa el simulador de la tripulación o la red real). */
+  registrarRespuesta(id: string, texto: string, ahora = Date.now()): Comunicacion | undefined {
+    const c = this.comunicacionesEnviadas.find((x) => x.id === id);
+    if (!c) return undefined;
+    c.estado = 'respondido';
+    c.respuesta = { texto, timestamp: ahora };
+    return c;
+  }
+
+  /** Al recuperar enlace, lo que estaba en cola sale. Devuelve lo que se envió. */
+  reintentarCola(): Comunicacion[] {
+    const enviadas: Comunicacion[] = [];
+    for (const c of this.comunicacionesEnviadas) {
+      if (c.estado !== 'enCola') continue;
+      const r = this.rutear(c.destino);
+      if (r.estado === 'enviado') {
+        c.estado = 'enviado';
+        c.retardo = r.retardo;
+        enviadas.push(c);
+      }
+    }
+    return enviadas;
+  }
+
+  /** Mensaje informativo a otra persona, a pedido del astronauta. */
+  enviarMensaje(destino: DestinoPedido, texto: string, ahora = Date.now()): Comunicacion[] {
+    return this.comunicar(destino, {
+      origen: 'asistente', tipo: 'nota', asunto: `Mensaje de ${this.perfil.nombre}`, texto,
+    }, ahora);
+  }
+
+  /**
+   * El astronauta pide ayuda (por voz o texto). Es una emergencia: se avisa de inmediato
+   * a quien corresponda y queda un mensaje de alerta en la app.
+   */
+  pedirAyuda(destino: DestinoPedido, motivo: string, ahora = Date.now()): Mensaje {
     const c = this.contexto;
-    const d: string[] = [];
-    if (c.companeroCercano) d.push('Compañero cercano (radio de proximidad)');
-    if (c.medicoABordo && this.perfil.formacionMedica !== 'medico') d.push('Médico de a bordo');
-    if (c.conexionHabitat) d.push('Base más cercana');
-    if (c.conexionTierra) d.push(`Control en Tierra (retardo de ${RETARDO_TIERRA[c.destino]})`);
-    return d;
+    const texto = `${this.perfil.nombre} pide ayuda ${UBICACION_TEXTO[c.ubicacion]}. Motivo: ${motivo} ` +
+      `Situación de salud: ${this.situacionActual()} Historia clínica: ${resumenClinico(this.perfil.historiaClinica)}.`;
+    const enviadas = this.comunicar(destino, { origen: 'asistente', tipo: 'emergencia', asunto: 'Pedido de ayuda', texto }, ahora);
+    const h: Hallazgo = {
+      riesgoId: 'asistente.ayuda', sistema: 'cuerpo', nivel: 'alerta', titulo: 'Pedido de ayuda',
+      resumenSimple: motivo, detalleTecnico: motivo, accion: 'Mantente en un lugar seguro: la ayuda está avisada.',
+      ruta: 'autogestion', sensible: false, fuente: 'Pedido del astronauta al asistente', timestamp: ahora,
+    };
+    return this.mensajeComunicacion(h, enviadas, 'Pedido del astronauta al asistente.', 'asistente', ahora);
+  }
+
+  /**
+   * Alerta o aviso surgido de la conversación (un síntoma, un malestar, un riesgo que el astronauta cuenta).
+   * Entra al mismo flujo que un hallazgo de sensores: figura del cuerpo, canal, confirmación y escalada.
+   */
+  alertaDesdeConversacion(
+    d: { nivel: Exclude<Nivel, 'normal'>; sistema: SistemaCorporal; titulo: string; detalle: string },
+    ahora = Date.now(),
+  ): Mensaje[] {
+    const accion = d.nivel === 'alerta'
+      ? 'Detén lo que estás haciendo y ponte en un lugar seguro. Si no respondes, Higia avisará a otros.'
+      : 'Higia lo seguirá de cerca; cuéntale si empeora.';
+    const h: Hallazgo = {
+      riesgoId: `conversacion.${d.sistema}`, sistema: d.sistema, nivel: d.nivel, titulo: d.titulo,
+      resumenSimple: d.detalle, detalleTecnico: `${d.detalle} (reportado por el astronauta)`, accion,
+      ruta: d.nivel === 'info' ? 'autogestion' : 'reporte', sensible: d.sistema === 'cerebro',
+      fuente: 'Reporte del astronauta en la conversación', timestamp: ahora,
+    };
+    this.hallazgos.set(h.riesgoId, h);
+    const m = this.procesarHallazgo(h, ahora);
+    return m ? [m] : [];
   }
 
   // ── Consultas de estado ──────────────────────────────────────────────
@@ -139,41 +225,134 @@ export class NucleoSalud {
       const h = regla.evaluar(this.historial, this.perfil, ahora, this.contexto);
       if (!h) continue;
       this.hallazgos.set(h.riesgoId, h);
-
-      const previo = this.emitido.get(h.riesgoId);
-      // Primer dato y todo normal: no hay nada que decir.
-      if (!previo && h.nivel === 'normal') {
-        this.emitido.set(h.riesgoId, { nivel: h.nivel, en: ahora });
-        continue;
-      }
-
-      // Modo proactivo: se habla solo si cambió el nivel… o si toca recordatorio según el perfil.
-      let esRecordatorio = false;
-      if (previo && previo.nivel === h.nivel) {
-        const intervalo = intervaloRecordatorioMs(this.perfil);
-        const toca = intervalo !== null && ORDEN_NIVEL[h.nivel] >= ORDEN_NIVEL.aviso && ahora - previo.en >= intervalo;
-        if (!toca) continue;
-        esRecordatorio = true;
-      }
-
-      this.emitido.set(h.riesgoId, { nivel: h.nivel, en: ahora });
-      // Si el riesgo cambió de nivel, la alerta anterior ya no espera confirmación.
-      for (const [id, p] of this.porConfirmar) if (p.mensaje.hallazgo.riesgoId === h.riesgoId) this.porConfirmar.delete(id);
-
-      const m = this.construirMensaje(h, ahora, esRecordatorio);
-      if (m.diferido) {
-        this.diferidos = [...this.diferidos.filter((d) => d.hallazgo.riesgoId !== h.riesgoId), m];
-      }
-      if (m.requiereConfirmacion) {
-        const plazo = h.posibleIncapacidad ? PLAZO_CONFIRMACION_INCAPACIDAD_MS : PLAZO_CONFIRMACION_MS;
-        this.porConfirmar.set(m.id, { mensaje: m, vence: ahora + plazo });
-      }
-      if (h.ruta === 'reporte' && ORDEN_NIVEL[h.nivel] >= ORDEN_NIVEL.aviso && !esRecordatorio) {
-        this.pendientesReporte.push(h);
-      }
-      salida.push(m);
+      const m = this.procesarHallazgo(h, ahora);
+      if (m) salida.push(m);
     }
     return salida.sort((a, b) => ORDEN_NIVEL[b.hallazgo.nivel] - ORDEN_NIVEL[a.hallazgo.nivel]);
+  }
+
+  /** Decide si un hallazgo amerita mensaje y lo prepara (confirmación, reporte, retención). */
+  private procesarHallazgo(h: Hallazgo, ahora: number): Mensaje | null {
+    const previo = this.emitido.get(h.riesgoId);
+    // Primer dato y todo normal: no hay nada que decir.
+    if (!previo && h.nivel === 'normal') {
+      this.emitido.set(h.riesgoId, { nivel: h.nivel, en: ahora });
+      return null;
+    }
+
+    // Modo proactivo: se habla solo si cambió el nivel… o si toca recordatorio según el perfil.
+    let esRecordatorio = false;
+    if (previo && previo.nivel === h.nivel && !h.riesgoId.startsWith('conversacion.')) {
+      const intervalo = intervaloRecordatorioMs(this.perfil);
+      const toca = intervalo !== null && ORDEN_NIVEL[h.nivel] >= ORDEN_NIVEL.aviso && ahora - previo.en >= intervalo;
+      if (!toca) return null;
+      esRecordatorio = true;
+    }
+
+    this.emitido.set(h.riesgoId, { nivel: h.nivel, en: ahora });
+    // Si el riesgo cambió de nivel, la alerta anterior ya no espera confirmación.
+    for (const [id, p] of this.porConfirmar) if (p.mensaje.hallazgo.riesgoId === h.riesgoId) this.porConfirmar.delete(id);
+
+    const m = this.construirMensaje(h, ahora, esRecordatorio);
+    if (m.diferido) {
+      this.diferidos = [...this.diferidos.filter((d) => d.hallazgo.riesgoId !== h.riesgoId), m];
+    }
+    if (m.requiereConfirmacion) {
+      const plazo = h.posibleIncapacidad ? PLAZO_CONFIRMACION_INCAPACIDAD_MS : PLAZO_CONFIRMACION_MS;
+      this.porConfirmar.set(m.id, { mensaje: m, vence: ahora + plazo });
+    }
+    if (h.ruta === 'reporte' && ORDEN_NIVEL[h.nivel] >= ORDEN_NIVEL.aviso && !esRecordatorio) {
+      this.pendientesReporte.push(h);
+    }
+    return m;
+  }
+
+  /** Cómo llegar a un destino con el contexto actual (directo, por la red del hábitat o en cola). */
+  private rutear(destino: DestinoComunicacion): Ruteo {
+    const c = this.contexto;
+    const companero = this.companeros[0];
+    switch (destino) {
+      case 'companero': {
+        const nombre = companero ? `${companero}, compañero cercano` : NOMBRE_DESTINO_COMUNICACION.companero;
+        if (c.companeroCercano) return { destino, destinatario: `${nombre} (radio de proximidad)`, estado: 'enviado' };
+        if (c.conexionHabitat) return { destino, destinatario: `${nombre} (por la red del hábitat)`, estado: 'enviado' };
+        return { destino, destinatario: nombre, estado: 'enCola' };
+      }
+      case 'medico':
+        if (c.medicoABordo && this.perfil.formacionMedica !== 'medico') return { destino, destinatario: NOMBRE_DESTINO_COMUNICACION.medico, estado: 'enviado' };
+        // Sin médico a bordo, el pedido médico va al equipo de la base o a Tierra.
+        if (c.conexionHabitat) return { destino: 'base', destinatario: 'Equipo médico de la base', estado: 'enviado' };
+        if (c.conexionTierra) return { destino: 'tierra', destinatario: 'Cirujano de vuelo en Tierra', estado: 'enviado', retardo: RETARDO_TIERRA[c.destino] };
+        return { destino: 'base', destinatario: 'Equipo médico de la base', estado: 'enCola' };
+      case 'base':
+        return { destino, destinatario: NOMBRE_DESTINO_COMUNICACION.base, estado: c.conexionHabitat ? 'enviado' : 'enCola' };
+      case 'tierra':
+        return { destino, destinatario: NOMBRE_DESTINO_COMUNICACION.tierra, estado: c.conexionTierra ? 'enviado' : 'enCola', retardo: RETARDO_TIERRA[c.destino] };
+      case 'baliza':
+        return { destino, destinatario: NOMBRE_DESTINO_COMUNICACION.baliza, estado: 'enviado' };
+    }
+  }
+
+  /** Destinos alcanzables ahora mismo, del más cercano al más lejano. */
+  private disponibles(): Ruteo[] {
+    const c = this.contexto;
+    const r: Ruteo[] = [];
+    if (c.companeroCercano) r.push(this.rutear('companero'));
+    if (c.medicoABordo && this.perfil.formacionMedica !== 'medico') r.push(this.rutear('medico'));
+    if (c.conexionHabitat) r.push(this.rutear('base'));
+    if (c.conexionTierra) r.push(this.rutear('tierra'));
+    return r;
+  }
+
+  /** Crea y guarda las comunicaciones hacia un destino (o hacia todos los disponibles). */
+  private comunicar(
+    destino: DestinoPedido | 'disponibles',
+    datos: Pick<Comunicacion, 'origen' | 'tipo' | 'asunto' | 'texto'>,
+    ahora: number,
+  ): Comunicacion[] {
+    let rutas: Ruteo[];
+    if (destino === 'todos' || destino === 'disponibles') {
+      rutas = this.disponibles();
+      // Nadie al alcance: en una emergencia se activa la baliza; una nota espera al compañero.
+      if (!rutas.length) rutas = [this.rutear(datos.tipo === 'emergencia' ? 'baliza' : 'companero')];
+    } else {
+      rutas = [this.rutear(destino)];
+    }
+    const nuevas = rutas.map((r): Comunicacion => ({
+      id: `c${++this.seq}`, destino: r.destino, destinatario: r.destinatario, estado: r.estado, retardo: r.retardo,
+      ...datos, timestamp: ahora,
+    }));
+    this.comunicacionesEnviadas.push(...nuevas);
+    return nuevas;
+  }
+
+  /** Resumen de una línea de los hallazgos activos, para quien recibe una comunicación. */
+  private situacionActual(): string {
+    const activos = [...this.hallazgos.values()]
+      .filter((h) => ORDEN_NIVEL[h.nivel] >= ORDEN_NIVEL.aviso)
+      .sort((a, b) => ORDEN_NIVEL[b.nivel] - ORDEN_NIVEL[a.nivel]);
+    return activos.length ? `${activos.map((h) => `${h.titulo} (${h.detalleTecnico})`).join('; ')}.` : 'sin hallazgos activos.';
+  }
+
+  /** Mensaje en la app que deja constancia de una comunicación de emergencia. */
+  private mensajeComunicacion(h: Hallazgo, enviadas: Comunicacion[], motivo: string, origen: 'escalada' | 'asistente', ahora: number): Mensaje {
+    const enCola = enviadas.filter((c) => c.estado === 'enCola');
+    const destinos = enviadas.map((c) => c.destinatario);
+    const prefijo = origen === 'asistente' ? 'Pedí ayuda' : `No respondiste a la alerta "${h.titulo}". Avisé`;
+    let texto = enviadas.some((c) => c.destino === 'baliza')
+      ? `${origen === 'asistente' ? 'Pedí ayuda' : `No respondiste a la alerta "${h.titulo}".`} No hay nadie al alcance: baliza de emergencia activada; se reintentará al recuperar enlace.`
+      : `${prefijo} a: ${destinos.join(', ')}.`;
+    if (enCola.length && !enviadas.some((c) => c.destino === 'baliza')) texto += ` Sin enlace con ${enCola.map((c) => c.destinatario).join(', ')}: sale al reconectar.`;
+
+    // La comunicación siempre interrumpe: por voz si hay auricular, si no por la pantalla disponible.
+    const c = this.contexto;
+    const canal = c.auricular ? 'auricular' : c.pantallaHabitat && c.ubicacion === 'habitat' ? 'pantallaHabitat' : 'pantallaPersonal';
+    return {
+      id: `m${++this.seq}`, hallazgo: h, texto, canal, voz: true, interrumpir: true, diferido: false,
+      motivo, esRecordatorio: false, requiereConfirmacion: false,
+      escalamiento: { destinos, motivo, origen, comunicaciones: enviadas.map((x) => x.id) },
+      timestamp: ahora,
+    };
   }
 
   /** A quién va un reporte que requiere evaluación externa. */
@@ -204,25 +383,21 @@ export class NucleoSalud {
     };
   }
 
+  /**
+   * Alerta sin respuesta: Higia se comunica con otros. Cada destinatario recibe un mensaje con
+   * qué pasó, dónde está el astronauta, sus datos actuales y su historia clínica (alergias, antecedentes).
+   */
   private escalar(h: Hallazgo, ahora: number): Mensaje {
-    const destinos = this.destinosEscalamiento();
     const motivo = h.posibleIncapacidad
       ? 'Alerta crítica sin respuesta: el astronauta podría no estar en condiciones de pedir ayuda.'
       : 'Alerta sin respuesta dentro del plazo.';
     if (!this.pendientesReporte.includes(h)) this.pendientesReporte.push(h);
 
-    const texto = destinos.length
-      ? `No respondiste a la alerta "${h.titulo}". Avisé a: ${destinos.join(', ')}.`
-      : `No respondiste a la alerta "${h.titulo}". No hay nadie al alcance: baliza de emergencia activada; se reintentará al recuperar enlace.`;
-
-    // La escalada siempre interrumpe: por voz si hay auricular, si no por la pantalla disponible.
     const c = this.contexto;
-    const canal = c.auricular ? 'auricular' : c.pantallaHabitat && c.ubicacion === 'habitat' ? 'pantallaHabitat' : 'pantallaPersonal';
-    return {
-      id: `m${++this.seq}`, hallazgo: h, texto, canal, voz: true, interrumpir: true, diferido: false,
-      motivo, esRecordatorio: false, requiereConfirmacion: false,
-      escalamiento: { destinos: destinos.length ? destinos : ['Baliza de emergencia'], motivo },
-      timestamp: ahora,
-    };
+    const texto = `${this.perfil.nombre} no respondió a una alerta de ${NOMBRE_SISTEMA[h.sistema].toLowerCase()}: ${h.titulo} (${h.detalleTecnico}). ` +
+      `Está ${UBICACION_TEXTO[c.ubicacion]}. ${h.posibleIncapacidad ? 'Podría no estar en condiciones de responder. ' : ''}` +
+      `Otros hallazgos: ${this.situacionActual()} Historia clínica: ${resumenClinico(this.perfil.historiaClinica)}.`;
+    const enviadas = this.comunicar('disponibles', { origen: 'escalada', tipo: 'emergencia', asunto: `Alerta sin respuesta: ${h.titulo}`, texto }, ahora);
+    return this.mensajeComunicacion(h, enviadas, motivo, 'escalada', ahora);
   }
 }

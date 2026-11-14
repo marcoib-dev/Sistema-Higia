@@ -1,6 +1,8 @@
 /** Estructura de la app: barra superior, navegación y aviso global de alerta. */
 import { useEffect, useRef } from 'react';
-import type { Contexto, Mensaje } from '../../core/tipos';
+import type { EstadoEscucha } from '../../adaptadores/voz/voz';
+import type { Comunicacion, Contexto, Mensaje } from '../../core/tipos';
+import { TEXTO_ESCUCHA } from '../asistente';
 import { NOMBRE_DESTINO } from '../../core/tipos';
 import { Icono } from '../iconos';
 import { SECCIONES, type Seccion } from '../navegacion';
@@ -13,13 +15,14 @@ interface PropsBarra {
   nombreAstronauta: string;
   iaActiva: boolean;
   iaConfigurada: boolean;
+  escucha: EstadoEscucha;
   vozActiva: boolean;
   onVozActiva: (v: boolean) => void;
   demoAbierta: boolean;
   onDemo: () => void;
 }
 
-export function BarraSuperior({ contexto: c, nombreAstronauta, iaActiva, iaConfigurada, vozActiva, onVozActiva, demoAbierta, onDemo }: PropsBarra) {
+export function BarraSuperior({ contexto: c, nombreAstronauta, iaActiva, iaConfigurada, escucha, vozActiva, onVozActiva, demoAbierta, onDemo }: PropsBarra) {
   return (
     <header className="barra-superior">
       <div className="marca">
@@ -35,6 +38,10 @@ export function BarraSuperior({ contexto: c, nombreAstronauta, iaActiva, iaConfi
         <li className={iaActiva ? 'ia' : ''} title={iaActiva ? 'IA activa (DeepSeek)' : iaConfigurada ? 'IA configurada' : 'IA no configurada: falta DEEPSEEK_API_KEY'}>
           <Icono nombre="ia" tamano={16} />
           <span className="indicador-texto">{iaActiva ? 'IA activa' : 'IA inactiva'}</span>
+        </li>
+        <li className={`escucha-${escucha}`} title={TEXTO_ESCUCHA[escucha]}>
+          <Icono nombre="microfono" tamano={16} />
+          <span className="indicador-texto">{escucha === 'llamado' ? 'Te escucho' : escucha === 'esperando' ? '«Higia»' : escucha === 'error' ? 'Sin micrófono' : 'Escucha apagada'}</span>
         </li>
         <li title="Astronauta">
           <Icono nombre="usuario" tamano={16} />{nombreAstronauta}
@@ -125,6 +132,41 @@ export function BannerAlerta({ pendientes, ahora, onConfirmar, onVer }: PropsBan
         <Icono nombre="check" /> Estoy bien
       </button>
       <button className="boton boton-fantasma" onClick={onVer}>Ver detalle</button>
+    </div>
+  );
+}
+
+const ESTADO_COMUNICACION: Record<Comunicacion['estado'], string> = { enviado: 'Enviado', enCola: 'En cola', respondido: 'Respondió' };
+
+interface PropsComunicacion {
+  mensaje: Mensaje;
+  comunicaciones: Comunicacion[];
+  onVer: () => void;
+  onCerrar: () => void;
+}
+
+/**
+ * Aviso global de comunicación con otros: aparece cuando Higia avisó a alguien (alerta sin respuesta
+ * o pedido de ayuda) y muestra, en vivo, a quién y si ya respondió.
+ */
+export function BannerComunicacion({ mensaje, comunicaciones, onVer, onCerrar }: PropsComunicacion) {
+  const porEscalada = mensaje.escalamiento?.origen !== 'asistente';
+  return (
+    <div className="banner-comunicacion" role="status" aria-live="polite">
+      <Icono nombre="escalado" tamano={22} />
+      <div className="banner-texto">
+        <strong>{porEscalada ? `Sin respuesta a «${mensaje.hallazgo.titulo}»: Higia avisó a otros` : 'Pedido de ayuda enviado'}</strong>
+        <ul className="banner-destinos">
+          {comunicaciones.map((x) => (
+            <li key={x.id} className={`com-${x.estado}`}>
+              <span className="com-destino">{x.destinatario}</span>
+              <span className="com-estado">{x.respuesta ? x.respuesta.texto : ESTADO_COMUNICACION[x.estado]}{x.retardo && x.estado === 'enviado' ? ` · retardo ${x.retardo}` : ''}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <button className="boton boton-fantasma" onClick={onVer}>Ver comunicaciones</button>
+      <button className="boton-icono" onClick={onCerrar} aria-label="Cerrar aviso"><Icono nombre="cerrar" /></button>
     </div>
   );
 }

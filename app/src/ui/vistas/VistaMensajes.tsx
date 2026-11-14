@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { PERFILES } from '../../adaptadores/simulador/perfiles';
 import { redactar } from '../../core/personalizador';
-import type { Contexto, Mensaje } from '../../core/tipos';
+import { antecedentesDe, type Contexto, type HistoriaClinica, type Mensaje } from '../../core/tipos';
 import { CANAL, EncabezadoSeccion, Etiqueta, InsigniaNivel, sinTitulo, Vacio } from '../componentes/basicos';
 import { Icono } from '../iconos';
 
@@ -26,11 +26,12 @@ interface Props {
   pendientes: Map<string, number>;
   ahora: number;
   contexto: Contexto;
+  historia: HistoriaClinica;
   onConfirmar: (id: string) => void;
   onAbrirDemo: () => void;
 }
 
-export function VistaMensajes({ mensajes, evaluaciones, pendientes, ahora, contexto, onConfirmar, onAbrirDemo }: Props) {
+export function VistaMensajes({ mensajes, evaluaciones, pendientes, ahora, contexto, historia, onConfirmar, onAbrirDemo }: Props) {
   const [filtro, setFiltro] = useState<Filtro>('todos');
   const visibles = mensajes.filter(FILTROS.find((f) => f.id === filtro)!.aplica);
 
@@ -55,7 +56,7 @@ export function VistaMensajes({ mensajes, evaluaciones, pendientes, ahora, conte
       ) : (
         <ol className="lista-mensajes">
           {visibles.map((m) => (
-            <TarjetaMensaje key={m.id} mensaje={m} evaluacion={evaluaciones[m.id]} vence={pendientes.get(m.id)} ahora={ahora} contexto={contexto} onConfirmar={onConfirmar} />
+            <TarjetaMensaje key={m.id} mensaje={m} historia={historia} evaluacion={evaluaciones[m.id]} vence={pendientes.get(m.id)} ahora={ahora} contexto={contexto} onConfirmar={onConfirmar} />
           ))}
         </ol>
       )}
@@ -63,8 +64,8 @@ export function VistaMensajes({ mensajes, evaluaciones, pendientes, ahora, conte
   );
 }
 
-function TarjetaMensaje({ mensaje: m, evaluacion, vence, ahora, contexto, onConfirmar }: {
-  mensaje: Mensaje; evaluacion?: EvaluacionMensaje; vence?: number; ahora: number; contexto: Contexto; onConfirmar: (id: string) => void;
+function TarjetaMensaje({ mensaje: m, historia, evaluacion, vence, ahora, contexto, onConfirmar }: {
+  mensaje: Mensaje; historia: HistoriaClinica; evaluacion?: EvaluacionMensaje; vence?: number; ahora: number; contexto: Contexto; onConfirmar: (id: string) => void;
 }) {
   const canal = CANAL[m.canal];
   const segundos = vence ? Math.max(0, Math.ceil((vence - ahora) / 1000)) : 0;
@@ -78,6 +79,12 @@ function TarjetaMensaje({ mensaje: m, evaluacion, vence, ahora, contexto, onConf
       </div>
 
       <p className="mensaje-texto">{sinTitulo(m.texto, m.hallazgo.titulo)}</p>
+
+      {antecedentesDe(historia, m.hallazgo.sistema).length > 0 && !m.escalamiento && (
+        <p className="mensaje-antecedente">
+          <Icono nombre="documento" tamano={16} /> Antecedente relevante: {antecedentesDe(historia, m.hallazgo.sistema).map((a) => a.nombre).join(', ')}
+        </p>
+      )}
 
       <div className="mensaje-etiquetas">
         <Etiqueta icono={canal.icono}>{canal.nombre}</Etiqueta>

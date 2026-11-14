@@ -1,20 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { analizarEntornoIA, consultarEstadoIA, conversarIA, estadoParaIA, evaluarIA, peticionEvaluacion } from '../adaptadores/ia/cliente';
-import type { EstadoIA, RespuestaConversacion, TurnoConversacion } from '../adaptadores/ia/contrato';
+import type { EstadoIA, EstadoParaIA, RespuestaConversacion, TurnoConversacion } from '../adaptadores/ia/contrato';
 import { AdaptadorEjemplo } from '../adaptadores/interop/ejemploNasa';
-import type { Escenario } from '../adaptadores/simulador/escenarios';
+import { ESCENARIOS, type Escenario } from '../adaptadores/simulador/escenarios';
 import { PERFILES } from '../adaptadores/simulador/perfiles';
+import { respuestaSimulada } from '../adaptadores/simulador/tripulacion';
 import { detener, hablar } from '../adaptadores/voz/voz';
+import type { Accion } from '../core/acciones';
 import { interpretar } from '../core/conversacion';
 import { NucleoSalud } from '../core/nucleo';
 import { REGLAS } from '../core/reglas';
-import type { Contexto, Lectura, Mensaje, SistemaCorporal } from '../core/tipos';
-import { BannerAlerta, BarraSuperior, Navegacion } from './componentes/Estructura';
+import { NOMBRE_SISTEMA, type Comunicacion, type Contexto, type HistoriaClinica, type Lectura, type Mensaje, type Perfil, type SistemaCorporal } from '../core/tipos';
+import { useAsistente, type ResultadoConversacion } from './asistente';
+import { AccesoHigia } from './componentes/AccesoHigia';
+import { BannerAlerta, BannerComunicacion, BarraSuperior, Navegacion } from './componentes/Estructura';
 import { PanelDemo } from './componentes/PanelDemo';
 import { SECCIONES, useSeccion } from './navegacion';
-import { VistaAsistente, type Intercambio, type ResultadoConversacion } from './vistas/VistaAsistente';
+import { VistaAsistente } from './vistas/VistaAsistente';
+import { VistaComunicaciones } from './vistas/VistaComunicaciones';
 import { VistaEntorno } from './vistas/VistaEntorno';
 import { VistaMensajes, type EvaluacionMensaje } from './vistas/VistaMensajes';
+import { VistaPerfil } from './vistas/VistaPerfil';
 import { VistaReportes } from './vistas/VistaReportes';
 import { VistaResumen } from './vistas/VistaResumen';
 
@@ -25,30 +31,54 @@ const CONTEXTO_INICIAL: Contexto = {
   conexionHabitat: false, conexionTierra: false,
 };
 
+/** Segundos antes de escalar en que Higia avisa por voz que va a comunicarse con otros. */
+const PREAVISO_ESCALADA_MS = 10_000;
+
 const CLAVE_DEMO = 'higia.panelDemo';
 const leerDemo = () => { try { return localStorage.getItem(CLAVE_DEMO) === 'abierto'; } catch { return false; } };
 const guardarDemo = (v: boolean) => { try { localStorage.setItem(CLAVE_DEMO, v ? 'abierto' : 'cerrado'); } catch { /* sin almacenamiento */ } };
+
+// La historia clínica editada se guarda en este dispositivo, por astronauta.
+const claveHistoria = (id: string) => `higia.historia.${id}`;
+const conHistoriaGuardada = (p: Perfil): Perfil => {
+  try {
+    const h = localStorage.getItem(claveHistoria(p.id));
+    return h ? { ...p, historiaClinica: { ...p.historiaClinica, ...(JSON.parse(h) as Partial<HistoriaClinica>) } } : p;
+  } catch { return p; }
+};
+const guardarHistoria = (id: string, h: HistoriaClinica) => { try { localStorage.setItem(claveHistoria(id), JSON.stringify(h)); } catch { /* sin almacenamiento */ } };
 
 const escribiendo = (e: KeyboardEvent) => {
   const t = e.target as HTMLElement | null;
   return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
 };
 
+const normal = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+/** Acciones que no esperan a la IA: la seguridad no depende de la red. */
+const esUrgente = (a: Accion) => a.tipo === 'pedir_ayuda' || a.tipo === 'confirmar_bien' || (a.tipo === 'emitir_alerta' && a.nivel === 'alerta');
+
 export function App() {
-  const [nucleo] = useState(() => new NucleoSalud(REGLAS, PERFILES[0], CONTEXTO_INICIAL));
+  const [nucleo] = useState(() => {
+    const n = new NucleoSalud(REGLAS, conHistoriaGuardada(PERFILES[0]), CONTEXTO_INICIAL);
+    n.companeros = PERFILES.filter((p) => p.id !== PERFILES[0].id).map((p) => p.nombre);
+    return n;
+  });
   const [interop] = useState(() => new AdaptadorEjemplo());
   const [seccion, ir] = useSeccion();
   const [, setVersion] = useState(0);
   const [ahora, setAhora] = useState(Date.now());
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   const [vistoHasta, setVistoHasta] = useState(0);
-  const [chat, setChat] = useState<Intercambio[]>([]);
   const [seleccion, setSeleccion] = useState<SistemaCorporal[] | null>(null);
   const [vozActiva, setVozActiva] = useState(true);
   const [demoAbierta, setDemoAbierta] = useState(leerDemo);
   const [ia, setIa] = useState<EstadoIA>({ configurada: false, modelo: '' });
   const [evaluaciones, setEvaluaciones] = useState<Record<string, EvaluacionMensaje>>({});
+  /** Comunicación de emergencia a destacar en el aviso global (hasta que se cierre). */
+  const [avisoComunicacion, setAvisoComunicacion] = useState<{ mensaje: Mensaje; ids: string[] } | null>(null);
   const turnos = useRef<TurnoConversacion[]>([]);
+  const preavisados = useRef(new Set<string>());
   const vozRef = useRef(vozActiva);
   vozRef.current = vozActiva;
 
@@ -63,7 +93,7 @@ export function App() {
 
   // Título de la pestaña según la sección.
   useEffect(() => {
-    document.title = `${SECCIONES.find((s) => s.id === seccion)!.nombre} · Higia`;
+    document.title = seccion === 'asistente' ? 'Higia · Asistente' : `${SECCIONES.find((s) => s.id === seccion)!.nombre} · Higia`;
     if (seccion === 'mensajes') setVistoHasta(Date.now());
   }, [seccion, mensajes.length]);
 
@@ -105,23 +135,52 @@ export function App() {
     }
   }, [nucleo]);
 
+  /** Simula la respuesta de cada destinatario (en la realidad llega por radio o por la red del hábitat). */
+  const programarRespuestas = useCallback((coms: Comunicacion[]) => {
+    for (const com of coms) {
+      const r = respuestaSimulada(com, nucleo.companeros[0]);
+      if (!r) continue;
+      setTimeout(() => {
+        nucleo.registrarRespuesta(com.id, r.texto);
+        if (vozRef.current && com.tipo === 'emergencia') hablar(r.texto);
+        setVersion((v) => v + 1);
+      }, r.enMs);
+    }
+  }, [nucleo]);
+
   const procesar = useCallback(async (nuevos: Mensaje[]) => {
     if (vozRef.current) nuevos.filter((m) => m.voz).forEach((m) => hablar(m.texto));
     if (nuevos.length) setMensajes((prev) => [...nuevos, ...prev].slice(0, 100));
+    // Una comunicación de emergencia (escalada o pedido de ayuda) se destaca en toda la app.
+    const comunicado = nuevos.find((m) => m.escalamiento?.comunicaciones?.length);
+    if (comunicado) {
+      const ids = comunicado.escalamiento!.comunicaciones!;
+      setAvisoComunicacion({ mensaje: comunicado, ids });
+      programarRespuestas(nucleo.comunicaciones().filter((x) => ids.includes(x.id)));
+    }
     evaluarConIA(nuevos);
     // La capa de interoperabilidad solo actúa con conexión; si no, el núcleo sigue solo.
     if (nucleo.contexto.conexionHabitat && nucleo.hayPendientesReporte()) {
       await interop.enviar(nucleo.tomarPendientesReporte(), nucleo.perfil);
     }
     refrescar();
-  }, [nucleo, interop, evaluarConIA]);
+  }, [nucleo, interop, evaluarConIA, programarRespuestas]);
 
-  // Cada segundo: confirmaciones vencidas (escalada). Cada minuto: recordatorios.
+  // Cada segundo: preaviso y escalada de alertas sin respuesta. Cada minuto: recordatorios.
   useEffect(() => {
     let segundos = 0;
     const id = setInterval(() => {
       const t = Date.now();
       setAhora(t);
+      // Alerta de comunicación: antes de avisar a otros, Higia lo dice para que el astronauta pueda responder.
+      for (const [mid, vence] of nucleo.confirmacionesPendientes()) {
+        if (vence - t <= PREAVISO_ESCALADA_MS && !preavisados.current.has(mid)) {
+          preavisados.current.add(mid);
+          const destinos = nucleo.destinosEscalamiento();
+          const a = destinos.length ? `aviso a ${destinos.length === 1 ? destinos[0].replace(/ \(.*\)$/, '') : 'otros'}` : 'activo la baliza de emergencia';
+          if (vozRef.current) hablar(`No respondiste. En ${Math.round((vence - t) / 1000)} segundos ${a}. Di «Higia, estoy bien» si estás bien.`);
+        }
+      }
       const nuevos = nucleo.verificarConfirmaciones(t);
       if (++segundos % 60 === 0) nuevos.push(...nucleo.tick(t));
       if (nuevos.length) void procesar(nuevos);
@@ -129,7 +188,11 @@ export function App() {
     return () => clearInterval(id);
   }, [nucleo, procesar]);
 
-  const cambiarContexto = (cambios: Partial<Contexto>) => void procesar(nucleo.actualizarContexto(cambios));
+  const cambiarContexto = (cambios: Partial<Contexto>) => {
+    void procesar(nucleo.actualizarContexto(cambios));
+    // Al recuperar enlace, sale lo que estaba en cola.
+    if (cambios.conexionHabitat || cambios.conexionTierra || cambios.companeroCercano) programarRespuestas(nucleo.reintentarCola());
+  };
 
   const ejecutarEscenario = (e: Escenario) => {
     const deContexto = e.contexto ? nucleo.actualizarContexto(e.contexto) : [];
@@ -138,13 +201,117 @@ export function App() {
   };
 
   const cambiarPerfil = (id: string) => {
-    nucleo.cambiarPerfil(PERFILES.find((p) => p.id === id)!);
+    nucleo.cambiarPerfil(conHistoriaGuardada(PERFILES.find((p) => p.id === id)!));
+    nucleo.companeros = PERFILES.filter((p) => p.id !== id).map((p) => p.nombre);
     refrescar();
+  };
+
+  const cambiarHistoria = (h: HistoriaClinica) => {
+    nucleo.cambiarPerfil({ ...nucleo.perfil, historiaClinica: h });
+    guardarHistoria(nucleo.perfil.id, h);
+    refrescar();
+  };
+
+  const restablecerHistoria = () => {
+    try { localStorage.removeItem(claveHistoria(nucleo.perfil.id)); } catch { /* sin almacenamiento */ }
+    cambiarPerfil(nucleo.perfil.id);
   };
 
   const confirmar = (id: string) => {
     nucleo.confirmar(id);
     refrescar();
+  };
+
+  const pedirAyuda = (motivo = 'Pedido manual desde la app.') => void procesar([nucleo.pedirAyuda('todos', motivo)]);
+
+  /** Ejecuta lo que pidió el asistente. Devuelve, para cada acción, qué se hizo (se muestra en el chat). */
+  const ejecutarAcciones = (acciones: Accion[]): string[] => {
+    const hechos: string[] = [];
+    for (const a of acciones) {
+      switch (a.tipo) {
+        case 'pedir_ayuda': {
+          const m = nucleo.pedirAyuda(a.destino, a.motivo);
+          void procesar([{ ...m, voz: false }]); // la respuesta del asistente ya lo dice en voz alta
+          hechos.push(`Pedí ayuda a: ${m.escalamiento!.destinos.join(', ')}`);
+          break;
+        }
+        case 'enviar_mensaje': {
+          const coms = nucleo.enviarMensaje(a.destino, a.mensaje);
+          programarRespuestas(coms);
+          hechos.push(...coms.map((x) => `${x.estado === 'enCola' ? 'En cola para' : 'Mensaje enviado a'} ${x.destinatario}`));
+          refrescar();
+          break;
+        }
+        case 'emitir_alerta': {
+          const ms = nucleo.alertaDesdeConversacion(a);
+          void procesar(ms.map((m) => ({ ...m, voz: false })));
+          hechos.push(`${a.nivel === 'alerta' ? 'Alerta' : a.nivel === 'aviso' ? 'Aviso' : 'Nota'} registrada: ${a.titulo} (${NOMBRE_SISTEMA[a.sistema]})`);
+          break;
+        }
+        case 'confirmar_bien': {
+          const pendientes = [...nucleo.confirmacionesPendientes().keys()];
+          pendientes.forEach((id) => nucleo.confirmar(id));
+          if (pendientes.length) hechos.push(`Confirmé que estás bien (${pendientes.length} alerta${pendientes.length > 1 ? 's' : ''})`);
+          refrescar();
+          break;
+        }
+        case 'ir_a':
+          ir(a.seccion);
+          hechos.push(`Abrí ${SECCIONES.find((s) => s.id === a.seccion)!.nombre}`);
+          break;
+        case 'mostrar_sistema':
+          setSeleccion([a.sistema]);
+          ir('resumen');
+          hechos.push(`Mostré ${NOMBRE_SISTEMA[a.sistema]}`);
+          break;
+        case 'cambiar_contexto': {
+          const cambios: Partial<Contexto> = {};
+          if (a.ubicacion) cambios.ubicacion = a.ubicacion;
+          if (a.actividad) cambios.actividad = a.actividad;
+          cambiarContexto(cambios);
+          hechos.push('Actualicé el contexto');
+          break;
+        }
+        case 'voz':
+          if (a.estado === 'silenciar') { setVozActiva(false); detener(); hechos.push('Voz silenciada'); }
+          else if (a.estado === 'activar') { setVozActiva(true); hechos.push('Voz activada'); }
+          else { detener(); }
+          break;
+        case 'actualizar_historia': {
+          const h = nucleo.perfil.historiaClinica;
+          const nueva: HistoriaClinica = a.campo === 'antecedentes'
+            ? { ...h, antecedentes: [...h.antecedentes, { nombre: a.valor }] }
+            : { ...h, [a.campo]: [...h[a.campo], a.valor] };
+          cambiarHistoria(nueva);
+          hechos.push(`Historia clínica: agregué "${a.valor}"`);
+          break;
+        }
+        case 'ejecutar_escenario': {
+          const e = ESCENARIOS.find((x) => x.id === a.escenario || normal(x.nombre) === normal(a.escenario));
+          if (e) { ejecutarEscenario(e); hechos.push(`Escenario de la demo: ${e.nombre}`); }
+          break;
+        }
+        case 'cambiar_astronauta': {
+          const p = PERFILES.find((x) => x.id === a.astronauta || normal(x.nombre).includes(normal(a.astronauta)));
+          if (p) { cambiarPerfil(p.id); hechos.push(`Astronauta: ${p.nombre}`); }
+          break;
+        }
+      }
+    }
+    return hechos;
+  };
+
+  /** Lo que el asistente necesita saber de la app para controlarla. */
+  const estadoApp = (): EstadoParaIA['app'] => {
+    const vencimientos = nucleo.confirmacionesPendientes();
+    return {
+      seccion,
+      alertasEsperandoRespuesta: mensajes.filter((m) => vencimientos.has(m.id)).map((m) => m.hallazgo.titulo),
+      comunicacionesRecientes: nucleo.comunicaciones().slice(0, 5).map((x) => ({ destinatario: x.destinatario, asunto: x.asunto, estado: x.estado })),
+      destinosDisponibles: nucleo.destinosEscalamiento(),
+      escenariosDemo: ESCENARIOS.map((e) => ({ id: e.id, nombre: e.nombre })),
+      astronautasDemo: PERFILES.map((p) => ({ id: p.id, nombre: p.nombre, actual: p.id === nucleo.perfil.id })),
+    };
   };
 
   /** Convierte lo que la IA extrajo de la conversación en lecturas del núcleo. */
@@ -159,44 +326,66 @@ export function App() {
   };
 
   const conversar = async (frase: string): Promise<ResultadoConversacion> => {
+    // Seguridad primero: lo urgente que entiende el intérprete local (pedir ayuda, "estoy bien",
+    // un síntoma grave) se ejecuta ya, sin esperar a la IA ni depender de la red.
+    const local = interpretar(frase, nucleo);
+    const urgentes = local.acciones.filter(esUrgente);
+    const hechos = ejecutarAcciones(urgentes);
+    const yaHecha = (a: Accion) => urgentes.some((u) => u.tipo === a.tipo && (a.tipo !== 'emitir_alerta' || (u.tipo === 'emitir_alerta' && u.sistema === a.sistema)));
+
     let resultado: ResultadoConversacion;
     let lecturas: Lectura[];
     try {
       if (!iaActiva) throw new Error('');
-      const r = await conversarIA({ frase, historial: turnos.current, estado: estadoParaIA(nucleo) });
+      const r = await conversarIA({ frase, historial: turnos.current, estado: estadoParaIA(nucleo, estadoApp()) });
       lecturas = lecturasDesdeIA(r);
-      resultado = { texto: r.respuesta, fuente: 'ia' };
+      hechos.push(...ejecutarAcciones(r.acciones.filter((a) => !yaHecha(a))));
+      resultado = { texto: r.respuesta, fuente: 'ia', hechos };
     } catch (e) {
       // Autonomía primero: sin IA, responde el intérprete local.
-      const local = interpretar(frase, nucleo);
       lecturas = local.lecturas;
+      hechos.push(...ejecutarAcciones(local.acciones.filter((a) => !esUrgente(a))));
       const motivo = e instanceof Error && e.message ? `IA no disponible (${e.message}). ` : '';
-      resultado = { texto: local.texto, fuente: 'local', nota: motivo ? `${motivo}Respondió el intérprete local.` : undefined };
+      resultado = { texto: local.texto, fuente: 'local', hechos, nota: motivo ? `${motivo}Respondió el intérprete local.` : undefined };
     }
     turnos.current = [...turnos.current, { rol: 'astronauta' as const, texto: frase }, { rol: 'higia' as const, texto: resultado.texto }].slice(-12);
-    setChat((prev) => [{ id: Date.now(), pregunta: frase, respuesta: resultado.texto, fuente: resultado.fuente, nota: resultado.nota }, ...prev].slice(0, 30));
-    void procesar(lecturas.length ? nucleo.registrar(lecturas) : []);
+    if (lecturas.length) void procesar(nucleo.registrar(lecturas));
     return resultado;
   };
+
+  const asistente = useAsistente(conversar, vozActiva);
 
   const vencimientos = nucleo.confirmacionesPendientes();
   const pendientes = mensajes.filter((m) => vencimientos.has(m.id)).map((m) => ({ mensaje: m, vence: vencimientos.get(m.id)! }));
   const nuevos = seccion === 'mensajes' ? 0 : mensajes.filter((m) => m.timestamp > vistoHasta && !m.diferido).length;
   const escaladas = mensajes.filter((m) => m.escalamiento);
+  const comunicaciones = nucleo.comunicaciones();
 
   return (
     <div className={`app ${demoAbierta ? 'con-demo' : ''}`}>
       <a href="#contenido" className="saltar">Saltar al contenido</a>
       <BarraSuperior
         contexto={c} nombreAstronauta={nucleo.perfil.nombre} iaActiva={iaActiva} iaConfigurada={ia.configurada}
-        vozActiva={vozActiva} onVozActiva={setVozActiva} demoAbierta={demoAbierta} onDemo={() => alternarDemo()}
+        escucha={asistente.estadoEscucha} vozActiva={vozActiva} onVozActiva={setVozActiva} demoAbierta={demoAbierta} onDemo={() => alternarDemo()}
       />
       <BannerAlerta pendientes={pendientes} ahora={ahora} onConfirmar={confirmar} onVer={() => ir('mensajes')} />
+      {avisoComunicacion && (
+        <BannerComunicacion
+          mensaje={avisoComunicacion.mensaje} comunicaciones={comunicaciones.filter((x) => avisoComunicacion.ids.includes(x.id))}
+          onVer={() => ir('comunicaciones')} onCerrar={() => setAvisoComunicacion(null)}
+        />
+      )}
 
       <div className="cuerpo">
-        <Navegacion seccion={seccion} onIr={ir} contadores={{ mensajes: nuevos, reportes: 0 }} />
+        <Navegacion seccion={seccion} onIr={ir} contadores={{ mensajes: nuevos }} />
 
         <main id="contenido" className="contenido" tabIndex={-1}>
+          {seccion === 'asistente' && (
+            <VistaAsistente
+              asistente={asistente} iaActiva={iaActiva} perfil={nucleo.perfil} hallazgos={nucleo.hallazgosActuales()}
+              alertasPendientes={pendientes.length} comunicaciones={comunicaciones} onIr={ir} onPedirAyuda={() => pedirAyuda()}
+            />
+          )}
           {seccion === 'resumen' && (
             <VistaResumen
               perfil={nucleo.perfil} contexto={c} estado={nucleo.estadoCorporal()} hallazgos={nucleo.hallazgosActuales()}
@@ -204,9 +393,17 @@ export function App() {
             />
           )}
           {seccion === 'mensajes' && (
-            <VistaMensajes mensajes={mensajes} evaluaciones={evaluaciones} pendientes={vencimientos} ahora={ahora} contexto={c} onConfirmar={confirmar} onAbrirDemo={() => alternarDemo(true)} />
+            <VistaMensajes
+              mensajes={mensajes} evaluaciones={evaluaciones} pendientes={vencimientos} ahora={ahora} contexto={c}
+              historia={nucleo.perfil.historiaClinica} onConfirmar={confirmar} onAbrirDemo={() => alternarDemo(true)}
+            />
           )}
-          {seccion === 'asistente' && <VistaAsistente historial={chat} vozActiva={vozActiva} iaActiva={iaActiva} onFrase={conversar} />}
+          {seccion === 'comunicaciones' && (
+            <VistaComunicaciones comunicaciones={comunicaciones} destinos={nucleo.destinosEscalamiento()} onPedirAyuda={() => pedirAyuda()} />
+          )}
+          {seccion === 'perfil' && (
+            <VistaPerfil perfil={nucleo.perfil} onHistoria={cambiarHistoria} onRestablecer={restablecerHistoria} />
+          )}
           {seccion === 'entorno' && (
             <VistaEntorno
               contexto={c} iaActiva={iaActiva} onAplicar={cambiarContexto} onAbrirDemo={() => alternarDemo(true)}
@@ -218,6 +415,8 @@ export function App() {
           )}
         </main>
       </div>
+
+      {seccion !== 'asistente' && <AccesoHigia asistente={asistente} onAbrir={() => ir('asistente')} />}
 
       <PanelDemo
         abierto={demoAbierta} onCerrar={() => alternarDemo(false)} perfil={nucleo.perfil} contexto={c}

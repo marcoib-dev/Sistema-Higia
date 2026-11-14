@@ -1,5 +1,5 @@
 import { redactar } from '../../core/personalizador';
-import { NOMBRE_SISTEMA, ORDEN_NIVEL, SISTEMAS, type Contexto, type EstadoCorporal, type Hallazgo, type Perfil, type SistemaCorporal } from '../../core/tipos';
+import { antecedentesDe, NOMBRE_SISTEMA, ORDEN_NIVEL, SISTEMAS, type Contexto, type EstadoCorporal, type Hallazgo, type Perfil, type SistemaCorporal } from '../../core/tipos';
 import { EncabezadoSeccion, InsigniaNivel, NOMBRE_NIVEL, Punto, sinTitulo } from '../componentes/basicos';
 import { FiguraCorporal } from '../FiguraCorporal';
 import { Icono } from '../iconos';
@@ -80,6 +80,9 @@ export function VistaResumen({ perfil, contexto, estado, hallazgos, seleccion, o
                         {propios.length
                           ? propios.map((h) => <p key={h.riesgoId}><strong>{h.titulo}.</strong> {sinTitulo(redactar(h, perfil, contexto), h.titulo)}</p>)
                           : <p className="texto-suave">Sin sensores que reporten sobre este sistema todavía.</p>}
+                        {antecedentesDe(perfil.historiaClinica, s).map((a) => (
+                          <p key={a.nombre} className="mensaje-antecedente"><Icono nombre="documento" tamano={14} /> Antecedente: {a.nombre}{a.detalle ? ` (${a.detalle})` : ''}</p>
+                        ))}
                       </div>
                     )}
                   </li>

@@ -1,7 +1,8 @@
 /**
  * Contrato entre la app y el servidor de IA (app/server). Solo tipos y listas: lo importan los dos lados.
  */
-import type { Actividad, Destino, Nivel, Ubicacion } from '../../core/tipos';
+import type { Accion } from '../../core/acciones';
+import type { Actividad, Destino, HistoriaClinica, Nivel, Ubicacion } from '../../core/tipos';
 
 /** Datos que el astronauta puede reportar hablando y que la IA puede extraer. */
 export const SENSORES_CONVERSACION = ['horasSueno', 'animo', 'minutosEjercicioRealizados'] as const;
@@ -14,10 +15,23 @@ export interface TurnoConversacion {
 
 /** Foto del estado que se envía a la IA. Nunca incluye el nombre del astronauta. */
 export interface EstadoParaIA {
-  perfil: { formacionMedica: string; experiencia: string; toleranciaEstres: string; propensoPanico: boolean };
+  perfil: {
+    formacionMedica: string; experiencia: string; toleranciaEstres: string; propensoPanico: boolean;
+    /** Historia clínica previa a la misión (sin nombre). */
+    historiaClinica: HistoriaClinica;
+  };
   contexto: Record<string, unknown>;
   hallazgos: { titulo: string; nivel: Nivel; detalle: string; sensible: boolean }[];
   ultimasLecturas: Record<string, number>;
+  /** Estado de la app, para que el asistente pueda controlarla. */
+  app?: {
+    seccion: string;
+    alertasEsperandoRespuesta: string[];
+    comunicacionesRecientes: { destinatario: string; asunto: string; estado: string }[];
+    destinosDisponibles: string[];
+    escenariosDemo: { id: string; nombre: string }[];
+    astronautasDemo: { id: string; nombre: string; actual: boolean }[];
+  };
 }
 
 export interface PeticionConversacion {
@@ -29,6 +43,8 @@ export interface PeticionConversacion {
 export interface RespuestaConversacion {
   respuesta: string;
   lecturas: { sensor: SensorConversacion; valor: number }[];
+  /** Acciones que el asistente pide ejecutar en la app (ya validadas). */
+  acciones: Accion[];
 }
 
 export interface PeticionEntorno {

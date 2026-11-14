@@ -64,6 +64,77 @@ export interface Perfil {
   lineaBase: Partial<Record<TipoSensor, number>>;
   /** Horas (0–24) del horario de sueño. */
   horarioSueno: { inicio: number; fin: number };
+  /** Historia clínica previa a la misión: la usan la IA, las evaluaciones y las comunicaciones de emergencia. */
+  historiaClinica: HistoriaClinica;
+}
+
+// ── Historia clínica previa ─────────────────────────────────────────────
+/** Antecedente médico, opcionalmente asociado a un sistema del cuerpo (para destacarlo en sus hallazgos). */
+export interface Antecedente {
+  nombre: string;
+  sistema?: SistemaCorporal;
+  detalle?: string;
+}
+
+export interface HistoriaClinica {
+  edad: number;
+  sexo: 'femenino' | 'masculino' | 'otro';
+  grupoSanguineo: string;
+  alergias: string[];
+  /** Condiciones crónicas o previas relevantes. */
+  antecedentes: Antecedente[];
+  medicacion: string[];
+  cirugias: string[];
+  antecedentesFamiliares: string[];
+  /** Vacunas o aptitudes médicas relevantes para la misión. */
+  notas: string[];
+}
+
+/** Antecedentes de la historia clínica que tocan un sistema del cuerpo. */
+export function antecedentesDe(h: HistoriaClinica, sistema: SistemaCorporal): Antecedente[] {
+  return h.antecedentes.filter((a) => a.sistema === sistema);
+}
+
+/** Resumen de una línea para comunicaciones de emergencia (lo que un rescatista necesita saber primero). */
+export function resumenClinico(h: HistoriaClinica): string {
+  const partes = [
+    `${h.edad} años`,
+    `grupo ${h.grupoSanguineo}`,
+    `alergias: ${h.alergias.length ? h.alergias.join(', ') : 'ninguna conocida'}`,
+  ];
+  if (h.antecedentes.length) partes.push(`antecedentes: ${h.antecedentes.map((a) => a.nombre).join(', ')}`);
+  if (h.medicacion.length) partes.push(`medicación: ${h.medicacion.join(', ')}`);
+  return partes.join(' · ');
+}
+
+// ── Comunicaciones con otros ────────────────────────────────────────────
+export type DestinoComunicacion = 'companero' | 'medico' | 'base' | 'tierra' | 'baliza';
+
+export const NOMBRE_DESTINO_COMUNICACION: Record<DestinoComunicacion, string> = {
+  companero: 'Compañero cercano', medico: 'Médico de a bordo', base: 'Base más cercana',
+  tierra: 'Control en Tierra', baliza: 'Baliza de emergencia',
+};
+
+/**
+ * Un mensaje que Higia envía a otra persona: por una escalada (alerta sin respuesta)
+ * o porque el astronauta se lo pidió al asistente ("pide ayuda", "avísale a Tierra que…").
+ */
+export interface Comunicacion {
+  id: string;
+  destino: DestinoComunicacion;
+  /** Nombre visible del destinatario (p. ej. "Kai Tanaka (compañero cercano)"). */
+  destinatario: string;
+  origen: 'escalada' | 'asistente';
+  /** Una emergencia pide ayuda; una nota solo informa. */
+  tipo: 'emergencia' | 'nota';
+  asunto: string;
+  texto: string;
+  /** enviado: salió; enCola: sin enlace, sale al reconectar; respondido: hubo respuesta. */
+  estado: 'enviado' | 'enCola' | 'respondido';
+  /** Retardo de la comunicación, si aplica (Tierra). */
+  retardo?: string;
+  respuesta?: { texto: string; timestamp: number };
+  timestamp: number;
 }
 
 // ── Contexto: dónde está, qué hace y qué hay disponible ─────────────────
@@ -159,7 +230,7 @@ export interface Mensaje {
   /** Las alertas piden confirmación ("Estoy bien"); si no llega a tiempo, se escala. */
   requiereConfirmacion: boolean;
   /** Presente si este mensaje es una escalada por falta de respuesta. */
-  escalamiento?: { destinos: string[]; motivo: string };
+  escalamiento?: { destinos: string[]; motivo: string; origen?: 'escalada' | 'asistente'; comunicaciones?: string[] };
   timestamp: number;
 }
 

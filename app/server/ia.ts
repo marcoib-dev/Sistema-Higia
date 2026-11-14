@@ -6,6 +6,7 @@
  * La clave de API vive en el servidor (app/.env o app/.env.local) y nunca llega al navegador.
  */
 import * as z from 'zod';
+import { validarAcciones } from '../src/core/acciones';
 import {
   SENSORES_CONVERSACION,
   type AnalisisEntorno, type EvaluacionIA, type PeticionConversacion, type PeticionEntorno, type PeticionEvaluacion,
@@ -160,16 +161,51 @@ Cómo responder:
 - Si hay una alerta activa, prioriza la acción de seguridad por encima de cualquier otra conversación.
 - Los hallazgos marcados como sensibles (ánimo, estrés) se tratan con tacto.
 - Si te habla de algo ajeno a su salud, responde brevemente y con amabilidad.
+- Ten en cuenta su historia clínica previa (alergias, antecedentes, medicación) que llega en <estado>.perfil.historiaClinica. Nunca recomiendes algo a lo que es alérgico.
 
 Registro de datos: si el astronauta menciona un dato que puede registrarse (horas dormidas, ánimo del 1 al 10, minutos de ejercicio que acaba de hacer), inclúyelo en "lecturas". Si no menciona ninguno, deja "lecturas" vacía. No conviertas impresiones vagas en números: "dormí mal" no es un número de horas.
 
+Acciones: eres el centro de la app y puedes controlarla. Si la frase lo pide, incluye en "acciones" lo que hay que hacer (si no, deja "acciones" vacía). Tu "respuesta" debe decir lo que hiciste.
+- pedir_ayuda {destino, motivo}: el astronauta pide ayuda o describe una emergencia ("pide ayuda", "necesito a alguien", "me siento muy mal"). destino: "companero" | "medico" | "base" | "tierra" | "todos" (si no dice a quién, "todos"). Avisa de inmediato a otros y crea una alerta.
+- enviar_mensaje {destino, mensaje}: quiere hablar con otro astronauta o mandar un mensaje que no es emergencia ("dile a Tierra que terminé la reparación", "avísale a Kai que voy para allá"). "mensaje" es lo que hay que transmitir, redactado en tercera persona si hace falta.
+- emitir_alerta {nivel, sistema, titulo, detalle}: cuenta un síntoma o un riesgo nuevo que los sensores no ven (dolor de pecho, falta de aire, mareo, golpe, visión borrosa…). nivel: "info" | "aviso" | "alerta" ("alerta" solo si es grave o urgente). sistema: "cerebro" | "ojos" | "oidoInterno" | "corazon" | "pulmones" | "inmune" | "intestino" | "huesos" | "musculos" | "piernas" | "metabolismo" | "cuerpo". Si es grave y además pide ayuda, usa también pedir_ayuda.
+- confirmar_bien {}: dice que está bien en respuesta a una alerta que espera respuesta (ver <estado>.app.alertasEsperandoRespuesta).
+- ir_a {seccion}: quiere ver una parte de la app. seccion: "asistente" | "resumen" | "mensajes" | "comunicaciones" | "perfil" (historia clínica) | "entorno" | "reportes".
+- mostrar_sistema {sistema}: quiere ver un sistema del cuerpo en la figura.
+- cambiar_contexto {ubicacion?, actividad?}: cuenta que cambió lo que hace ("salgo a EVA", "empiezo a entrenar"). ubicacion: "habitat" | "eva" | "rover"; actividad: "reposo" | "trabajo" | "ejercicio".
+- voz {estado}: "silenciar" | "activar" | "detener".
+- actualizar_historia {campo, valor}: cuenta un dato médico propio para su historia clínica ("soy alérgico al látex", "empecé a tomar…"). campo: "alergias" | "medicacion" | "antecedentes" | "notas".
+- ejecutar_escenario {escenario} y cambiar_astronauta {astronauta}: solo si lo pide explícitamente para la demo; usa los id de <estado>.app.
+Nunca inventes una emergencia: pedir_ayuda y emitir_alerta solo cuando la frase lo justifica.
+
 Formato de salida: entrega la respuesta llamando a la herramienta "responder", con esta forma:
-{"respuesta": "texto que se le dirá al astronauta", "lecturas": [{"sensor": "horasSueno", "valor": 5}]}
+{"respuesta": "texto que se le dirá al astronauta", "lecturas": [{"sensor": "horasSueno", "valor": 5}], "acciones": [{"tipo": "pedir_ayuda", "destino": "todos", "motivo": "Dolor fuerte en el pecho"}]}
 Valores permitidos para "sensor": ${SENSORES_CONVERSACION.map((s) => `"${s}"`).join(', ')}.`;
+
+/** Acción del asistente. Esquema plano (más fácil para el modelo); la validación estricta la hace validarAcciones. */
+const EsquemaAccion = z.object({
+  tipo: z.string().describe('pedir_ayuda | enviar_mensaje | emitir_alerta | confirmar_bien | ir_a | mostrar_sistema | cambiar_contexto | voz | actualizar_historia | ejecutar_escenario | cambiar_astronauta'),
+  destino: z.string().optional().describe('companero | medico | base | tierra | todos'),
+  motivo: z.string().optional(),
+  mensaje: z.string().optional(),
+  nivel: z.string().optional().describe('info | aviso | alerta'),
+  sistema: z.string().optional(),
+  titulo: z.string().optional(),
+  detalle: z.string().optional(),
+  seccion: z.string().optional(),
+  ubicacion: z.string().optional(),
+  actividad: z.string().optional(),
+  estado: z.string().optional().describe('silenciar | activar | detener'),
+  campo: z.string().optional().describe('alergias | medicacion | antecedentes | notas'),
+  valor: z.string().optional(),
+  escenario: z.string().optional(),
+  astronauta: z.string().optional(),
+});
 
 const EsquemaConversacion = z.object({
   respuesta: z.string(),
   lecturas: z.array(z.object({ sensor: z.enum(SENSORES_CONVERSACION), valor: z.number() })).default([]),
+  acciones: z.array(EsquemaAccion).default([]),
 });
 
 export async function conversar(p: PeticionConversacion): Promise<RespuestaConversacion> {
@@ -179,11 +215,13 @@ export async function conversar(p: PeticionConversacion): Promise<RespuestaConve
   }));
   while (historial.length && historial[0].role !== 'user') historial.shift(); // la conversación debe empezar por el usuario
 
-  return pedirJSON([
+  const r = await pedirJSON([
     { role: 'system', content: SISTEMA_CONVERSACION },
     ...historial,
     { role: 'user', content: `<estado>\n${JSON.stringify(p.estado)}\n</estado>\n\n${p.frase}` },
   ], EsquemaConversacion, 'responder');
+  // La app solo ejecuta acciones válidas: lo que el modelo invente o escriba mal se descarta.
+  return { ...r, acciones: validarAcciones(r.acciones) };
 }
 
 // ── Evaluación de hallazgos ─────────────────────────────────────────────
@@ -192,6 +230,7 @@ const SISTEMA_EVALUACION = `Eres Higia, el sistema de monitoreo de salud de un h
 
 Cómo evaluar:
 - Considera el hallazgo junto con el resto del estado que llega en <estado>: otros hallazgos, últimas lecturas, contexto (ubicación, actividad, destino, clima espacial, hora, si hay médico o compañero cerca) y perfil.
+- Considera la historia clínica previa (<estado>.perfil.historiaClinica): si un antecedente, una medicación o una alergia es relevante para este hallazgo, menciónalo. Nunca recomiendes algo a lo que es alérgico.
 - Explica qué significa ahora y si se relaciona con otros hallazgos (por ejemplo, poco sueño y estrés alto). No diagnostiques enfermedades.
 - No contradigas el nivel ni la acción de seguridad del motor; puedes concretarla según el contexto. No inventes cifras ni datos que no estén en <estado>.
 - Adapta el lenguaje al perfil: sin formación médica, sin cifras ni tecnicismos; con formación médica, puedes dar cifras.
