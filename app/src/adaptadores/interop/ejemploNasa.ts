@@ -1,5 +1,5 @@
 /**
- * ⚠️ INTERFAZ DE EJEMPLO: NO es una API real de la NASA.
+ * AVISO: INTERFAZ DE EJEMPLO: NO es una API real de la NASA.
  *
  * Muestra cómo el núcleo autónomo exporta hallazgos a un sistema médico externo cuando hay conexión.
  * El formato se inspira en HL7 FHIR "Observation", un estándar abierto de interoperabilidad clínica.

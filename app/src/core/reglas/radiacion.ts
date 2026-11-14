@@ -1,4 +1,4 @@
-// ⚠️ UMBRALES PROVISIONALES: validar contra los Anexos B, C y F antes de la demo.
+// AVISO: UMBRALES PROVISIONALES: validar contra los Anexos B, C y F antes de la demo.
 import { definirRegla, HORA, MINUTO, normal, r1 } from './util';
 
 /** Límite de carrera de NASA-STD-3001 (600 mSv). VERIFICAR en fuente oficial antes de citarlo. */

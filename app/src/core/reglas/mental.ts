@@ -1,4 +1,4 @@
-// ⚠️ UMBRALES PROVISIONALES: validar contra los Anexos B, C y F antes de la demo.
+// AVISO: UMBRALES PROVISIONALES: validar contra los Anexos B, C y F antes de la demo.
 // Salud mental: todo hallazgo es `sensible`, así que nunca va a una pantalla compartida.
 import { promedio } from '../historial';
 import { definirRegla, normal, r1 } from './util';

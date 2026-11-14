@@ -1,54 +1,23 @@
 /**
- * FIGURA 3D — modo pasivo. Cuerpo translúcido con órganos coloreados por estado.
+ * FIGURA 3D — modo pasivo. Cuerpo humano realista en pose "A" (ver figura3d/anatomia.ts),
+ * con piel translúcida y malla de cuadros, y órganos internos coloreados por estado.
  * Arrastra para rotar, rueda para acercar, clic para ver el detalle de una región.
  */
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { NOMBRE_SISTEMA, type EstadoCorporal, type Nivel, type SistemaCorporal } from '../core/tipos';
+import { type EstadoCorporal, type Nivel, type SistemaCorporal } from '../core/tipos';
 import { COLOR_NIVEL, NOMBRE_NIVEL, peorEstado } from './FiguraCorporal';
+import { construirSegmento, ORGANOS, PIEL } from './figura3d/anatomia';
 
 type EstadoVisual = Nivel | 'sinDatos';
 
 /** Mismos colores que los tokens CSS; three.js necesita valores concretos. */
 const HEX: Record<EstadoVisual, number> = {
-  normal: 0x3fbf7f, info: 0x4f9cf0, aviso: 0xf0b13c, alerta: 0xef5350, sinDatos: 0x5a6488,
+  normal: 0x3fbf7f, info: 0x4f9cf0, aviso: 0xf0b13c, alerta: 0xef5350, sinDatos: 0x8a93ad,
 };
-
-interface Region {
-  id: string;
-  sistemas: SistemaCorporal[];
-  /** Las "carcasas" (piel) son translúcidas y ceden el clic a los órganos que tienen dentro. */
-  carcasa?: boolean;
-  crear: () => THREE.Object3D[];
-}
-
-const esfera = (r: number, x: number, y: number, z: number, escala: [number, number, number] = [1, 1, 1]) => {
-  const g = new THREE.SphereGeometry(r, 32, 24);
-  const m = new THREE.Mesh(g);
-  m.position.set(x, y, z);
-  m.scale.set(...escala);
-  return m;
-};
-const capsula = (r: number, largo: number, x: number, y: number, z: number, rotZ = 0) => {
-  const m = new THREE.Mesh(new THREE.CapsuleGeometry(r, largo, 8, 24));
-  m.position.set(x, y, z);
-  m.rotation.z = rotZ;
-  return m;
-};
-
-const REGIONES: Region[] = [
-  { id: 'cabeza', sistemas: ['cerebro'], crear: () => [esfera(0.24, 0, 1.62, 0, [0.95, 1.08, 1])] },
-  { id: 'ojos', sistemas: ['ojos'], crear: () => [esfera(0.035, -0.08, 1.65, 0.215), esfera(0.035, 0.08, 1.65, 0.215)] },
-  { id: 'oidos', sistemas: ['oidoInterno'], crear: () => [esfera(0.045, -0.235, 1.62, 0, [0.6, 1, 1]), esfera(0.045, 0.235, 1.62, 0, [0.6, 1, 1])] },
-  { id: 'torso', sistemas: ['inmune'], carcasa: true, crear: () => [capsula(0.3, 0.5, 0, 1.05, 0)] },
-  { id: 'columna', sistemas: ['huesos'], crear: () => [capsula(0.035, 0.85, 0, 1.03, -0.17)] },
-  { id: 'pulmones', sistemas: ['pulmones'], crear: () => [esfera(0.11, -0.12, 1.2, 0, [1, 1.7, 0.9]), esfera(0.11, 0.12, 1.2, 0, [1, 1.7, 0.9])] },
-  { id: 'corazon', sistemas: ['corazon'], crear: () => [esfera(0.075, 0.04, 1.14, 0.1)] },
-  { id: 'abdomen', sistemas: ['metabolismo', 'intestino'], crear: () => [esfera(0.17, 0, 0.83, 0.03, [1.1, 0.75, 0.8])] },
-  { id: 'brazos', sistemas: ['musculos'], carcasa: true, crear: () => [capsula(0.075, 0.62, -0.42, 1.0, 0, -0.18), capsula(0.075, 0.62, 0.42, 1.0, 0, 0.18)] },
-  { id: 'piernas', sistemas: ['piernas'], carcasa: true, crear: () => [capsula(0.1, 0.72, -0.13, 0.26, 0), capsula(0.1, 0.72, 0.13, 0.26, 0)] },
-];
+const COLOR_PIEL = new THREE.Color(0xd5d9e2);
+const OPACIDAD_PIEL = 0.34;
 
 interface Props {
   estado: EstadoCorporal;
@@ -66,9 +35,16 @@ export function webglDisponible(): boolean {
   }
 }
 
+interface Pintable {
+  sistemas: SistemaCorporal[];
+  esPiel: boolean;
+  superficies: THREE.Mesh[];
+  lineas: THREE.LineSegments[];
+}
+
 export function FiguraCorporal3D({ estado, seleccion, onSeleccionar }: Props) {
   const contenedor = useRef<HTMLDivElement>(null);
-  const mallas = useRef(new Map<string, THREE.Mesh[]>());
+  const pintables = useRef(new Map<string, Pintable>());
   const halo = useRef<THREE.Mesh | null>(null);
   const props = useRef({ estado, seleccion, onSeleccionar });
   props.current = { estado, seleccion, onSeleccionar };
@@ -77,63 +53,88 @@ export function FiguraCorporal3D({ estado, seleccion, onSeleccionar }: Props) {
   useEffect(() => {
     const div = contenedor.current!;
     const escena = new THREE.Scene();
-    const camara = new THREE.PerspectiveCamera(35, 1, 0.1, 50);
-    camara.position.set(0, 1.1, 4.2);
+    const camara = new THREE.PerspectiveCamera(32, 1, 0.1, 50);
+    camara.position.set(0.8, 1.1, 3.55);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     div.appendChild(renderer.domElement);
 
-    escena.add(new THREE.AmbientLight(0xffffff, 1.1));
-    const luz = new THREE.DirectionalLight(0xffffff, 1.6);
-    luz.position.set(2, 4, 3);
-    escena.add(luz);
+    // Iluminación de estudio, como la referencia.
+    escena.add(new THREE.HemisphereLight(0xffffff, 0x404858, 1.2));
+    const clave = new THREE.DirectionalLight(0xffffff, 1.8);
+    clave.position.set(2, 3, 3);
+    escena.add(clave);
+    const contra = new THREE.DirectionalLight(0x9db4ff, 1.0);
+    contra.position.set(-2, 2, -3);
+    escena.add(contra);
 
-    // Cuello neutro
-    const cuello = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.09, 0.14, 16), new THREE.MeshStandardMaterial({ color: HEX.sinDatos, transparent: true, opacity: 0.4 }));
-    cuello.position.set(0, 1.4, 0);
-    escena.add(cuello);
-
-    for (const r of REGIONES) {
-      const lista: THREE.Mesh[] = [];
-      for (const obj of r.crear()) {
-        const m = obj as THREE.Mesh;
-        m.material = new THREE.MeshStandardMaterial({
-          color: HEX.sinDatos, roughness: 0.45, metalness: 0.05,
-          transparent: !!r.carcasa, opacity: r.carcasa ? 0.28 : 1, depthWrite: !r.carcasa,
-        });
-        m.userData = { region: r.id, sistemas: r.sistemas, prioridad: r.carcasa ? 0 : 1 };
-        m.renderOrder = r.carcasa ? 1 : 0;
+    // Órganos: opacos, se dibujan primero.
+    for (const o of ORGANOS) {
+      const superficies = o.crear().map((m) => {
+        m.material = new THREE.MeshStandardMaterial({ color: HEX.sinDatos, roughness: 0.4, metalness: 0.05, emissive: HEX.sinDatos, emissiveIntensity: 0 });
+        m.userData = { sistemas: o.sistemas, prioridad: 1 };
+        m.renderOrder = 0;
         escena.add(m);
-        lista.push(m);
-      }
-      mallas.current.set(r.id, lista);
+        return m;
+      });
+      pintables.current.set(o.id, { sistemas: o.sistemas, esPiel: false, superficies, lineas: [] });
     }
 
-    // Halo = todo el cuerpo (radiación)
+    // Piel: 1) pasada de profundidad invisible, 2) color translúcido solo de la capa frontal, 3) malla de cuadros.
+    const desfase = { polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 };
+    for (const parte of PIEL) {
+      const p: Pintable = { sistemas: parte.sistemas, esPiel: true, superficies: [], lineas: [] };
+      for (const seg of parte.segmentos) {
+        const { superficie, malla } = construirSegmento(seg);
+
+        const profundidad = new THREE.Mesh(superficie, new THREE.MeshBasicMaterial({ colorWrite: false, ...desfase }));
+        profundidad.renderOrder = 1;
+        profundidad.raycast = () => {}; // no participa en los clics
+        escena.add(profundidad);
+
+        const color = new THREE.Mesh(superficie, new THREE.MeshStandardMaterial({
+          color: COLOR_PIEL, roughness: 0.75, metalness: 0, transparent: true, opacity: OPACIDAD_PIEL,
+          depthWrite: false, depthFunc: THREE.LessEqualDepth, emissive: 0x000000, ...desfase,
+        }));
+        color.renderOrder = 2;
+        color.userData = { sistemas: parte.sistemas, prioridad: 0 };
+        escena.add(color);
+        p.superficies.push(color);
+
+        const lineas = new THREE.LineSegments(malla, new THREE.LineBasicMaterial({ color: 0xeef1f7, transparent: true, opacity: 0.22 }));
+        lineas.renderOrder = 3;
+        lineas.raycast = () => {};
+        escena.add(lineas);
+        p.lineas.push(lineas);
+      }
+      pintables.current.set(parte.id, p);
+    }
+
+    // Halo = todo el cuerpo (radiación): aro a los pies.
     const anillo = new THREE.Mesh(
-      new THREE.TorusGeometry(0.55, 0.02, 12, 96),
+      new THREE.TorusGeometry(0.48, 0.012, 12, 128),
       new THREE.MeshBasicMaterial({ color: HEX.sinDatos, transparent: true, opacity: 0.9 }),
     );
     anillo.rotation.x = Math.PI / 2;
-    anillo.position.y = -0.18; // aro a los pies: se ve como elipse desde la cámara
-    anillo.userData = { region: 'halo', sistemas: ['cuerpo'], prioridad: 0 };
+    anillo.position.y = -0.01;
+    anillo.userData = { sistemas: ['cuerpo'], prioridad: 0 };
     escena.add(anillo);
     halo.current = anillo;
 
     const controles = new OrbitControls(camara, renderer.domElement);
-    controles.target.set(0, 0.95, 0);
+    controles.target.set(0, 0.93, 0);
     controles.enablePan = false;
-    controles.minDistance = 2.2;
+    controles.minDistance = 1.6;
     controles.maxDistance = 6;
     controles.autoRotate = true;
-    controles.autoRotateSpeed = 1.2;
+    controles.autoRotateSpeed = 1.0;
     controles.update();
     let reanudarGiro: ReturnType<typeof setTimeout> | undefined;
     controles.addEventListener('start', () => { controles.autoRotate = false; clearTimeout(reanudarGiro); });
     controles.addEventListener('end', () => { reanudarGiro = setTimeout(() => (controles.autoRotate = true), 4000); });
 
-    // Clic (distinto de arrastrar) → selección
+    // Clic (distinto de arrastrar) → selección. Prioridad a los órganos sobre la piel.
     const raycaster = new THREE.Raycaster();
     let inicio = { x: 0, y: 0 };
     const alPresionar = (e: PointerEvent) => (inicio = { x: e.clientX, y: e.clientY });
@@ -142,9 +143,8 @@ export function FiguraCorporal3D({ estado, seleccion, onSeleccionar }: Props) {
       const rect = renderer.domElement.getBoundingClientRect();
       const puntero = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
       raycaster.setFromCamera(puntero, camara);
-      const golpes = raycaster.intersectObjects(escena.children).filter((g) => g.object.userData.sistemas);
+      const golpes = raycaster.intersectObjects(escena.children).filter((g) => g.object.userData.sistemas?.length);
       if (!golpes.length) return;
-      // Prioridad a los órganos sobre la piel translúcida
       const mejor = golpes.reduce((a, b) => (b.object.userData.prioridad > a.object.userData.prioridad ? b : a));
       props.current.onSeleccionar(mejor.object.userData.sistemas);
     };
@@ -161,17 +161,17 @@ export function FiguraCorporal3D({ estado, seleccion, onSeleccionar }: Props) {
     ro.observe(div);
     redimensionar();
 
-    // Animación: el corazón late y las regiones en alerta pulsan.
+    // Animación: el corazón late y lo que está en alerta pulsa.
     const reloj = new THREE.Clock();
     renderer.setAnimationLoop(() => {
       const t = reloj.getElapsedTime();
-      const { estado: e } = props.current;
-      const corazon = mallas.current.get('corazon')?.[0];
-      if (corazon) corazon.scale.setScalar(1 + 0.08 * Math.max(0, Math.sin(t * 7)));
-      for (const r of REGIONES) {
-        const nivel = peorEstado(e, r.sistemas);
+      const corazon = pintables.current.get('corazon')?.superficies[0];
+      if (corazon) corazon.scale.set(1, 1.15, 0.9).multiplyScalar(1 + 0.08 * Math.max(0, Math.sin(t * 7)));
+      for (const p of pintables.current.values()) {
+        if (!p.sistemas.length) continue;
+        const nivel = peorEstado(props.current.estado, p.sistemas);
         const intensidad = nivel === 'alerta' ? 0.35 + 0.35 * Math.sin(t * 6) : nivel === 'aviso' ? 0.15 : 0;
-        for (const m of mallas.current.get(r.id) ?? []) (m.material as THREE.MeshStandardMaterial).emissiveIntensity = intensidad;
+        for (const m of p.superficies) (m.material as THREE.MeshStandardMaterial).emissiveIntensity = intensidad * (p.esPiel ? 0.6 : 1);
       }
       anillo.rotation.z = t * 0.4;
       controles.update();
@@ -183,6 +183,8 @@ export function FiguraCorporal3D({ estado, seleccion, onSeleccionar }: Props) {
       clearTimeout(reanudarGiro);
       ro.disconnect();
       controles.dispose();
+      renderer.domElement.removeEventListener('pointerdown', alPresionar);
+      renderer.domElement.removeEventListener('pointerup', alSoltar);
       escena.traverse((o) => {
         const m = o as THREE.Mesh;
         m.geometry?.dispose();
@@ -190,41 +192,36 @@ export function FiguraCorporal3D({ estado, seleccion, onSeleccionar }: Props) {
       });
       renderer.dispose();
       div.removeChild(renderer.domElement);
-      mallas.current.clear();
+      pintables.current.clear();
     };
   }, []);
 
   // Colores según el estado y la selección.
   useEffect(() => {
-    for (const r of REGIONES) {
-      const nivel = peorEstado(estado, r.sistemas);
-      const sel = seleccion?.join() === r.sistemas.join();
-      for (const m of mallas.current.get(r.id) ?? []) {
+    for (const p of pintables.current.values()) {
+      const nivel = peorEstado(estado, p.sistemas);
+      const sel = p.sistemas.length > 0 && seleccion?.join() === p.sistemas.join();
+      for (const m of p.superficies) {
         const mat = m.material as THREE.MeshStandardMaterial;
-        mat.color.setHex(HEX[nivel]);
-        mat.emissive.setHex(HEX[nivel]);
-        if (r.carcasa) mat.opacity = sel ? 0.55 : 0.28;
+        if (p.esPiel) {
+          // La piel se tiñe suavemente hacia el color del estado de su región.
+          mat.color.copy(COLOR_PIEL).lerp(new THREE.Color(HEX[nivel]), p.sistemas.length && nivel !== 'sinDatos' ? 0.55 : 0);
+          mat.emissive.setHex(p.sistemas.length ? HEX[nivel] : 0x000000);
+          mat.opacity = sel ? 0.6 : OPACIDAD_PIEL;
+        } else {
+          mat.color.setHex(HEX[nivel]);
+          mat.emissive.setHex(HEX[nivel]);
+        }
       }
+      for (const l of p.lineas) (l.material as THREE.LineBasicMaterial).opacity = sel ? 0.45 : 0.22;
     }
     if (halo.current) (halo.current.material as THREE.MeshBasicMaterial).color.setHex(HEX[estado.cuerpo]);
   }, [estado, seleccion]);
 
-  const regionesConEstado = REGIONES.map((r) => ({ r, nivel: peorEstado(estado, r.sistemas) }));
-
   return (
     <div className="figura">
       <div ref={contenedor} className="lienzo-3d" role="img" aria-label="Figura 3D con el estado de salud por sistema corporal" />
-      <p className="ayuda">Arrastra para rotar · clic en una región para ver el detalle</p>
-      {/* Alternativa accesible y para teclado: las mismas regiones como botones */}
-      <div className="regiones-accesibles">
-        {[...regionesConEstado, { r: { id: 'halo', sistemas: ['cuerpo'] as SistemaCorporal[] }, nivel: estado.cuerpo }].map(({ r, nivel }) => (
-          <button key={r.id} onClick={() => onSeleccionar(r.sistemas)} aria-pressed={seleccion?.join() === r.sistemas.join()}>
-            <span className="punto" style={{ background: COLOR_NIVEL[nivel] }} />
-            {r.sistemas.map((s) => NOMBRE_SISTEMA[s]).join(' / ')}
-            <span className="sr-only"> · {NOMBRE_NIVEL[nivel]}</span>
-          </button>
-        ))}
-      </div>
+      <p className="ayuda">Arrastra para rotar · rueda para acercar · clic en una región para ver su detalle</p>
       <ul className="leyenda">
         {(['normal', 'info', 'aviso', 'alerta', 'sinDatos'] as EstadoVisual[]).map((n) => (
           <li key={n}><span className="punto" style={{ background: COLOR_NIVEL[n] }} />{NOMBRE_NIVEL[n]}</li>

@@ -1,4 +1,4 @@
-// ⚠️ UMBRALES PROVISIONALES: validar contra los Anexos B, C y F antes de la demo.
+// AVISO: UMBRALES PROVISIONALES: validar contra los Anexos B, C y F antes de la demo.
 // TODO (línea A / kinesiología): agregar reglas de huesos (pérdida ósea de 1–1,5 %/mes),
 // pruebas de fuerza y equilibrio. Ver Anexo G.
 import { definirRegla, normal } from './util';

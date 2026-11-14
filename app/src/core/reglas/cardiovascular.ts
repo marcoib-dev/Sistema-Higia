@@ -1,4 +1,4 @@
-// ⚠️ UMBRALES PROVISIONALES: validar contra los Anexos B, C y F antes de la demo.
+// AVISO: UMBRALES PROVISIONALES: validar contra los Anexos B, C y F antes de la demo.
 import { definirRegla, normal, signo } from './util';
 
 export const reglaFrecuenciaCardiaca = definirRegla(
