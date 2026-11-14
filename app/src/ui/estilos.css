@@ -1,0 +1,85 @@
+:root {
+  --fondo: #0b1020;
+  --superficie: #141a2e;
+  --borde: #263052;
+  --texto: #e7ebf5;
+  --texto-suave: #98a2bf;
+  --acento: #6ea8ff;
+  --ok: #3fbf7f;
+  --info: #4f9cf0;
+  --aviso: #f0b13c;
+  --alerta: #ef5350;
+  --sin-datos: #3a4363;
+  color-scheme: dark;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--fondo); color: var(--texto); font-size: 14px; line-height: 1.45; }
+h1 { margin: 0; font-size: 20px; }
+h2 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--texto-suave); }
+button, input, select { font: inherit; color: inherit; }
+button {
+  background: var(--superficie); border: 1px solid var(--borde); border-radius: 8px;
+  padding: 6px 10px; cursor: pointer;
+}
+button:hover { border-color: var(--acento); }
+button[aria-pressed='true'] { background: var(--acento); color: var(--fondo); border-color: var(--acento); }
+input, select { background: var(--fondo); border: 1px solid var(--borde); border-radius: 8px; padding: 6px 8px; }
+pre { font-size: 11px; overflow-x: auto; background: var(--fondo); padding: 8px; border-radius: 8px; }
+
+.app { padding: 16px; max-width: 1500px; margin: 0 auto; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 16px; }
+.sub { color: var(--texto-suave); font-weight: normal; font-size: 13px; }
+.estado-red { margin: 0; color: var(--texto-suave); }
+
+.rejilla { display: grid; grid-template-columns: minmax(240px, 320px) minmax(0, 1fr) minmax(280px, 380px); gap: 16px; align-items: start; }
+@media (max-width: 1000px) { .rejilla { grid-template-columns: 1fr; } }
+.columna { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.tarjeta { background: var(--superficie); border: 1px solid var(--borde); border-radius: 12px; padding: 14px; }
+.vacio { color: var(--texto-suave); margin: 0; }
+
+/* Figura */
+.figura svg { width: 100%; max-height: 460px; display: block; }
+.region { cursor: pointer; transition: opacity .15s; }
+.region:hover { opacity: .8; }
+.leyenda { list-style: none; padding: 0; margin: 10px 0 0; display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--texto-suave); }
+.punto { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+.detalle { padding-left: 0; list-style: none; margin: 0; display: grid; gap: 8px; }
+
+/* Mensajes */
+.mensajes { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.mensaje { border-left: 4px solid; background: var(--fondo); border-radius: 8px; padding: 10px 12px; }
+.mensaje.diferido { opacity: .65; }
+.mensaje-cab { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.mensaje-cab time { margin-left: auto; color: var(--texto-suave); font-size: 12px; }
+.mensaje-texto { margin: 8px 0 4px; font-size: 15px; }
+.mensaje-reporte, .mensaje-motivo, .mensaje-fuente { margin: 2px 0; font-size: 12px; color: var(--texto-suave); }
+.chip { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; color: #0b1020; }
+.chip-borde { background: transparent; color: var(--texto-suave); border: 1px solid var(--borde); font-weight: normal; }
+
+/* Controles */
+.escenarios { display: flex; flex-wrap: wrap; gap: 6px; }
+.segmentado { display: flex; gap: 4px; margin-bottom: 8px; }
+.segmentado button { flex: 1; }
+.fila { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 0; }
+.fila input[type='number'] { width: 64px; }
+select { width: 100%; }
+.perfil { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 10px 0 0; font-size: 13px; }
+.perfil dt { color: var(--texto-suave); }
+.perfil dd { margin: 0; }
+
+/* Conversación */
+.conversacion { display: flex; gap: 6px; }
+.conversacion input { flex: 1; min-width: 0; }
+.ejemplos { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 8px 0; }
+.enlace { background: none; border: none; padding: 0; color: var(--acento); font-size: 12px; }
+.chat { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.chat p { margin: 0; padding: 6px 10px; border-radius: 8px; }
+.chat .yo { background: var(--borde); justify-self: end; }
+.chat .sistema { background: var(--fondo); margin-top: 4px; }
+
+/* Comparación e interop */
+.comparacion { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.comparacion p { margin: 4px 0 0; }
+.etiqueta-ejemplo { background: var(--aviso); color: var(--fondo); font-size: 10px; padding: 1px 6px; border-radius: 4px; vertical-align: 2px; }

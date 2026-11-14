@@ -1,0 +1,77 @@
+/**
+ * SIMULADOR DE SENSORES — escenarios para la demo en vivo.
+ * Cada escenario inyecta lecturas falsas y, si corresponde, cambia el contexto.
+ */
+import type { Historial } from '../../core/historial';
+import type { Contexto, Lectura, TipoSensor } from '../../core/tipos';
+
+export interface Escenario {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  contexto?: Partial<Contexto>;
+  lecturas: (ahora: number, h: Historial) => Lectura[];
+}
+
+const L = (sensor: TipoSensor, valor: number, timestamp: number): Lectura => ({ sensor, valor, timestamp, fuente: 'simulador' });
+
+export const ESCENARIOS: Escenario[] = [
+  {
+    id: 'base', nombre: 'Día normal en el hábitat',
+    descripcion: 'Todos los sensores en rango. Sirve también para volver a la normalidad.',
+    contexto: { ubicacion: 'habitat', hora: 10 },
+    lecturas: (t, h) => [
+      L('frecuenciaCardiaca', 64, t), L('presionSistolica', 118, t), L('presionDiastolica', 76, t),
+      L('spo2', 98, t), L('animo', 7, t), L('estres', 25, t), L('minutosEjercicio', 95, t),
+      // tres noches registradas
+      L('horasSueno', 7.5, t - 2), L('horasSueno', 7, t - 1), L('horasSueno', 7.5, t),
+      L('dosisRadiacion', h.ultima('dosisRadiacion')?.valor ?? 120, t),
+    ],
+  },
+  {
+    id: 'eva-estres', nombre: 'EVA: golpe en la estación',
+    descripcion: 'Sale a reparar y el estrés se dispara. Debe llegar una indicación breve por auricular.',
+    contexto: { ubicacion: 'eva', hora: 10 },
+    lecturas: (t) => [L('frecuenciaCardiaca', 132, t), L('estres', 86, t), L('spo2', 96, t)],
+  },
+  {
+    id: 'animo', nombre: 'Descenso del ánimo',
+    descripcion: 'Información sensible: nunca debe ir a la pantalla compartida.',
+    contexto: { ubicacion: 'habitat' },
+    lecturas: (t) => [L('animo', 3, t)],
+  },
+  {
+    id: 'sueno', nombre: 'Tres noches durmiendo poco',
+    descripcion: 'Déficit de sueño acumulado: es un aviso, no una alerta.',
+    lecturas: (t) => [L('horasSueno', 5, t - 2), L('horasSueno', 5.5, t - 1), L('horasSueno', 4.5, t)],
+  },
+  {
+    id: 'hipoxia', nombre: 'Hipoxia',
+    descripcion: 'Saturación de oxígeno baja. Es alerta y requiere reporte.',
+    lecturas: (t) => [L('spo2', 86, t), L('frecuenciaCardiaca', 104, t)],
+  },
+  {
+    id: 'presion-baja', nombre: 'Presión baja',
+    descripcion: 'Riesgo de desmayo (adaptación cardiovascular).',
+    lecturas: (t) => [L('presionSistolica', 86, t), L('presionDiastolica', 56, t)],
+  },
+  {
+    id: 'sin-ejercicio', nombre: 'Día sin ejercicio',
+    descripcion: 'Lleva 20 de 90 minutos. Contramedida para huesos y músculos.',
+    lecturas: (t) => [L('minutosEjercicio', 20, t)],
+  },
+  {
+    id: 'tormenta', nombre: 'Tormenta solar',
+    descripcion: 'La dosis sube de golpe: debe ir al refugio.',
+    lecturas: (t, h) => {
+      const base = h.ultima('dosisRadiacion')?.valor ?? 120;
+      return [L('dosisRadiacion', base, t - 30 * 60_000), L('dosisRadiacion', base + 2.5, t)];
+    },
+  },
+  {
+    id: 'madrugada', nombre: 'Aviso de madrugada',
+    descripcion: 'Son las 3:00: el aviso se retiene. Cambia la hora a 8 para entregarlo.',
+    contexto: { hora: 3, ubicacion: 'habitat' },
+    lecturas: (t) => [L('presionSistolica', 145, t), L('presionDiastolica', 88, t)],
+  },
+];
