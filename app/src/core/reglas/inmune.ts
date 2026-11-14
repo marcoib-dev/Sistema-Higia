@@ -2,7 +2,7 @@
 // Sistema inmune y microorganismos: fiebre, reactivación de virus latentes y carga microbiana del entorno.
 import type { Historial } from '../historial';
 import type { DatoClinico, Lectura, Nivel } from '../tipos';
-import { dato, datosDe, definirRegla, factor, HORA, normal, r1, recientes, subirNivel, ultimaReciente, type DatosHallazgo } from './util';
+import { dato, datosDe, definirRegla, factor, HORA, normal, pendiente, r1, recientes, subirNivel, ultimaReciente, type DatosHallazgo } from './util';
 
 // ── Fiebre ─────────────────────────────────────────────────────────────
 
@@ -145,5 +145,60 @@ export const reglaReactivacion = definirRegla(
           ];
     }
     return base;
+  },
+);
+
+// ── Microorganismos del entorno ────────────────────────────────────────
+
+/** UFC por placa a partir de las cuales la carga se considera alta (provisional). */
+export const CARGA_MICROBIANA_ALTA = 100;
+
+export const reglaMicrobioma = definirRegla(
+  {
+    id: 'microbioma.entorno', nombre: 'Microbios del entorno', sistema: 'intestino',
+    sensores: ['cargaMicrobiana', 'sxDigestivo', 'temperatura'],
+    fuente: '§7.1.5 Interacción huésped-microorganismos (hisopados) · §8.3 Veggie: vigilar patrones y tendencias, no el valor aislado',
+    hrp: ['microorganismos', 'inmune'],
+  },
+  (h, p, ahora) => {
+    const muestras = recientes(h, 'cargaMicrobiana', ahora, 60 * 24);
+    if (!muestras.length) return null;
+    const ult = muestras.at(-1)!;
+    const tendencia = pendiente(h, 'cargaMicrobiana', ahora, 60);
+    // Subida sostenida: pendiente positiva y cada muestra mayor o igual que la anterior en las últimas tres.
+    const ultimas3 = muestras.slice(-3);
+    const sube = tendencia !== null && tendencia > 0 && ultimas3.length === 3 && ultimas3.every((l, i) => i === 0 || l.valor >= ultimas3[i - 1].valor);
+    const alta = ult.valor >= CARGA_MICROBIANA_ALTA;
+    const digestivo = ultimaReciente(h, 'sxDigestivo', ahora, 48);
+    const temp = ultimaReciente(h, 'temperatura', ahora, 24);
+    const conSintomas = (digestivo?.valor ?? 0) >= 4;
+    const fiebre = (temp?.valor ?? 0) >= 38;
+    const nivel: Nivel = alta && conSintomas && fiebre ? 'alerta' : alta && conSintomas ? 'aviso' : sube || alta ? (sube ? 'info' : 'normal') : 'normal';
+    const datos = [...muestras.slice(-4).map((l) => dato(l, p)), ...datosDe(p, digestivo, fiebre ? temp : undefined)];
+    const detalle = `Carga microbiana ${ult.valor} UFC (${muestras.slice(-4).map((l) => l.valor).join(' → ')})` +
+      `${tendencia !== null ? ` · tendencia ${tendencia > 0 ? '+' : ''}${r1(tendencia)} UFC/día` : ''}` +
+      `${digestivo && digestivo.valor > 0 ? ` · síntomas digestivos ${digestivo.valor}/10` : ''}` +
+      `${fiebre ? ` · fiebre ${r1(temp!.valor)} °C` : ''}`;
+    if (nivel === 'normal') return { ...normal('Microbios del entorno', detalle), datos };
+    const accion = 'Desinfecta las superficies, no consumas del lote de agua analizado y repite el hisopado.';
+    const d: DatosHallazgo = {
+      nivel, detalleTecnico: detalle, datos, region: nivel === 'info' ? undefined : 'abdomen',
+      titulo: nivel === 'info' ? 'Microbios en aumento en el entorno' : nivel === 'aviso' ? 'Posible infección por el entorno' : 'Infección probable por el entorno',
+      resumenSimple: nivel === 'info'
+        ? 'Los hisopados muestran más microbios que antes. No siempre es un problema, pero hay que seguirlo.'
+        : 'Tus síntomas coinciden con más microbios en el entorno.',
+      accion, ruta: nivel === 'info' ? 'autogestion' : 'reporte', sensible: false,
+    };
+    if (nivel === 'alerta') {
+      d.bloquea = ['eva', 'ejercicioIntenso'];
+      d.pasos = [
+        'Deja de consumir el agua y la comida del lote sospechoso.',
+        'Bebe solución con electrolitos de otro lote para no deshidratarte.',
+        'Aíslate del resto y lava tus manos con frecuencia.',
+        'Desinfecta las superficies y repite el hisopado.',
+        'Higia envía el reporte con la serie de hisopados y tus síntomas.',
+      ];
+    }
+    return d;
   },
 );
