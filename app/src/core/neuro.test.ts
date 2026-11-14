@@ -12,6 +12,7 @@ const HABITAT: Contexto = {
   ubicacion: 'habitat', destino: 'luna', actividad: 'trabajo', climaEspacial: 'calmo', hora: 10,
   pantallaHabitat: true, pantallaPersonal: true, auricular: true,
   companeroCercano: true, medicoABordo: false, conexionHabitat: false, conexionTierra: false,
+  diaMision: 45, transicionGravedad: false,
 };
 const L = (sensor: TipoSensor, valor: number, t = T): Lectura => ({ sensor, valor, timestamp: t, fuente: 'simulador' });
 const nuevo = (perfil = PILOTO, contexto: Partial<Contexto> = {}) => new NucleoSalud(REGLAS, perfil, { ...HABITAT, ...contexto });

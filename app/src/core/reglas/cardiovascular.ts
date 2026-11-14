@@ -6,6 +6,7 @@ export const reglaFrecuenciaCardiaca = definirRegla(
     id: 'cardio.frecuencia', nombre: 'Frecuencia cardíaca', sistema: 'corazon',
     sensores: ['frecuenciaCardiaca'],
     fuente: 'Anexo F: frecuencia cardíaca · Anexo B: adaptaciones cardiovasculares y arritmias',
+    hrp: ['cardiovascular'],
   },
   (h, p, _ahora, c) => {
     const ult = h.ultima('frecuenciaCardiaca');
@@ -58,6 +59,7 @@ export const reglaPresionArterial = definirRegla(
     id: 'cardio.presion', nombre: 'Presión arterial', sistema: 'corazon',
     sensores: ['presionSistolica', 'presionDiastolica'],
     fuente: 'Anexo F: presión arterial (riesgo de desmayo) · Anexo B: riesgo cardiovascular',
+    hrp: ['cardiovascular'],
   },
   (h) => {
     const sis = h.ultima('presionSistolica')?.valor;

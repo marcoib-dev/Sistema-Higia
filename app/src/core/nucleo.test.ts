@@ -11,6 +11,7 @@ const HABITAT: Contexto = {
   ubicacion: 'habitat', destino: 'luna', actividad: 'trabajo', climaEspacial: 'calmo', hora: 10,
   pantallaHabitat: true, pantallaPersonal: true, auricular: true,
   companeroCercano: false, medicoABordo: false, conexionHabitat: false, conexionTierra: false,
+  diaMision: 45, transicionGravedad: false,
 };
 const L = (sensor: TipoSensor, valor: number, t = T): Lectura => ({ sensor, valor, timestamp: t, fuente: 'simulador' });
 const nuevo = (perfil = MEDICA_VETERANA, contexto: Partial<Contexto> = {}) =>
@@ -161,6 +162,78 @@ describe('contexto en la evaluación', () => {
     const [fuera] = n.actualizarContexto({ ubicacion: 'eva' }, T + 2);
     expect(fuera.hallazgo.nivel).toBe('alerta');
     expect(fuera.texto).toMatch(/refugio/);
+  });
+});
+
+describe('caducidad de hallazgos', () => {
+  it('el golpe en la cabeza de hace más de 24 h deja de figurar', () => {
+    const n = nuevo(NOVATO_PANICO);
+    n.registrar(L('impactoCabeza', 18), T);
+    expect(n.hallazgo('trauma.craneal')?.nivel).toBe('aviso');
+    n.tick(T + 25 * 3_600_000);
+    expect(n.hallazgo('trauma.craneal')).toBeUndefined();
+    expect(n.estadoRegiones().craneo).toBeUndefined();
+  });
+
+  it('una alerta que caduca deja de esperar confirmación', () => {
+    const n = nuevo(NOVATO_PANICO);
+    n.registrar(L('impactoCabeza', 50), T);
+    expect(n.confirmacionesPendientes().size).toBe(1);
+    n.tick(T + 25 * 3_600_000);
+    expect(n.confirmacionesPendientes().size).toBe(0);
+  });
+
+  it('lo contado en la conversación vence a las 24 h', () => {
+    const n = nuevo(NOVATO_PANICO);
+    n.alertaDesdeConversacion({ nivel: 'aviso', sistema: 'ojos', titulo: 'Visión borrosa', detalle: 'Veo borroso' }, T);
+    expect(n.hallazgo('conversacion.ojos')).toBeDefined();
+    n.tick(T + 23 * 3_600_000);
+    expect(n.hallazgo('conversacion.ojos')).toBeDefined();
+    n.tick(T + 24 * 3_600_000);
+    expect(n.hallazgo('conversacion.ojos')).toBeUndefined();
+  });
+});
+
+describe('aptitud para tareas críticas', () => {
+  it('sin hallazgos, todo apto', () => {
+    const a = nuevo().aptitudTareas();
+    expect(a.eva.apto && a.pilotaje.apto && a.ejercicioIntenso.apto).toBe(true);
+  });
+
+  it('un golpe en la cabeza contraindica EVA y pilotaje, con el motivo', () => {
+    const n = nuevo(NOVATO_PANICO);
+    n.registrar(L('impactoCabeza', 18), T);
+    const a = n.aptitudTareas();
+    expect(a.eva.apto).toBe(false);
+    expect(a.pilotaje.motivos[0].riesgoId).toBe('trauma.craneal');
+    expect(a.ejercicioIntenso.apto).toBe(true);
+  });
+
+  it('salir a EVA no apto genera un aviso que se borra al volver al hábitat', () => {
+    const n = nuevo(NOVATO_PANICO);
+    n.registrar(L('impactoCabeza', 18), T);
+    const ms = n.actualizarContexto({ ubicacion: 'eva' }, T + 1000);
+    const aviso = ms.find((m) => m.hallazgo.riesgoId === 'tarea.eva');
+    expect(aviso?.hallazgo.nivel).toBe('aviso');
+    expect(aviso?.hallazgo.detalleTecnico).toMatch(/Golpe en la cabeza/);
+    n.actualizarContexto({ ubicacion: 'habitat' }, T + 2000);
+    expect(n.hallazgo('tarea.eva')).toBeUndefined();
+  });
+
+  it('salir a EVA apto no genera aviso', () => {
+    const n = nuevo(NOVATO_PANICO);
+    expect(n.actualizarContexto({ ubicacion: 'eva' }, T).some((m) => m.hallazgo.riesgoId.startsWith('tarea.'))).toBe(false);
+  });
+});
+
+describe('riesgos HRP', () => {
+  it('cada hallazgo lleva sus riesgos y el estado se agrupa por riesgo', () => {
+    const n = nuevo();
+    n.registrar(L('spo2', 90), T);
+    expect(n.hallazgo('pulmones.spo2')?.hrp).toEqual(['hipoxia']);
+    const e = n.estadoRiesgosHRP();
+    expect(e.hipoxia).toBe('aviso');
+    expect(e.oseo).toBe('sinDatos');
   });
 });
 

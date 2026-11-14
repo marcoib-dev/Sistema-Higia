@@ -2,17 +2,8 @@
 // Neurología y salud mental: traumatismo craneal, desorientación / deterioro cognitivo y posibles
 // síntomas psicóticos. Higia no diagnostica: detecta señales, las comunica con calma y avisa a quien
 // corresponde. Cada hallazgo deja registrados los datos exactos en que se basó.
-import type { Historial } from '../historial';
 import { promedio } from '../historial';
-import type { DatoClinico, Lectura, Perfil } from '../tipos';
-import { dato, definirRegla, HORA, normal, r1 } from './util';
-
-/** Lecturas de las últimas `horas` horas. */
-const recientes = (h: Historial, s: Parameters<Historial['ultima']>[0], ahora: number, horas: number) =>
-  h.desde(s, ahora - horas * HORA);
-const ultimaReciente = (h: Historial, s: Parameters<Historial['ultima']>[0], ahora: number, horas: number): Lectura | undefined =>
-  recientes(h, s, ahora, horas).at(-1);
-const datosDe = (p: Perfil, ...ls: (Lectura | undefined)[]): DatoClinico[] => ls.filter((l): l is Lectura => !!l).map((l) => dato(l, p));
+import { dato, datosDe, definirRegla, normal, r1, ultimaReciente } from './util';
 
 // ── Traumatismo craneal ────────────────────────────────────────────────
 
@@ -24,6 +15,7 @@ export const reglaTraumaCraneal = definirRegla(
     id: 'trauma.craneal', nombre: 'Traumatismo craneal', sistema: 'cerebro',
     sensores: ['impactoCabeza', 'orientacion'],
     fuente: 'Anexo B: lesiones y traumatismos en misión · Acelerómetro del casco y chequeo de orientación',
+    hrp: ['cargasDinamicas', 'eva'],
   },
   (h, p, ahora, c) => {
     const impacto = ultimaReciente(h, 'impactoCabeza', ahora, 24);
@@ -51,7 +43,7 @@ export const reglaTraumaCraneal = definirRegla(
           vigilar,
           'No duermas solo ni hagas tareas de riesgo hasta que te evalúe el médico.',
         ],
-        posibleIncapacidad: true, ruta: 'reporte', sensible: false,
+        posibleIncapacidad: true, ruta: 'reporte', sensible: false, bloquea: ['eva', 'pilotaje', 'ejercicioIntenso'],
       };
     }
     if (g >= IMPACTO.golpe) {
@@ -60,7 +52,7 @@ export const reglaTraumaCraneal = definirRegla(
         resumenSimple: 'Recibiste un golpe en la cabeza.',
         accion: `Higia te hará unas preguntas de orientación. ${vigilar}`,
         accionPorUbicacion: { eva: `Pausa la tarea y asegúrate al arnés. Higia te hará unas preguntas de orientación. ${vigilar}` },
-        ruta: 'reporte', sensible: false,
+        ruta: 'reporte', sensible: false, bloquea: ['eva', 'pilotaje'],
       };
     }
     if (g >= IMPACTO.leve && c.ubicacion !== 'rover') {
@@ -80,6 +72,7 @@ export const reglaOrientacion = definirRegla(
     id: 'mental.orientacion', nombre: 'Orientación y rendimiento cognitivo', sistema: 'cerebro',
     sensores: ['orientacion', 'cognicion', 'tiempoReaccion'],
     fuente: 'Anexo B: rendimiento cognitivo y conductual · Pruebas tipo Cognition / WinSCAT y PVT',
+    hrp: ['conductual', 'sensoriomotor'],
   },
   (h, p, ahora) => {
     const orientacion = ultimaReciente(h, 'orientacion', ahora, 12);
@@ -115,7 +108,7 @@ export const reglaOrientacion = definirRegla(
         accion: 'Detén lo que haces y quédate en un lugar seguro. Higia avisa a un compañero.',
         accionPorUbicacion: { eva: 'Detén la EVA y asegúrate al arnés. Tu compañero debe guiarte de regreso.' },
         pasos: pasosDesorientacion,
-        posibleIncapacidad: true, ruta: 'reporte', sensible: true,
+        posibleIncapacidad: true, ruta: 'reporte', sensible: true, bloquea: ['eva', 'pilotaje'],
       };
     }
     if ((orientacion && orientacion.valor <= 7) || caidaCog >= 0.15 || subeRt >= 0.25) {
@@ -125,7 +118,7 @@ export const reglaOrientacion = definirRegla(
         resumenSimple: porOrientacion ? 'Algunas respuestas de orientación no fueron correctas.' : 'Tu atención está algo más lenta que de costumbre.',
         textoCalmado: 'Parece que hoy estás algo cansado. Vamos a ir con calma.',
         accion: 'Evita tareas de riesgo por ahora, descansa e hidrátate. Higia repetirá la prueba más tarde.',
-        ruta: 'reporte', sensible: true,
+        ruta: 'reporte', sensible: true, bloquea: ['eva', 'pilotaje'],
       };
     }
     return { ...normal('Orientación y rendimiento cognitivo', detalle, true), datos };
@@ -139,6 +132,7 @@ export const reglaPsicosis = definirRegla(
     id: 'mental.psicosis', nombre: 'Alteraciones de la percepción', sistema: 'cerebro',
     sensores: ['marcadoresPsicoticos', 'horasSueno', 'estres'],
     fuente: 'Anexo B: salud conductual en aislamiento y confinamiento · Factores de riesgo: privación de sueño y estrés',
+    hrp: ['conductual'],
   },
   (h, p, ahora) => {
     const marcadores = ultimaReciente(h, 'marcadoresPsicoticos', ahora, 24);
@@ -165,7 +159,7 @@ export const reglaPsicosis = definirRegla(
         resumenSimple: 'Lo que cuentas sugiere que tu percepción puede estar alterada.',
         textoCalmado: 'Higia está contigo. Vamos a buscar a alguien para que te acompañe y conversar con calma.',
         accion: 'No te quedes solo. Higia avisa a un compañero y al médico de la misión.',
-        pasos, ruta: 'reporte', sensible: true,
+        pasos, ruta: 'reporte', sensible: true, bloquea: ['eva', 'pilotaje'],
       };
     }
     if (marcadores.valor >= 3 || (marcadores.valor >= 1 && (suenoBajo || estresAlto))) {

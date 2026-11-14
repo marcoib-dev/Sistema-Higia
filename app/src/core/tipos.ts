@@ -3,6 +3,7 @@
  * Si cambian algo aquí, avísenle al equipo: lo usan el motor, la GUI, la voz y la interoperabilidad.
  */
 import type { Historial } from './historial';
+import type { IdRiesgoHRP } from './riesgosHRP';
 
 // ── Cuerpo ──────────────────────────────────────────────────────────────
 export type SistemaCorporal =
@@ -40,25 +41,51 @@ export type TipoSensor =
   | 'marcadoresPsicoticos' // 0–10, señales en la conversación (voces, ideas de persecución, discurso desorganizado)
   | 'impactoCabeza';      // g, pico de aceleración medido en el casco o el traje
 
-/** Nombre y unidad de cada dato, para mostrar qué datos usó cada análisis. */
-export const INFO_SENSOR: Record<TipoSensor, { nombre: string; unidad: string }> = {
-  frecuenciaCardiaca: { nombre: 'Frecuencia cardíaca', unidad: 'lpm' },
-  presionSistolica: { nombre: 'Presión sistólica', unidad: 'mmHg' },
-  presionDiastolica: { nombre: 'Presión diastólica', unidad: 'mmHg' },
-  spo2: { nombre: 'Saturación de oxígeno', unidad: '%' },
-  temperatura: { nombre: 'Temperatura', unidad: '°C' },
-  glucemia: { nombre: 'Glucemia', unidad: 'mg/dL' },
-  horasSueno: { nombre: 'Horas de sueño', unidad: 'h' },
-  animo: { nombre: 'Ánimo', unidad: '/10' },
-  estres: { nombre: 'Índice de estrés', unidad: '/100' },
-  minutosEjercicio: { nombre: 'Ejercicio del día', unidad: 'min' },
-  dosisRadiacion: { nombre: 'Dosis de radiación acumulada', unidad: 'mSv' },
-  orientacion: { nombre: 'Chequeo de orientación', unidad: '/10' },
-  cognicion: { nombre: 'Prueba cognitiva', unidad: '/100' },
-  tiempoReaccion: { nombre: 'Tiempo de reacción (PVT)', unidad: 'ms' },
-  marcadoresPsicoticos: { nombre: 'Señales de alteración de la percepción', unidad: '/10' },
-  impactoCabeza: { nombre: 'Impacto en la cabeza', unidad: 'g' },
+/** Familia de cada dato: el simulador agrupa sus controles por esto. */
+export type CategoriaSensor = 'vital' | 'sintoma' | 'prueba' | 'habito' | 'traje' | 'entorno' | 'laboratorio';
+
+export const NOMBRE_CATEGORIA_SENSOR: Record<CategoriaSensor, string> = {
+  vital: 'Signos vitales', sintoma: 'Síntomas reportados', prueba: 'Pruebas a bordo', habito: 'Hábitos y encuestas',
+  traje: 'Traje y vehículo', entorno: 'Entorno', laboratorio: 'Laboratorio',
 };
+
+export interface InfoSensor {
+  nombre: string;
+  unidad: string;
+  categoria: CategoriaSensor;
+  /** Rango válido: límites del control del simulador y de la validación de entradas (voz, IA). */
+  min: number;
+  max: number;
+  paso: number;
+  /** El astronauta lo puede reportar hablando. */
+  porVoz?: boolean;
+}
+
+/** Nombre, unidad y rango de cada dato. Lo usan la trazabilidad, el simulador y la validación de entradas. */
+export const INFO_SENSOR: Record<TipoSensor, InfoSensor> = {
+  frecuenciaCardiaca: { nombre: 'Frecuencia cardíaca', unidad: 'lpm', categoria: 'vital', min: 25, max: 220, paso: 1, porVoz: true },
+  presionSistolica: { nombre: 'Presión sistólica', unidad: 'mmHg', categoria: 'vital', min: 50, max: 240, paso: 1, porVoz: true },
+  presionDiastolica: { nombre: 'Presión diastólica', unidad: 'mmHg', categoria: 'vital', min: 30, max: 150, paso: 1, porVoz: true },
+  spo2: { nombre: 'Saturación de oxígeno', unidad: '%', categoria: 'vital', min: 60, max: 100, paso: 1, porVoz: true },
+  temperatura: { nombre: 'Temperatura', unidad: '°C', categoria: 'vital', min: 32, max: 42, paso: 0.1, porVoz: true },
+  glucemia: { nombre: 'Glucemia', unidad: 'mg/dL', categoria: 'laboratorio', min: 30, max: 400, paso: 1, porVoz: true },
+  horasSueno: { nombre: 'Horas de sueño', unidad: 'h', categoria: 'habito', min: 0, max: 14, paso: 0.5, porVoz: true },
+  animo: { nombre: 'Ánimo', unidad: '/10', categoria: 'habito', min: 1, max: 10, paso: 1, porVoz: true },
+  estres: { nombre: 'Índice de estrés', unidad: '/100', categoria: 'vital', min: 0, max: 100, paso: 1, porVoz: true },
+  minutosEjercicio: { nombre: 'Ejercicio del día', unidad: 'min', categoria: 'habito', min: 0, max: 300, paso: 5 },
+  dosisRadiacion: { nombre: 'Dosis de radiación acumulada', unidad: 'mSv', categoria: 'entorno', min: 0, max: 1000, paso: 0.5 },
+  orientacion: { nombre: 'Chequeo de orientación', unidad: '/10', categoria: 'prueba', min: 0, max: 10, paso: 1 },
+  cognicion: { nombre: 'Prueba cognitiva', unidad: '/100', categoria: 'prueba', min: 0, max: 100, paso: 1 },
+  tiempoReaccion: { nombre: 'Tiempo de reacción (PVT)', unidad: 'ms', categoria: 'prueba', min: 150, max: 1000, paso: 5 },
+  marcadoresPsicoticos: { nombre: 'Señales de alteración de la percepción', unidad: '/10', categoria: 'sintoma', min: 0, max: 10, paso: 1 },
+  impactoCabeza: { nombre: 'Impacto en la cabeza', unidad: 'g', categoria: 'traje', min: 0, max: 100, paso: 1 },
+};
+
+/** Recorta un valor al rango válido del dato. */
+export function enRango(s: TipoSensor, v: number): number {
+  const i = INFO_SENSOR[s];
+  return Math.min(i.max, Math.max(i.min, v));
+}
 
 /** Dato concreto en el que se apoya un análisis clínico (trazabilidad). */
 export interface DatoClinico {
@@ -198,7 +225,21 @@ export interface Contexto {
   medicoABordo: boolean;
   conexionHabitat: boolean;
   conexionTierra: boolean;
+  /** Día de la misión (1 = lanzamiento). Lo usan los riesgos de largo plazo (hueso, radiación). */
+  diaMision: number;
+  /** Hubo un cambio de gravedad en las últimas ~72 h (llegada a la superficie o regreso). */
+  transicionGravedad: boolean;
 }
+
+/** Tareas críticas que un hallazgo puede contraindicar. */
+export type TareaCritica = 'eva' | 'pilotaje' | 'ejercicioIntenso';
+export const TAREAS_CRITICAS: TareaCritica[] = ['eva', 'pilotaje', 'ejercicioIntenso'];
+export const NOMBRE_TAREA: Record<TareaCritica, string> = {
+  eva: 'Caminata espacial (EVA)', pilotaje: 'Pilotaje (rover o nave)', ejercicioIntenso: 'Ejercicio intenso',
+};
+
+export { NOMBRE_PELIGRO } from './riesgosHRP';
+export type { IdRiesgoHRP, Peligro } from './riesgosHRP';
 
 /** Retardo de la comunicación con Tierra (solo ida), según el destino. */
 export const RETARDO_TIERRA: Record<Destino, string> = {
@@ -239,6 +280,10 @@ export interface Hallazgo {
   datos?: DatoClinico[];
   /** Región del cuerpo afectada, si se conoce (se destaca en la figura). */
   region?: RegionCuerpo;
+  /** Riesgos del HRP de la NASA a los que responde (lo copia `definirRegla`). */
+  hrp?: IdRiesgoHRP[];
+  /** Tareas críticas que este hallazgo contraindica (cuenta desde nivel aviso). */
+  bloquea?: TareaCritica[];
 }
 
 export interface Regla {
@@ -248,6 +293,8 @@ export interface Regla {
   /** Sensores que disparan la regla: solo se evalúa cuando llega uno de estos (ahorro de energía). */
   sensores: TipoSensor[];
   fuente: string;
+  /** Riesgos del HRP que cubre. Obligatorio: alimenta la matriz de cobertura. */
+  hrp: IdRiesgoHRP[];
   /** Devuelve null si no hay datos suficientes. El contexto permite ajustar la evaluación (p. ej. en ejercicio). */
   evaluar(h: Historial, p: Perfil, ahora: number, c: Contexto): Hallazgo | null;
 }

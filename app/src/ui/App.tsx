@@ -30,6 +30,7 @@ const CONTEXTO_INICIAL: Contexto = {
   pantallaHabitat: true, pantallaPersonal: true, auricular: true,
   companeroCercano: true, medicoABordo: false,
   conexionHabitat: false, conexionTierra: false,
+  diaMision: 45, transicionGravedad: false,
 };
 
 /** Segundos antes de escalar en que Higia avisa por voz que va a comunicarse con otros. */

@@ -7,10 +7,11 @@ import { elegirCanal } from './canales';
 import { Historial } from './historial';
 import { intervaloRecordatorioMs, redactar } from './personalizador';
 import type { DestinoPedido } from './acciones';
+import { IDS_HRP, type IdRiesgoHRP } from './riesgosHRP';
 import {
-  NOMBRE_DESTINO_COMUNICACION, NOMBRE_SISTEMA, ORDEN_NIVEL, RETARDO_TIERRA, SISTEMAS, resumenClinico,
+  NOMBRE_DESTINO_COMUNICACION, NOMBRE_SISTEMA, NOMBRE_TAREA, ORDEN_NIVEL, RETARDO_TIERRA, SISTEMAS, TAREAS_CRITICAS, resumenClinico,
   type Comunicacion, type Contexto, type DestinoComunicacion, type EstadoCorporal, type Hallazgo, type Lectura,
-  type Mensaje, type Nivel, type Perfil, type RegionCuerpo, type Regla, type SistemaCorporal,
+  type Mensaje, type Nivel, type Perfil, type RegionCuerpo, type Regla, type SistemaCorporal, type TareaCritica,
 } from './tipos';
 
 /** Cómo llega una comunicación a su destino con el contexto actual. */
@@ -26,6 +27,14 @@ const UBICACION_TEXTO: Record<Contexto['ubicacion'], string> = { habitat: 'en el
 /** Tiempo para responder "Estoy bien" antes de escalar (cortos para la demo). */
 export const PLAZO_CONFIRMACION_MS = 30_000;
 export const PLAZO_CONFIRMACION_INCAPACIDAD_MS = 15_000;
+/** Los hallazgos que no salen de una regla (conversación, asistente, tareas) vencen solos. */
+export const VENCIMIENTO_HALLAZGO_SUELTO_MS = 24 * 60 * 60_000;
+
+/** Aptitud para cada tarea crítica, con los hallazgos que la contraindican. */
+export type AptitudTareas = Record<TareaCritica, { apto: boolean; motivos: Hallazgo[] }>;
+
+/** Hallazgos que no produce una regla: no se reevalúan, caducan por tiempo. */
+const esSuelto = (id: string) => id.startsWith('conversacion.') || id.startsWith('asistente.') || id.startsWith('tarea.');
 
 export class NucleoSalud {
   readonly historial = new Historial();
@@ -56,6 +65,9 @@ export class NucleoSalud {
 
   /** Reevaluación periódica, para los recordatorios. */
   tick(ahora = Date.now()): Mensaje[] {
+    for (const h of [...this.hallazgos.values()]) {
+      if (esSuelto(h.riesgoId) && ahora - h.timestamp >= VENCIMIENTO_HALLAZGO_SUELTO_MS) this.olvidar(h.riesgoId);
+    }
     return this.evaluar(this.reglas, ahora);
   }
 
@@ -64,6 +76,7 @@ export class NucleoSalud {
    * Reevalúa las reglas, porque el contexto cambia la interpretación, y entrega lo retenido si ya se puede.
    */
   actualizarContexto(cambios: Partial<Contexto>, ahora = Date.now()): Mensaje[] {
+    const ubicacionPrevia = this.contexto.ubicacion;
     this.contexto = { ...this.contexto, ...cambios };
     const salida: Mensaje[] = [];
     const siguenRetenidos: Mensaje[] = [];
@@ -74,7 +87,9 @@ export class NucleoSalud {
     }
     this.diferidos = siguenRetenidos;
     const entregados = new Set(salida.map((m) => m.hallazgo.riesgoId));
-    return [...salida, ...this.evaluar(this.reglas, ahora).filter((m) => !entregados.has(m.hallazgo.riesgoId))];
+    const evaluados = this.evaluar(this.reglas, ahora).filter((m) => !entregados.has(m.hallazgo.riesgoId));
+    const tarea = cambios.ubicacion && cambios.ubicacion !== ubicacionPrevia ? this.revisarTarea(ahora) : [];
+    return [...salida, ...evaluados, ...tarea];
   }
 
   /** Cambio de perfil: no altera la detección, solo la entrega. */
@@ -209,6 +224,29 @@ export class NucleoSalud {
     return r;
   }
 
+  /** Riesgos del HRP: el peor nivel de los hallazgos que responden a cada uno. */
+  estadoRiesgosHRP(): Record<IdRiesgoHRP, Nivel | 'sinDatos'> {
+    const e = Object.fromEntries(IDS_HRP.map((id) => [id, 'sinDatos'])) as Record<IdRiesgoHRP, Nivel | 'sinDatos'>;
+    for (const h of this.hallazgos.values()) {
+      for (const id of h.hrp ?? []) {
+        const actual = e[id];
+        if (actual === 'sinDatos' || ORDEN_NIVEL[h.nivel] > ORDEN_NIVEL[actual]) e[id] = h.nivel;
+      }
+    }
+    return e;
+  }
+
+  /** Si cada tarea crítica está contraindicada por algún hallazgo de nivel aviso o superior. */
+  aptitudTareas(): AptitudTareas {
+    const activos = [...this.hallazgos.values()]
+      .filter((h) => ORDEN_NIVEL[h.nivel] >= ORDEN_NIVEL.aviso && h.bloquea?.length)
+      .sort((a, b) => ORDEN_NIVEL[b.nivel] - ORDEN_NIVEL[a.nivel]);
+    return Object.fromEntries(TAREAS_CRITICAS.map((t) => {
+      const motivos = activos.filter((h) => h.bloquea!.includes(t));
+      return [t, { apto: motivos.length === 0, motivos }];
+    })) as AptitudTareas;
+  }
+
   hallazgosActuales(): Hallazgo[] {
     return [...this.hallazgos.values()];
   }
@@ -234,12 +272,55 @@ export class NucleoSalud {
     const salida: Mensaje[] = [];
     for (const regla of reglas) {
       const h = regla.evaluar(this.historial, this.perfil, ahora, this.contexto);
-      if (!h) continue;
+      if (!h) {
+        // Sin datos vigentes (p. ej. el golpe ya tiene más de 24 h): el hallazgo viejo caduca.
+        if (this.hallazgos.has(regla.id)) this.olvidar(regla.id);
+        continue;
+      }
       this.hallazgos.set(h.riesgoId, h);
       const m = this.procesarHallazgo(h, ahora);
       if (m) salida.push(m);
     }
     return salida.sort((a, b) => ORDEN_NIVEL[b.hallazgo.nivel] - ORDEN_NIVEL[a.hallazgo.nivel]);
+  }
+
+  /** Borra un hallazgo y todo lo que dependía de él (emitido, confirmaciones y mensajes retenidos). */
+  private olvidar(riesgoId: string): void {
+    this.hallazgos.delete(riesgoId);
+    this.emitido.delete(riesgoId);
+    for (const [id, p] of this.porConfirmar) if (p.mensaje.hallazgo.riesgoId === riesgoId) this.porConfirmar.delete(id);
+    this.diferidos = this.diferidos.filter((d) => d.hallazgo.riesgoId !== riesgoId);
+  }
+
+  /**
+   * Al cambiar de ubicación: si sale a EVA o sube al rover con un hallazgo que lo contraindica,
+   * Higia avisa (no lo impide: la decisión es del astronauta y del equipo). Al volver, el aviso se borra.
+   */
+  private revisarTarea(ahora: number): Mensaje[] {
+    this.olvidar('tarea.eva');
+    this.olvidar('tarea.pilotaje');
+    const u = this.contexto.ubicacion;
+    if (u === 'habitat') return [];
+    const tarea: TareaCritica = u === 'eva' ? 'eva' : 'pilotaje';
+    const { apto, motivos } = this.aptitudTareas()[tarea];
+    if (apto) return [];
+    const nombre = NOMBRE_TAREA[tarea].toLowerCase();
+    const sensible = motivos.some((m) => m.sensible);
+    const h: Hallazgo = {
+      riesgoId: `tarea.${tarea}`, sistema: motivos[0].sistema, nivel: 'aviso',
+      titulo: tarea === 'eva' ? 'Saliste a EVA con una contraindicación' : 'Pilotaje con una contraindicación',
+      resumenSimple: `Hay señales de salud que desaconsejan la ${nombre} ahora mismo.`,
+      detalleTecnico: `Contraindicada por: ${motivos.map((m) => `${m.titulo} (${m.nivel})`).join('; ')}`,
+      accion: tarea === 'eva'
+        ? 'Si puedes, pospón la salida. Si ya estás fuera, quédate cerca de la esclusa y con tu compañero a la vista.'
+        : 'Si puedes, deja que otra persona maneje. Si no, ve despacio y evita maniobras bruscas.',
+      ruta: 'reporte', sensible, fuente: 'Aptitud para tareas críticas (agrega los hallazgos activos)', timestamp: ahora,
+      hrp: [...new Set(motivos.flatMap((m) => m.hrp ?? []))],
+      datos: motivos.flatMap((m) => m.datos ?? []),
+    };
+    this.hallazgos.set(h.riesgoId, h);
+    const m = this.procesarHallazgo(h, ahora);
+    return m ? [m] : [];
   }
 
   /** Decide si un hallazgo amerita mensaje y lo prepara (confirmación, reporte, retención). */

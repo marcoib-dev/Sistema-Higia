@@ -6,6 +6,7 @@ export const reglaSaturacionOxigeno = definirRegla(
     id: 'pulmones.spo2', nombre: 'Saturación de oxígeno', sistema: 'pulmones',
     sensores: ['spo2'],
     fuente: 'Anexo F: síntomas de hipoxia leve · Anexo G: pulmones / respiración',
+    hrp: ['hipoxia'],
   },
   (h) => {
     const v = h.ultima('spo2')?.valor;

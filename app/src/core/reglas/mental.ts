@@ -8,6 +8,7 @@ export const reglaSueno = definirRegla(
     id: 'sueno.deficit', nombre: 'Déficit de sueño', sistema: 'cerebro',
     sensores: ['horasSueno'],
     fuente: 'Anexo F: horas de sueño, actigrafía · Anexo B: sueño y ritmo circadiano',
+    hrp: ['sueno'],
   },
   (h) => {
     const noches = h.ultimas('horasSueno', 3);
@@ -40,6 +41,7 @@ export const reglaAnimo = definirRegla(
     id: 'mental.animo', nombre: 'Estado de ánimo', sistema: 'cerebro',
     sensores: ['animo'],
     fuente: 'Anexo F: encuestas de ánimo · Anexo B: salud conductual por aislamiento y confinamiento',
+    hrp: ['conductual'],
   },
   (h, p) => {
     const ult = h.ultima('animo');
@@ -75,6 +77,7 @@ export const reglaEstres = definirRegla(
     id: 'mental.estres', nombre: 'Estrés agudo', sistema: 'cerebro',
     sensores: ['estres'],
     fuente: 'Anexo B: salud conductual · Documento de visión: ejemplo de EVA con ataque de pánico',
+    hrp: ['conductual'],
   },
   (h, p) => {
     const ult = h.ultima('estres');

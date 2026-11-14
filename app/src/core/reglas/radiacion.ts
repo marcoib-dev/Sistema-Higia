@@ -11,6 +11,7 @@ export const reglaRadiacion = definirRegla(
     id: 'radiacion.dosis', nombre: 'Exposición a radiación', sistema: 'cuerpo',
     sensores: ['dosisRadiacion'],
     fuente: 'Anexo A: peligro de radiación · Anexo F: dosímetros',
+    hrp: ['radiacion'],
   },
   (h, _p, _ahora, c) => {
     const ult = h.ultima('dosisRadiacion');

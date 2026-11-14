@@ -26,6 +26,16 @@ export class Historial {
   desde(s: TipoSensor, ts: number): Lectura[] {
     return (this.porSensor.get(s) ?? []).filter((l) => l.timestamp >= ts);
   }
+
+  /** Lecturas con timestamp en [desde, hasta]. */
+  entre(s: TipoSensor, desde: number, hasta: number): Lectura[] {
+    return (this.porSensor.get(s) ?? []).filter((l) => l.timestamp >= desde && l.timestamp <= hasta);
+  }
+
+  /** Datos con al menos una lectura. */
+  sensores(): TipoSensor[] {
+    return [...this.porSensor.keys()].filter((s) => this.porSensor.get(s)!.length > 0);
+  }
 }
 
 export function promedio(xs: number[]): number {

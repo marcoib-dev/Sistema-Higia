@@ -10,6 +10,7 @@ export const reglaEjercicio = definirRegla(
     id: 'musculo.ejercicio', nombre: 'Ejercicio diario', sistema: 'musculos',
     sensores: ['minutosEjercicio'],
     fuente: 'Anexo F: contramedida de 1,5 h/día de ejercicio · Anexo G: huesos y músculos',
+    hrp: ['aptitud', 'oseo'],
   },
   (h) => {
     const ult = h.ultima('minutosEjercicio');
