@@ -2,7 +2,6 @@ import { redactar } from '../../core/personalizador';
 import { NOMBRE_SISTEMA, ORDEN_NIVEL, SISTEMAS, type Contexto, type EstadoCorporal, type Hallazgo, type Perfil, type SistemaCorporal } from '../../core/tipos';
 import { EncabezadoSeccion, InsigniaNivel, NOMBRE_NIVEL, Punto, sinTitulo } from '../componentes/basicos';
 import { FiguraCorporal } from '../FiguraCorporal';
-import { FiguraCorporal3D } from '../FiguraCorporal3D';
 import { Icono } from '../iconos';
 
 interface Props {
@@ -10,13 +9,12 @@ interface Props {
   contexto: Contexto;
   estado: EstadoCorporal;
   hallazgos: Hallazgo[];
-  figura3D: boolean;
   seleccion: SistemaCorporal[] | null;
   onSeleccionar: (s: SistemaCorporal[] | null) => void;
   onIrMensajes: () => void;
 }
 
-export function VistaResumen({ perfil, contexto, estado, hallazgos, figura3D, seleccion, onSeleccionar, onIrMensajes }: Props) {
+export function VistaResumen({ perfil, contexto, estado, hallazgos, seleccion, onSeleccionar, onIrMensajes }: Props) {
   const atencion = hallazgos
     .filter((h) => ORDEN_NIVEL[h.nivel] >= ORDEN_NIVEL.aviso)
     .sort((a, b) => ORDEN_NIVEL[b.nivel] - ORDEN_NIVEL[a.nivel]);
@@ -29,9 +27,7 @@ export function VistaResumen({ perfil, contexto, estado, hallazgos, figura3D, se
       <div className="resumen">
         <section className="tarjeta tarjeta-figura" aria-labelledby="titulo-cuerpo">
           <h2 id="titulo-cuerpo" className="titulo-tarjeta">Cuerpo</h2>
-          {figura3D
-            ? <FiguraCorporal3D estado={estado} seleccion={seleccion} onSeleccionar={onSeleccionar} />
-            : <FiguraCorporal estado={estado} seleccion={seleccion} onSeleccionar={onSeleccionar} />}
+          <FiguraCorporal estado={estado} seleccion={seleccion} onSeleccionar={onSeleccionar} />
         </section>
 
         <div className="resumen-lateral">

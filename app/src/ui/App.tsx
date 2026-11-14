@@ -11,7 +11,6 @@ import { REGLAS } from '../core/reglas';
 import type { Contexto, Lectura, Mensaje, SistemaCorporal } from '../core/tipos';
 import { BannerAlerta, BarraSuperior, Navegacion } from './componentes/Estructura';
 import { PanelDemo } from './componentes/PanelDemo';
-import { webglDisponible } from './FiguraCorporal3D';
 import { SECCIONES, useSeccion } from './navegacion';
 import { VistaAsistente, type Intercambio, type ResultadoConversacion } from './vistas/VistaAsistente';
 import { VistaEntorno } from './vistas/VistaEntorno';
@@ -38,7 +37,6 @@ const escribiendo = (e: KeyboardEvent) => {
 export function App() {
   const [nucleo] = useState(() => new NucleoSalud(REGLAS, PERFILES[0], CONTEXTO_INICIAL));
   const [interop] = useState(() => new AdaptadorEjemplo());
-  const [figura3D] = useState(webglDisponible);
   const [seccion, ir] = useSeccion();
   const [, setVersion] = useState(0);
   const [ahora, setAhora] = useState(Date.now());
@@ -181,7 +179,7 @@ export function App() {
           {seccion === 'resumen' && (
             <VistaResumen
               perfil={nucleo.perfil} contexto={c} estado={nucleo.estadoCorporal()} hallazgos={nucleo.hallazgosActuales()}
-              figura3D={figura3D} seleccion={seleccion} onSeleccionar={setSeleccion} onIrMensajes={() => ir('mensajes')}
+              seleccion={seleccion} onSeleccionar={setSeleccion} onIrMensajes={() => ir('mensajes')}
             />
           )}
           {seccion === 'mensajes' && (

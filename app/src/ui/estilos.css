@@ -30,6 +30,8 @@
   --ancho-nav: 220px;
   --ancho-demo: 380px;
   --alto-banner: 0px;
+  --piel-centro: #273152;
+  --piel-borde: #18203a;
   --tope: calc(var(--alto-barra) + var(--alto-banner));
 
   color-scheme: dark;
@@ -232,9 +234,7 @@ select, input[type='text'], input:not([type]) {
 .resumen { display: grid; grid-template-columns: minmax(300px, 420px) minmax(0, 1fr); gap: 20px; align-items: start; }
 .resumen-lateral { display: grid; gap: 20px; min-width: 0; }
 .tarjeta-figura { position: sticky; top: calc(var(--tope) + 20px); }
-.figura svg { width: 100%; max-height: 520px; display: block; }
-.lienzo-3d { width: 100%; height: 500px; cursor: grab; touch-action: none; }
-.lienzo-3d:active { cursor: grabbing; }
+.figura svg { width: 100%; display: block; }
 .region { cursor: pointer; }
 .ayuda { margin: 6px 0 10px; font-size: 12px; color: var(--texto-3); text-align: center; }
 .leyenda { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; font-size: 12px; color: var(--texto-2); }
@@ -345,6 +345,42 @@ select, input[type='text'], input:not([type]) {
 .registro-cab { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .lista-registro summary { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--acento); font-size: 13px; }
 
+/* ── Figura anatómica 2D ─────────────────────────────────────────────── */
+.figura-svg { max-height: 600px; margin: 0 auto; overflow: visible; }
+.figura-svg .contorno { fill: none; stroke: #8794b8; stroke-width: 1.3; pointer-events: none; }
+.sistema-svg { cursor: pointer; outline: none; --c: var(--sin-datos); transition: filter .15s, opacity .15s; }
+.sistema-svg.nivel-normal { --c: var(--ok); }
+.sistema-svg.nivel-info { --c: var(--info); }
+.sistema-svg.nivel-aviso { --c: var(--aviso); }
+.sistema-svg.nivel-alerta { --c: var(--alerta); }
+.sistema-svg.nivel-sinDatos { --c: #59648a; }
+
+.organo path, .organo circle { fill: color-mix(in srgb, var(--c) 62%, #0a0e1a); stroke: var(--c); stroke-width: 1.2; }
+.organo .detalle { fill: none; stroke: rgba(8, 12, 24, .55); stroke-width: 1.1; }
+.organo .trazo { fill: none; stroke: var(--c); stroke-width: 3; stroke-linecap: round; }
+.organo .trazo.grueso { stroke-width: 7; opacity: .55; }
+.organo .trazo.fino { stroke-width: 2; }
+.ojos path { fill: color-mix(in srgb, var(--c) 30%, #d9dee9); stroke-width: .8; }
+.relieve path, .relieve ellipse { fill: none; stroke: rgba(200, 210, 235, .16); stroke-width: 1.1; stroke-linecap: round; }
+.organo .pupila { fill: #0a0e1a; stroke: none; }
+.zona path { fill: var(--c); opacity: .14; }
+.zona.nivel-sinDatos path { opacity: 0; }
+.zona.seleccionado path { opacity: .32; }
+.hueso rect, .hueso .hueso-relleno { fill: color-mix(in srgb, var(--c) 30%, #0a0e1a); stroke: var(--c); stroke-width: 1; }
+.hueso .hueso-trazo { fill: none; stroke: var(--c); stroke-width: 2; stroke-linecap: round; opacity: .75; }
+.hueso .costilla { stroke-width: 1.6; opacity: .45; }
+.vaso path { fill: none; stroke: var(--c); stroke-width: 1.6; stroke-linecap: round; opacity: .5; }
+.musculo path { fill: none; stroke: var(--c); stroke-width: 1.3; stroke-linecap: round; opacity: .55; }
+.aura path { stroke: var(--c); opacity: .3; pointer-events: stroke; }
+.aura.nivel-sinDatos path { opacity: .12; }
+
+.sistema-svg:hover { filter: brightness(1.3); }
+.sistema-svg.seleccionado, .sistema-svg:focus-visible { filter: drop-shadow(0 0 5px var(--c)) brightness(1.25); }
+.sistema-svg.nivel-alerta { animation: pulso-alerta 1.6s ease-in-out infinite; }
+@keyframes pulso-alerta { 50% { opacity: .7; } }
+.latido path { transform-box: fill-box; transform-origin: center; animation: latir 1.1s ease-in-out infinite; }
+@keyframes latir { 0%, 40%, 100% { transform: scale(1); } 12% { transform: scale(1.05); } 26% { transform: scale(1.02); } }
+
 /* ── Responsivo ──────────────────────────────────────────────────────── */
 @media (min-width: 1400px) {
   .app.con-demo .contenido { padding-right: calc(var(--ancho-demo) + 32px); }
@@ -358,7 +394,6 @@ select, input[type='text'], input:not([type]) {
   .contador { position: absolute; top: 4px; right: 4px; min-width: 18px; height: 18px; font-size: 10px; }
   .resumen { grid-template-columns: 1fr; }
   .tarjeta-figura { position: static; }
-  .lienzo-3d { height: 420px; }
   .control-voz-estado { display: none; }
 }
 @media (max-width: 760px) {
@@ -380,7 +415,6 @@ select, input[type='text'], input:not([type]) {
   .contenido { padding: 20px 16px 96px; }
   .encabezado-seccion h1 { font-size: 22px; }
   .panel-demo { width: 100%; }
-  .lienzo-3d { height: 380px; }
   .camara-cuerpo { grid-template-columns: 1fr; }
   .burbuja { max-width: 90%; }
   .chat-historial { max-height: calc(100vh - 380px); }

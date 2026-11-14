@@ -40,7 +40,7 @@ Higia vigila la salud de astronautas que viven en hábitats permanentes (base lu
 | **Conversar** | Chat por voz o texto; con IA entiende frases libres y registra los datos que menciona el astronauta |
 | **Ver el entorno** | Con IA, analiza una foto de la cámara para detectar peligros y confirmar el contexto |
 | **Integrarse** | Exporta hallazgos en formato HL7 FHIR hacia sistemas médicos (interfaz de ejemplo) |
-| **Mostrarlo todo** | Figura humana 3D coloreada por estado, mensajes explicados, historial de escaladas y reportes |
+| **Mostrarlo todo** | Figura anatómica detallada coloreada por estado, mensajes explicados, historial de escaladas y reportes |
 
 ---
 
@@ -110,7 +110,7 @@ La interfaz separa **lo que ve el astronauta** de **los controles de la demo**.
 
 | Sección | Para qué sirve |
 |---|---|
-| **Resumen** | Figura 3D del cuerpo, lista de lo que **requiere atención** (avisos y alertas activos, de más grave a menos) y lista de **sistemas del cuerpo**, que se despliega para ver el detalle. La lista y la figura están sincronizadas |
+| **Resumen** | Figura anatómica del cuerpo, lista de lo que **requiere atención** (avisos y alertas activos, de más grave a menos) y lista de **sistemas del cuerpo**, que se despliega para ver el detalle. La lista y la figura están sincronizadas |
 | **Mensajes** | Todo lo que Higia comunicó. Filtros: Todos, Alertas, Retenidos, Escalados. Cada mensaje muestra nivel, canal, si es privado, retenido o recordatorio, a quién se reportó y la guía paso a paso si corresponde. **"Por qué este mensaje"** abre el canal elegido, la base científica, el dato técnico y la comparación entre los tres astronautas |
 | **Asistente** | Chat con Higia por voz o texto. Sugerencias para empezar, micrófono, modo **manos libres** e indicación de si respondió la IA o el intérprete local |
 | **Entorno** | El contexto actual en fichas: ubicación y destino, actividad, clima espacial, hora, a quién se puede avisar y canales de salida. Debajo, la **cámara** |
@@ -153,16 +153,30 @@ El navegador recuerda si el panel quedó abierto.
 
 ## Funcionalidades en detalle
 
-### 1. Figura 3D del cuerpo
+### 1. Figura anatómica
 
-Cuerpo humano realista en pose "A", con piel translúcida gris, malla de cuadros y órganos internos que se colorean solos a medida que llegan datos (`app/src/ui/FiguraCorporal3D.tsx`, con three.js).
+Ilustración anatómica 2D en vista frontal, en SVG (`app/src/ui/FiguraCorporal.tsx`). Liviana, nítida en cualquier tamaño y sin dependencias externas.
 
-- **Anatomía generada por código** (`app/src/ui/figura3d/anatomia.ts`), sin modelos externos ni licencias. Cada parte del cuerpo es un tubo con perfil anatómico (hombros, pecho, cintura, muslos, rodillas, pantorrillas, manos, cabeza con mandíbula y nariz) que se ajusta editando sus números.
-- **Órganos visibles:** cerebro, ojos, oídos internos, pulmones, corazón, abdomen (metabolismo e intestino) y columna (huesos). Las zonas sin órganos (torso, brazos, piernas) tiñen la piel con el color de su estado.
-- **Color = el peor nivel** entre los riesgos activos de ese sistema: verde normal, azul info, amarillo aviso, rojo alerta, gris sin datos. Las regiones en alerta laten y el corazón late siempre.
-- El **aro a los pies** representa todo el cuerpo (radiación).
-- Se rota arrastrando, se acerca con la rueda y gira sola cuando nadie la toca. Un clic en una región muestra su detalle.
-- Si el navegador no tiene WebGL, se usa una figura 2D.
+- **Silueta con proporciones de adulto**, en estilo de ilustración médica: hombros más anchos que la cadera, cuello con trapecios, cintura, brazos junto al cuerpo con codo y muñeca a la altura correcta, manos de perfil con pulgar, rodillas, pantorrillas y tobillos. Relieve tenue de la superficie (cuello, ombligo, línea inguinal, rodillas, tobillos). Se genera con curvas suaves a partir de una lista de puntos del lado derecho, espejada para que sea simétrica.
+- **Cada sistema tiene su dibujo:**
+
+| Sistema | Qué se dibuja |
+|---|---|
+| Cerebro / mente | Cerebro con circunvoluciones y cisura central |
+| Ojos | Ojos con pupilas |
+| Oído interno | Cóclea a cada lado |
+| Pulmones | Tráquea, bronquios y pulmones con sus lóbulos |
+| Corazón y vasos | Corazón con forma anatómica y latido sutil, aorta y arterias hacia brazos y piernas |
+| Metabolismo | Hígado y estómago |
+| Intestino | Intestino grueso e intestino delgado |
+| Huesos | Columna vértebra por vértebra, costillas, clavículas, pelvis y rótulas |
+| Sistema inmune | Ganglios del cuello, axilas e ingle, bazo y piel del torso |
+| Músculos | Brazos y relieve de pectorales, bíceps, abdomen y cuádriceps |
+| Piernas | Piernas y relieve de las pantorrillas |
+| Todo el cuerpo (radiación) | Contorno fino alrededor de la silueta |
+
+- **Color = el peor nivel** entre los riesgos activos de ese sistema: verde normal, azul info, amarillo aviso, rojo alerta, gris sin datos. Lo que está en alerta pulsa suavemente.
+- **Interacción:** al pasar el mouse cada sistema se ilumina y muestra su nombre y nivel; con clic (o Tab y Enter) se selecciona y se ve su detalle en la lista **Sistemas del cuerpo**. Lo seleccionado queda resaltado.
 
 ### 2. Motor de detección
 
@@ -370,7 +384,7 @@ app/
 │       ├── iconos.tsx         Íconos SVG
 │       ├── componentes/       Barra superior, navegación, franja de alerta, panel de demo, piezas básicas
 │       ├── vistas/            Resumen, Mensajes, Asistente, Entorno, Reportes
-│       ├── FiguraCorporal3D.tsx + figura3d/anatomia.ts   Figura 3D
+│       ├── FiguraCorporal.tsx      Figura anatómica 2D (SVG)
 │       └── estilos.css        Sistema de diseño
 ```
 
@@ -379,7 +393,7 @@ app/
 | — | `app/src/core/tipos.ts` | **Contratos de datos.** Avisen antes de cambiarlos. | |
 | **A. Detección** | `app/src/core/reglas/` | 8 reglas con contexto y guías paso a paso | Validar umbrales con los anexos; agregar huesos, temperatura, glucemia, vestibular |
 | **B. Perfil, canales y escalada** | `app/src/core/personalizador.ts`, `canales.ts`, `nucleo.ts` | Texto por perfil, canal, sueño, privacidad, recordatorios, confirmación y escalada | Perfil que aprende del uso |
-| **C. Interfaz** | `app/src/ui/` | Navegación por secciones, figura 3D, panel de demo, franja de alerta, íconos SVG | Gráficos de tendencia, vistas dedicadas "pantalla del hábitat" y "auricular" |
+| **C. Interfaz** | `app/src/ui/` | Navegación por secciones, figura anatómica, panel de demo, franja de alerta, íconos SVG | Gráficos de tendencia, vistas dedicadas "pantalla del hábitat" y "auricular" |
 | **D. Voz, IA e integración** | `app/src/adaptadores/`, `app/server/` | Web Speech API, IA híbrida (conversación y visión), FHIR de ejemplo | Reconocimiento de voz local (Vosk o whisper.cpp) |
 
 ---
@@ -401,7 +415,7 @@ app/
 | Agregar un astronauta de ejemplo | `app/src/adaptadores/simulador/perfiles.ts` |
 | Cambiar los plazos de "Estoy bien" | `PLAZO_CONFIRMACION_MS` y `PLAZO_CONFIRMACION_INCAPACIDAD_MS` en `app/src/core/nucleo.ts` |
 | Cambiar la frecuencia de recordatorios | `intervaloRecordatorioMs` en `app/src/core/personalizador.ts` |
-| Ajustar la forma del cuerpo 3D | Perfiles numéricos en `app/src/ui/figura3d/anatomia.ts` |
+| Ajustar la silueta o los órganos | Puntos de `LADO_DERECHO` y trazados en `app/src/ui/FiguraCorporal.tsx`; colores en la sección "Figura anatómica 2D" de `estilos.css` |
 | Cambiar lo que la IA dice o extrae | Instrucciones y esquemas en `app/server/ia.ts` |
 | Conectar un sistema médico real | Implementar `AdaptadorExterno` en `app/src/adaptadores/interop/` |
 | Agregar una sección | `SECCIONES` en `app/src/ui/navegacion.ts` y una vista en `app/src/ui/vistas/` |
@@ -418,7 +432,6 @@ app/
 | No aparece el botón del micrófono | El navegador no tiene reconocimiento de voz | Usar Chrome |
 | No se escucha la voz | Voz silenciada o volumen en 0 | Revisar el control de voz de la barra superior |
 | "No se pudo acceder a la cámara" | Permiso denegado en el navegador | Habilitar la cámara para `localhost` en la configuración del navegador |
-| Se ve una figura plana en vez de la 3D | El navegador no tiene WebGL | Usar un navegador actualizado con aceleración gráfica |
 | La IA no funciona después de `npm run build` | El build estático no incluye el servidor de IA | Usar `npm run dev` para la demo con IA |
 
 ---
