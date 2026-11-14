@@ -12,6 +12,7 @@ export const reglaSueno = definirRegla(
   (h) => {
     const noches = h.ultimas('horasSueno', 3);
     if (!noches.length) return null;
+    const datos = noches.map((n) => ({ sensor: n.sensor, valor: n.valor, timestamp: n.timestamp, fuente: n.fuente }));
     const media = r1(promedio(noches.map((n) => n.valor)));
     const detalle = `Promedio de ${media} h en las últimas ${noches.length} noches`;
     const accion = 'Esta noche: luz tenue una hora antes de dormir, nada de cafeína después del mediodía y mantén tu horario.';
@@ -20,17 +21,17 @@ export const reglaSueno = definirRegla(
       return {
         nivel: 'aviso', titulo: 'Déficit de sueño acumulado', detalleTecnico: detalle,
         resumenSimple: 'Estás durmiendo bastante menos de lo que necesitas.',
-        accion, ruta: 'autogestion', sensible: false,
+        accion, ruta: 'autogestion', sensible: false, datos,
       };
     }
     if (media < 7) {
       return {
         nivel: 'info', titulo: 'Sueño algo corto', detalleTecnico: detalle,
         resumenSimple: 'Has dormido un poco menos de lo ideal.',
-        accion, ruta: 'autogestion', sensible: false,
+        accion, ruta: 'autogestion', sensible: false, datos,
       };
     }
-    return normal('Sueño', detalle);
+    return { ...normal('Sueño', detalle), datos };
   },
 );
 

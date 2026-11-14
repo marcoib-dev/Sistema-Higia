@@ -40,6 +40,8 @@ export interface Asistente {
   dictando: boolean;
   micDisponible: boolean;
   enviar: (frase: string, origen?: 'voz' | 'texto') => Promise<void>;
+  /** Higia habla por iniciativa propia (p. ej. empieza un chequeo de orientación tras un golpe). */
+  decir: (texto: string, hechos?: string[]) => void;
   alternarEscucha: (v: boolean) => void;
   dictar: () => void;
 }
@@ -92,6 +94,11 @@ export function useAsistente(onFrase: (frase: string) => Promise<ResultadoConver
     return parar;
   }, [escuchaActiva, dictando, micDisponible, enviar]);
 
+  const decir = useCallback((texto: string, hechos: string[] = []) => {
+    setHistorial((prev) => [{ id: Date.now(), pregunta: '', respuesta: texto, fuente: 'local' as const, hechos, origen: 'voz' as const }, ...prev].slice(0, 40));
+    if (vozRef.current) hablar(texto);
+  }, []);
+
   const alternarEscucha = (v: boolean) => {
     guardarEscucha(v);
     setEscuchaActiva(v);
@@ -110,7 +117,7 @@ export function useAsistente(onFrase: (frase: string) => Promise<ResultadoConver
     setDictando(true);
   };
 
-  return { historial, pensando, escuchaActiva, estadoEscucha, detalleEscucha, dictando, micDisponible, enviar, alternarEscucha, dictar };
+  return { historial, pensando, escuchaActiva, estadoEscucha, detalleEscucha, dictando, micDisponible, enviar, decir, alternarEscucha, dictar };
 }
 
 export const TEXTO_ESCUCHA: Record<EstadoEscucha, string> = {

@@ -82,6 +82,36 @@ export const ESCENARIOS: Escenario[] = [
     },
   },
   {
+    id: 'golpe-cabeza-eva', nombre: 'EVA: golpe fuerte en la cabeza',
+    descripcion: 'El casco registra 46 g. Alerta de posible traumatismo craneal y Higia empieza el chequeo de orientación.',
+    contexto: { ubicacion: 'eva', actividad: 'trabajo' },
+    lecturas: (t) => [L('impactoCabeza', 46, t), L('frecuenciaCardiaca', 112, t)],
+  },
+  {
+    id: 'golpe-cabeza-leve', nombre: 'Golpe en la cabeza en el hábitat',
+    descripcion: 'Golpe de 18 g contra una escotilla: aviso y chequeo de orientación. Si fallas preguntas, pasa a alerta.',
+    contexto: { ubicacion: 'habitat' },
+    lecturas: (t) => [L('impactoCabeza', 18, t)],
+  },
+  {
+    id: 'desorientacion', nombre: 'Desorientación y lentitud',
+    descripcion: 'Tras noches cortas: orientación 6/10, prueba cognitiva y tiempo de reacción peores que su línea base.',
+    contexto: { ubicacion: 'habitat' },
+    lecturas: (t) => [
+      L('horasSueno', 4.5, t - 2), L('horasSueno', 5, t - 1), L('horasSueno', 4, t),
+      L('orientacion', 6, t), L('cognicion', 66, t), L('tiempoReaccion', 390, t),
+    ],
+  },
+  {
+    id: 'percepcion', nombre: 'Señales de alteración de la percepción',
+    descripcion: 'Dice oír voces, con poco sueño y estrés alto: alerta sensible de posibles síntomas psicóticos.',
+    contexto: { ubicacion: 'habitat' },
+    lecturas: (t) => [
+      L('horasSueno', 4, t - 2), L('horasSueno', 3.5, t - 1), L('horasSueno', 4, t),
+      L('estres', 82, t), L('marcadoresPsicoticos', 5, t),
+    ],
+  },
+  {
     id: 'madrugada', nombre: 'Aviso de madrugada',
     descripcion: 'Son las 3:00: el aviso se retiene. Cambia la hora a 8 para entregarlo.',
     contexto: { hora: 3, ubicacion: 'habitat' },

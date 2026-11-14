@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { PERFILES } from '../../adaptadores/simulador/perfiles';
 import { redactar } from '../../core/personalizador';
-import { antecedentesDe, type Contexto, type HistoriaClinica, type Mensaje } from '../../core/tipos';
+import { antecedentesDe, INFO_SENSOR, type Contexto, type DatoClinico, type HistoriaClinica, type Mensaje } from '../../core/tipos';
 import { CANAL, EncabezadoSeccion, Etiqueta, InsigniaNivel, sinTitulo, Vacio } from '../componentes/basicos';
 import { Icono } from '../iconos';
 
@@ -10,7 +10,7 @@ type Filtro = 'todos' | 'alertas' | 'retenidos' | 'escalados';
 /** Evaluación de la IA asociada a un mensaje del motor. */
 export type EvaluacionMensaje =
   | { estado: 'cargando' }
-  | { estado: 'lista'; evaluacion: string; recomendacion: string }
+  | { estado: 'lista'; evaluacion: string; recomendacion: string; datosUsados: string[]; limitaciones: string }
   | { estado: 'error'; error: string };
 
 const FILTROS: { id: Filtro; nombre: string; aplica: (m: Mensaje) => boolean }[] = [
@@ -113,6 +113,10 @@ function TarjetaMensaje({ mensaje: m, historia, evaluacion, vence, ahora, contex
             <>
               <p>{evaluacion.evaluacion}</p>
               {evaluacion.recomendacion && <p className="evaluacion-ia-accion"><b>Siguiente paso:</b> {evaluacion.recomendacion}</p>}
+              {evaluacion.datosUsados.length > 0
+                ? <p className="evaluacion-ia-datos"><b>Datos que usó:</b> {evaluacion.datosUsados.join(' · ')}</p>
+                : <p className="evaluacion-ia-datos aviso">La IA no citó datos: tómala con cautela y guíate por el mensaje del motor.</p>}
+              {evaluacion.limitaciones && <p className="evaluacion-ia-datos"><b>Limitaciones:</b> {evaluacion.limitaciones}</p>}
             </>
           )}
           {evaluacion.estado === 'error' && <p className="nota">IA no disponible ({evaluacion.error}). Vale el mensaje del motor local.</p>}
@@ -125,6 +129,8 @@ function TarjetaMensaje({ mensaje: m, historia, evaluacion, vence, ahora, contex
           <ol>{m.pasos.map((p) => <li key={p}>{p}</li>)}</ol>
         </div>
       )}
+
+      {!!m.hallazgo.datos?.length && <DatosUsados datos={m.hallazgo.datos} />}
 
       <details className="mensaje-detalles">
         <summary>Por qué este mensaje</summary>
@@ -148,5 +154,30 @@ function TarjetaMensaje({ mensaje: m, historia, evaluacion, vence, ahora, contex
         )}
       </details>
     </li>
+  );
+}
+
+const horaDato = (ts: number) => new Date(ts).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+const FUENTE: Record<DatoClinico['fuente'], string> = { sensor: 'sensor', voz: 'conversación', manual: 'manual', simulador: 'simulador' };
+
+/** Datos exactos en que se basó el análisis: valor, cuándo, de dónde y la línea base de la persona. */
+function DatosUsados({ datos }: { datos: DatoClinico[] }) {
+  return (
+    <div className="datos-usados">
+      <p className="datos-usados-titulo"><Icono nombre="actividad" tamano={14} /> Datos usados en este análisis</p>
+      <ul>
+        {datos.map((d, i) => {
+          const info = INFO_SENSOR[d.sensor];
+          return (
+            <li key={`${d.sensor}-${d.timestamp}-${i}`}>
+              <span className="dato-nombre">{info.nombre}</span>
+              <span className="dato-valor">{d.valor} {info.unidad}</span>
+              {d.lineaBase !== undefined && <span className="texto-suave">habitual {d.lineaBase} {info.unidad}</span>}
+              <span className="texto-suave">{horaDato(d.timestamp)} · {FUENTE[d.fuente]}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }

@@ -59,16 +59,36 @@ const SECCION_POR_PALABRA: [RegExp, SeccionApp][] = [
 ];
 
 /** Síntomas que el astronauta puede contar y que Higia convierte en aviso o alerta. */
-const SINTOMAS: { claves: RegExp; alerta: Extract<Accion, { tipo: 'emitir_alerta' }> }[] = [
-  { claves: /dolor (en el|de) pecho|duele (el|mucho el) pecho|opresion en el pecho/, alerta: { tipo: 'emitir_alerta', nivel: 'alerta', sistema: 'corazon', titulo: 'Dolor en el pecho', detalle: 'El astronauta reporta dolor u opresión en el pecho.' } },
+const SINTOMAS: { claves: RegExp; alerta: Extract<Accion, { tipo: 'emitir_alerta' }>; extra?: Accion[] }[] = [
+  // Un golpe en la cabeza va antes que el golpe genérico: además de la alerta, Higia evalúa la orientación.
+  {
+    claves: /(golpe|golpee|pegue|di|darme) (fuerte )?(en |con )?(la )?cabeza|cabezazo|me (cai|desmaye) y me (golpee|pegue)/,
+    alerta: { tipo: 'emitir_alerta', nivel: 'aviso', sistema: 'cerebro', titulo: 'Golpe en la cabeza (reportado)', detalle: 'El astronauta reporta un golpe en la cabeza.', region: 'craneo' },
+    extra: [{ tipo: 'chequeo_orientacion' }],
+  },
+  { claves: /dolor (en el|de) pecho|duele (el|mucho el) pecho|opresion en el pecho/, alerta: { tipo: 'emitir_alerta', nivel: 'alerta', sistema: 'corazon', titulo: 'Dolor en el pecho', detalle: 'El astronauta reporta dolor u opresión en el pecho.', region: 'torax' } },
   { claves: /no puedo respirar|me falta el aire|me ahogo|falta de aire/, alerta: { tipo: 'emitir_alerta', nivel: 'alerta', sistema: 'pulmones', titulo: 'Dificultad para respirar', detalle: 'El astronauta reporta falta de aire.' } },
   { claves: /me voy a desmayar|me desmayo|perdi el conocimiento/, alerta: { tipo: 'emitir_alerta', nivel: 'alerta', sistema: 'cerebro', titulo: 'Sensación de desmayo', detalle: 'El astronauta reporta sensación de desmayo.' } },
   { claves: /mareo|mareado|mareada|vertigo|todo me da vueltas/, alerta: { tipo: 'emitir_alerta', nivel: 'aviso', sistema: 'oidoInterno', titulo: 'Mareo', detalle: 'El astronauta reporta mareo o vértigo.' } },
-  { claves: /duele (la|mucho la) cabeza|dolor de cabeza|jaqueca|migrana/, alerta: { tipo: 'emitir_alerta', nivel: 'aviso', sistema: 'cerebro', titulo: 'Dolor de cabeza', detalle: 'El astronauta reporta dolor de cabeza.' } },
+  { claves: /duele (la|mucho la) cabeza|dolor de cabeza|jaqueca|migrana/, alerta: { tipo: 'emitir_alerta', nivel: 'aviso', sistema: 'cerebro', titulo: 'Dolor de cabeza', detalle: 'El astronauta reporta dolor de cabeza.', region: 'craneo' } },
   { claves: /veo borroso|vision borrosa|no veo bien/, alerta: { tipo: 'emitir_alerta', nivel: 'aviso', sistema: 'ojos', titulo: 'Visión borrosa', detalle: 'El astronauta reporta visión borrosa.' } },
   { claves: /me (cai|golpee)|me lastime|me torci/, alerta: { tipo: 'emitir_alerta', nivel: 'aviso', sistema: 'huesos', titulo: 'Golpe o caída', detalle: 'El astronauta reporta un golpe o una caída.' } },
   { claves: /nauseas|ganas de vomitar|vomite/, alerta: { tipo: 'emitir_alerta', nivel: 'aviso', sistema: 'intestino', titulo: 'Náuseas', detalle: 'El astronauta reporta náuseas.' } },
 ];
+
+/**
+ * Señales de posible alteración de la percepción. No es un diagnóstico: cada señal suma al dato
+ * "marcadoresPsicoticos" (0–10) que evalúa la regla, junto con el sueño y el estrés.
+ */
+const SENALES_PERCEPCION: RegExp[] = [
+  /(oigo|escucho) voces|voces en mi cabeza|me hablan (las paredes|en mi cabeza|cuando no hay nadie)|alguien me habla y no hay nadie/,
+  /(me|nos) (vigilan|persiguen|espian|quieren hacer dano)|alguien me (vigila|persigue|quiere hacer dano)|me estan (espiando|vigilando)|conspiran contra mi/,
+  /veo (cosas|gente|personas|sombras) que (no|nadie)|hay alguien (aqui|en el modulo) que nadie ve|veo cosas raras/,
+  /me controlan|controlan mis pensamientos|me meten pensamientos|leen mi mente|me roban los pensamientos/,
+];
+
+/** Pide o sugiere un chequeo de orientación. */
+const PIDE_ORIENTACION = /chequeo de orientacion|prueba de orientacion|evalua (mi|la) orientacion|no se donde estoy|donde estoy|estoy (muy )?confundid[oa]|me siento confundid[oa]|no recuerdo (como llegue|que paso|nada)|me perdi/;
 
 const NOMBRE_DESTINO_PEDIDO: Record<DestinoPedido, string> = {
   companero: 'tu compañero', medico: 'el equipo médico', base: 'la base', tierra: 'Tierra', todos: 'todos los que están al alcance',
@@ -88,9 +108,22 @@ export function interpretar(frase: string, nucleo: NucleoSalud, ahora = Date.now
       [{ tipo: 'pedir_ayuda', destino, motivo: `Pedido de voz: "${frase.trim()}"` }, ...(sintoma ? [sintoma.alerta] : [])]);
   }
 
+  // ── Señales de alteración de la percepción: se registran como dato (la regla decide el nivel) ──
+  const senales = SENALES_PERCEPCION.filter((re) => re.test(f)).length;
+  if (senales) {
+    return r('Gracias por contármelo. No estás solo: voy a pedir que alguien te acompañe. Busca un lugar tranquilo y quédate conmigo.',
+      [], [lectura('marcadoresPsicoticos', Math.min(10, 4 + 2 * senales))]);
+  }
+
+  // ── Desorientación: chequeo de orientación ──
+  if (PIDE_ORIENTACION.test(f)) {
+    return r('Vamos a comprobarlo juntos, con calma.', [{ tipo: 'chequeo_orientacion' }]);
+  }
+
   // ── Síntomas: generan un aviso o una alerta ──
   for (const s of SINTOMAS) {
     if (s.claves.test(f)) {
+      if (s.extra) return r(`${s.alerta.titulo.replace(/ \(reportado\)$/, '')}: lo registro y vamos a revisar cómo estás.`, [s.alerta, ...s.extra]);
       const grave = s.alerta.nivel === 'alerta';
       return r(grave
         ? `${s.alerta.titulo}: lo registro como alerta. Detente y ponte en un lugar seguro. Si no respondes, aviso a otros.`

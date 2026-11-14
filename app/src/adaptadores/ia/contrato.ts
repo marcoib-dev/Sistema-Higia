@@ -5,7 +5,7 @@ import type { Accion } from '../../core/acciones';
 import type { Actividad, Destino, HistoriaClinica, Nivel, Ubicacion } from '../../core/tipos';
 
 /** Datos que el astronauta puede reportar hablando y que la IA puede extraer. */
-export const SENSORES_CONVERSACION = ['horasSueno', 'animo', 'minutosEjercicioRealizados'] as const;
+export const SENSORES_CONVERSACION = ['horasSueno', 'animo', 'minutosEjercicioRealizados', 'marcadoresPsicoticos'] as const;
 export type SensorConversacion = (typeof SENSORES_CONVERSACION)[number];
 
 export interface TurnoConversacion {
@@ -23,6 +23,10 @@ export interface EstadoParaIA {
   contexto: Record<string, unknown>;
   hallazgos: { titulo: string; nivel: Nivel; detalle: string; sensible: boolean }[];
   ultimasLecturas: Record<string, number>;
+  /** Últimas lecturas por dato (hasta 5), con unidad y antigüedad: la base de cualquier análisis. */
+  lecturasRecientes: Record<string, { valor: number; unidad: string; haceMin: number }[]>;
+  /** Valores habituales de la persona (antes de la misión). */
+  lineaBase: Record<string, number>;
   /** Estado de la app, para que el asistente pueda controlarla. */
   app?: {
     seccion: string;
@@ -68,8 +72,22 @@ export interface EstadoIA {
 }
 
 /** Hallazgo del motor de reglas que la IA evalúa en el contexto del estado completo. */
+export interface DatoParaIA {
+  dato: string;
+  valor: number;
+  unidad: string;
+  haceMin: number;
+  lineaBase?: number;
+}
+
 export interface PeticionEvaluacion {
-  hallazgo: { titulo: string; nivel: Nivel; resumen: string; detalle: string; accion: string; sensible: boolean; fuente: string };
+  hallazgo: {
+    titulo: string; nivel: Nivel; resumen: string; detalle: string; accion: string; sensible: boolean; fuente: string;
+    /** Datos exactos en que se basó el motor de reglas. */
+    datos: DatoParaIA[];
+    /** Serie reciente de esos mismos datos, para ver la tendencia. */
+    series: Record<string, { valor: number; haceMin: number }[]>;
+  };
   /** Lo que Higia ya le dijo al astronauta (texto del motor local). */
   mensaje: string;
   estado: EstadoParaIA;
@@ -80,4 +98,8 @@ export interface EvaluacionIA {
   evaluacion: string;
   /** Qué hacer a continuación, en una oración. */
   recomendacion: string;
+  /** Datos concretos (con su valor) en que se apoya la evaluación. */
+  datosUsados: string[];
+  /** Qué datos faltan o qué limita la evaluación ("" si nada). */
+  limitaciones: string;
 }

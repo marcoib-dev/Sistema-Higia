@@ -236,6 +236,8 @@ select, input[type='text'], input[type='number'], input:not([type]) {
 .tarjeta-figura { position: sticky; top: calc(var(--tope) + 20px); }
 .figura svg { width: 100%; display: block; }
 .region { cursor: pointer; }
+.figura-zona { margin: 6px 0 10px; font-size: 13px; color: var(--texto-2); text-align: center; min-height: 20px; }
+.figura-zona strong { color: var(--texto); }
 .ayuda { margin: 6px 0 10px; font-size: 12px; color: var(--texto-3); text-align: center; }
 .leyenda { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; font-size: 12px; color: var(--texto-2); }
 .leyenda li { display: inline-flex; align-items: center; gap: 6px; }
@@ -281,6 +283,14 @@ select, input[type='text'], input[type='number'], input:not([type]) {
 .evaluacion-ia { padding: 12px 14px; border-radius: var(--radio-s); background: color-mix(in srgb, var(--ia) 9%, var(--superficie-2)); border: 1px solid color-mix(in srgb, var(--ia) 30%, var(--borde)); display: grid; gap: 6px; font-size: 14px; }
 .evaluacion-ia-titulo { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ia); }
 .evaluacion-ia-accion { color: var(--texto-2); }
+.evaluacion-ia-datos { font-size: 13px; color: var(--texto-2); }
+.evaluacion-ia-datos.aviso { color: var(--aviso); }
+.datos-usados { padding: 10px 12px; border-radius: var(--radio-s); background: var(--superficie-2); border: 1px dashed var(--borde-fuerte); }
+.datos-usados-titulo { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--texto-2); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+.datos-usados ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.datos-usados li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 13px; }
+.dato-nombre { color: var(--texto-2); }
+.dato-valor { font-weight: 600; font-variant-numeric: tabular-nums; }
 .evaluacion-ia.cargando .texto-suave { animation: pulso-alerta 1.6s ease-in-out infinite; }
 .pasos { padding: 12px 14px; border-radius: var(--radio-s); background: var(--superficie-2); border: 1px solid var(--borde); }
 .pasos p { font-size: 13px; font-weight: 600; color: var(--texto-2); margin-bottom: 6px; }

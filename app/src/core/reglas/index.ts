@@ -2,6 +2,7 @@ import type { Regla } from '../tipos';
 import { reglaFrecuenciaCardiaca, reglaPresionArterial } from './cardiovascular';
 import { reglaAnimo, reglaEstres, reglaSueno } from './mental';
 import { reglaEjercicio } from './musculoesqueletico';
+import { reglaOrientacion, reglaPsicosis, reglaTraumaCraneal } from './neuro';
 import { reglaRadiacion } from './radiacion';
 import { reglaSaturacionOxigeno } from './respiratorio';
 
@@ -15,4 +16,7 @@ export const REGLAS: Regla[] = [
   reglaEstres,
   reglaEjercicio,
   reglaRadiacion,
+  reglaTraumaCraneal,
+  reglaOrientacion,
+  reglaPsicosis,
 ];

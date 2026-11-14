@@ -100,6 +100,14 @@ interface OpcionesEscucha {
 /** Tras decir solo «Higia», cuánto tiempo se espera el pedido. */
 const ESPERA_PEDIDO_MS = 8000;
 
+/** Hasta cuándo se acepta una respuesta sin nombrar a Higia (cuando ella acaba de hacer una pregunta). */
+let respuestaHasta = 0;
+
+/** Higia hizo una pregunta: la próxima frase se toma como respuesta aunque no la nombren. */
+export function aceptarRespuestaSinNombre(ms: number): void {
+  respuestaHasta = Date.now() + ms;
+}
+
 /**
  * Escucha continua: Higia solo se activa cuando la nombran. "Higia, pide ayuda" se procesa directo;
  * si solo dice "Higia", se espera la frase siguiente. El navegador corta la escucha cada tanto, así que
@@ -134,8 +142,9 @@ export function escucharPalabraClave({ onComando, onEstado, ignorar }: OpcionesE
         if (conLlamado) {
           if (conLlamado.resto) { esperaHasta = 0; onEstado('esperando'); onComando(conLlamado.resto); }
           else { esperaHasta = Date.now() + ESPERA_PEDIDO_MS; onEstado('llamado'); }
-        } else if (Date.now() < esperaHasta) {
+        } else if (Date.now() < esperaHasta || Date.now() < respuestaHasta) {
           esperaHasta = 0;
+          respuestaHasta = 0;
           onEstado('esperando');
           onComando(alternativas[0].trim());
         }

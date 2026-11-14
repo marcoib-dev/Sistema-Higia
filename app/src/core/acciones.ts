@@ -3,8 +3,8 @@
  * Las propone la IA (o el intérprete local, sin conexión) y las ejecuta la app.
  * Solo tipos y validación: no depende de React ni de la IA.
  */
-import type { Actividad, DestinoComunicacion, Nivel, SistemaCorporal, Ubicacion } from './tipos';
-import { SISTEMAS } from './tipos';
+import type { Actividad, DestinoComunicacion, Nivel, RegionCuerpo, SistemaCorporal, Ubicacion } from './tipos';
+import { REGIONES, SISTEMAS } from './tipos';
 
 export const SECCIONES_APP = ['asistente', 'resumen', 'mensajes', 'comunicaciones', 'perfil', 'entorno', 'reportes'] as const;
 export type SeccionApp = (typeof SECCIONES_APP)[number];
@@ -19,7 +19,9 @@ export type Accion =
   /** Mensaje informativo a otra persona (no es emergencia). */
   | { tipo: 'enviar_mensaje'; destino: DestinoPedido; mensaje: string }
   /** Alerta o aviso nuevo a partir de lo que cuenta el astronauta (síntoma, malestar, riesgo). */
-  | { tipo: 'emitir_alerta'; nivel: Exclude<Nivel, 'normal'>; sistema: SistemaCorporal; titulo: string; detalle: string }
+  | { tipo: 'emitir_alerta'; nivel: Exclude<Nivel, 'normal'>; sistema: SistemaCorporal; titulo: string; detalle: string; region?: RegionCuerpo }
+  /** Preguntas rápidas de orientación (persona, lugar, tiempo, atención): mide la desorientación. */
+  | { tipo: 'chequeo_orientacion' }
   /** "Estoy bien": responde a las alertas que esperan confirmación. */
   | { tipo: 'confirmar_bien' }
   | { tipo: 'ir_a'; seccion: SeccionApp }
@@ -49,7 +51,9 @@ export function validarAccion(a: unknown): Accion | null {
       return en(DESTINOS_PEDIDO, o.destino) && esTexto(o.mensaje) ? { tipo: 'enviar_mensaje', destino: o.destino, mensaje: o.mensaje } : null;
     case 'emitir_alerta':
       return en(['info', 'aviso', 'alerta'] as const, o.nivel) && en(SISTEMAS, o.sistema) && esTexto(o.titulo, 120) && esTexto(o.detalle)
-        ? { tipo: 'emitir_alerta', nivel: o.nivel, sistema: o.sistema, titulo: o.titulo, detalle: o.detalle } : null;
+        ? { tipo: 'emitir_alerta', nivel: o.nivel, sistema: o.sistema, titulo: o.titulo, detalle: o.detalle, region: en(REGIONES, o.region) ? o.region : undefined } : null;
+    case 'chequeo_orientacion':
+      return { tipo: 'chequeo_orientacion' };
     case 'confirmar_bien':
       return { tipo: 'confirmar_bien' };
     case 'ir_a':

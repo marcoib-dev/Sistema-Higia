@@ -162,13 +162,18 @@ Cómo responder:
 - Los hallazgos marcados como sensibles (ánimo, estrés) se tratan con tacto.
 - Si te habla de algo ajeno a su salud, responde brevemente y con amabilidad.
 - Ten en cuenta su historia clínica previa (alergias, antecedentes, medicación) que llega en <estado>.perfil.historiaClinica. Nunca recomiendes algo a lo que es alérgico.
+- Uso de datos: cuando hables de su salud, apóyate SOLO en los datos de <estado> (hallazgos, lecturasRecientes con su antigüedad en minutos, lineaBase e historia clínica) y menciona el dato concreto en que te basas (por ejemplo "tu pulso de hace 5 minutos fue 132"; sin cifras si el perfil no tiene formación médica, pero sin inventar). Si no hay datos sobre algo, dilo en vez de suponer.
+- Salud mental y neurología, con especial cuidado y sin diagnosticar:
+  · Si cuenta percepciones extrañas (oye voces, ve cosas que otros no ven, siente que lo vigilan o persiguen, que controlan sus pensamientos) o su discurso es claramente desorganizado, registra "marcadoresPsicoticos" (0–10: 4–5 una señal leve, 6–7 una señal clara, 8–10 varias o muy intensas). Responde con calma, sin discutir lo que percibe ni darle la razón, y no lo dejes solo: sugiere un lugar tranquilo y que alguien lo acompañe. Si hay riesgo para él o para otros, usa pedir_ayuda.
+  · Si parece confundido o desorientado (no sabe dónde está, qué día es, no recuerda qué pasó) o contó un golpe en la cabeza, usa chequeo_orientacion. Un golpe en la cabeza también es emitir_alerta con sistema "cerebro" y region "craneo".
 
 Registro de datos: si el astronauta menciona un dato que puede registrarse (horas dormidas, ánimo del 1 al 10, minutos de ejercicio que acaba de hacer), inclúyelo en "lecturas". Si no menciona ninguno, deja "lecturas" vacía. No conviertas impresiones vagas en números: "dormí mal" no es un número de horas.
 
 Acciones: eres el centro de la app y puedes controlarla. Si la frase lo pide, incluye en "acciones" lo que hay que hacer (si no, deja "acciones" vacía). Tu "respuesta" debe decir lo que hiciste.
 - pedir_ayuda {destino, motivo}: el astronauta pide ayuda o describe una emergencia ("pide ayuda", "necesito a alguien", "me siento muy mal"). destino: "companero" | "medico" | "base" | "tierra" | "todos" (si no dice a quién, "todos"). Avisa de inmediato a otros y crea una alerta.
 - enviar_mensaje {destino, mensaje}: quiere hablar con otro astronauta o mandar un mensaje que no es emergencia ("dile a Tierra que terminé la reparación", "avísale a Kai que voy para allá"). "mensaje" es lo que hay que transmitir, redactado en tercera persona si hace falta.
-- emitir_alerta {nivel, sistema, titulo, detalle}: cuenta un síntoma o un riesgo nuevo que los sensores no ven (dolor de pecho, falta de aire, mareo, golpe, visión borrosa…). nivel: "info" | "aviso" | "alerta" ("alerta" solo si es grave o urgente). sistema: "cerebro" | "ojos" | "oidoInterno" | "corazon" | "pulmones" | "inmune" | "intestino" | "huesos" | "musculos" | "piernas" | "metabolismo" | "cuerpo". Si es grave y además pide ayuda, usa también pedir_ayuda.
+- emitir_alerta {nivel, sistema, titulo, detalle, region?}: cuenta un síntoma o un riesgo nuevo que los sensores no ven (dolor de pecho, falta de aire, mareo, golpe, visión borrosa…). nivel: "info" | "aviso" | "alerta" ("alerta" solo si es grave o urgente). sistema: "cerebro" | "ojos" | "oidoInterno" | "corazon" | "pulmones" | "inmune" | "intestino" | "huesos" | "musculos" | "piernas" | "metabolismo" | "cuerpo". region (opcional, dónde está el problema): "craneo" | "cara" | "cuello" | "torax" | "abdomen" | "columna" | "pelvis" | "brazos" | "piernas". Si es grave y además pide ayuda, usa también pedir_ayuda.
+- chequeo_orientacion {}: Higia hace cuatro preguntas rápidas (nombre, lugar, mes, una resta) para medir la orientación. Úsalo ante confusión, desorientación o un golpe en la cabeza, o si lo pide. Si lo usas, NO hagas tú las preguntas: Higia agrega la primera al final de tu respuesta.
 - confirmar_bien {}: dice que está bien en respuesta a una alerta que espera respuesta (ver <estado>.app.alertasEsperandoRespuesta).
 - ir_a {seccion}: quiere ver una parte de la app. seccion: "asistente" | "resumen" | "mensajes" | "comunicaciones" | "perfil" (historia clínica) | "entorno" | "reportes".
 - mostrar_sistema {sistema}: quiere ver un sistema del cuerpo en la figura.
@@ -197,6 +202,7 @@ const EsquemaAccion = z.object({
   actividad: z.string().optional(),
   estado: z.string().optional().describe('silenciar | activar | detener'),
   campo: z.string().optional().describe('alergias | medicacion | antecedentes | notas'),
+  region: z.string().optional().describe('craneo | cara | cuello | torax | abdomen | columna | pelvis | brazos | piernas'),
   valor: z.string().optional(),
   escenario: z.string().optional(),
   astronauta: z.string().optional(),
@@ -237,10 +243,21 @@ Cómo evaluar:
 - Si el perfil es propenso al pánico o tiene baja tolerancia al estrés, o el hallazgo es sensible, usa un tono calmado y sin palabras alarmantes.
 - "evaluacion": de una a tres oraciones. "recomendacion": una oración con el siguiente paso concreto. Sin markdown ni emojis.
 
-Formato de salida: entrega el resultado llamando a la herramienta "evaluar_hallazgo", con esta forma:
-{"evaluacion": "...", "recomendacion": "..."}`;
+Uso de datos (obligatorio):
+- Basa la evaluación SOLO en los datos que recibes: <hallazgo>.datos (lo que usó el motor), <hallazgo>.series (la tendencia reciente de esos datos, con su antigüedad en minutos), <estado>.lecturasRecientes, <estado>.lineaBase y la historia clínica. No inventes valores, fechas ni estudios.
+- En "datosUsados" enumera cada dato en que te apoyas, con su valor y unidad (por ejemplo "Impacto en la cabeza: 46 g, hace 2 min", "Ánimo 3/10 frente a línea base 7", "Antecedente: hipertensión arterial leve").
+- En "limitaciones" di qué falta o qué limita la evaluación (por ejemplo "Solo hay una medición", "No hay chequeo de orientación después del golpe"). Si no falta nada relevante, deja "".
+- Si los datos no alcanzan para concluir, dilo en la evaluación en lugar de suponer.
 
-const EsquemaEvaluacion = z.object({ evaluacion: z.string().min(1), recomendacion: z.string() });
+Formato de salida: entrega el resultado llamando a la herramienta "evaluar_hallazgo", con esta forma:
+{"evaluacion": "...", "recomendacion": "...", "datosUsados": ["..."], "limitaciones": "..."}`;
+
+const EsquemaEvaluacion = z.object({
+  evaluacion: z.string().min(1),
+  recomendacion: z.string(),
+  datosUsados: z.array(z.string()).default([]),
+  limitaciones: z.string().default(''),
+});
 
 export async function evaluarHallazgo(p: PeticionEvaluacion): Promise<EvaluacionIA> {
   return pedirJSON([

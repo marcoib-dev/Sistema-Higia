@@ -92,7 +92,7 @@ export function VistaAsistente({ asistente: a, iaActiva, perfil, hallazgos, aler
           )}
           {cronologico.map((i) => (
             <div key={i.id} className="chat-turno">
-              <p className="burbuja burbuja-yo">{i.origen === 'voz' && <Icono nombre="microfono" tamano={13} />} {i.pregunta}</p>
+              {i.pregunta && <p className="burbuja burbuja-yo">{i.origen === 'voz' && <Icono nombre="microfono" tamano={13} />} {i.pregunta}</p>}
               <div className="burbuja burbuja-higia">
                 <span className="burbuja-autor">{i.fuente === 'ia' ? 'Higia · IA' : 'Higia · local'}</span>
                 <p>{i.respuesta}</p>

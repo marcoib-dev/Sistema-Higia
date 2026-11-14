@@ -30,7 +30,8 @@ Higia vigila la salud de astronautas que viven en hábitats permanentes (base lu
 
 | Capacidad | En una frase |
 |---|---|
-| **Detectar riesgos** | Ocho reglas basadas en el desafío: pulso, presión, oxígeno, sueño, ánimo, estrés, ejercicio y radiación, comparadas con la línea base de cada astronauta |
+| **Detectar riesgos** | Once reglas basadas en el desafío: pulso, presión, oxígeno, sueño, ánimo, estrés, ejercicio, radiación, **traumatismo craneal**, **desorientación / deterioro cognitivo** y **posibles síntomas psicóticos**, comparadas con la línea base de cada astronauta |
+| **Usar los datos** | Cada análisis registra los datos exactos en que se basó (valor, hora, fuente y línea base) y los muestra; la evaluación de la IA debe citar los datos que usó y declarar lo que falta |
 | **Entender el contexto** | Interpreta distinto según ubicación, actividad, destino, clima espacial y hora; por ejemplo, no alarma por pulso alto durante el ejercicio |
 | **Hablar solo cuando hace falta** | Avisa cuando algo cambia, no repite y respeta el horario de sueño |
 | **Personalizar el mensaje** | Cifras para quien es médico, indicaciones claras para quien no, tono calmado para quien es propenso al pánico |
@@ -42,7 +43,7 @@ Higia vigila la salud de astronautas que viven en hábitats permanentes (base lu
 | **Conversar** | Por voz (diciendo "Higia") o texto; con IA entiende frases libres y registra los datos que menciona el astronauta |
 | **Ver el entorno** | Con IA, analiza una foto de la cámara para detectar peligros y confirmar el contexto |
 | **Integrarse** | Exporta hallazgos en formato HL7 FHIR hacia sistemas médicos (interfaz de ejemplo) |
-| **Mostrarlo todo** | Figura anatómica detallada coloreada por estado, mensajes explicados, historial de escaladas y reportes |
+| **Mostrarlo todo** | Figura anatómica por categoría (órganos, músculos o huesos, de frente o de espalda) con zonas como cráneo, costillas o pectorales coloreadas por estado, mensajes explicados, historial de escaladas y reportes |
 
 ---
 
@@ -166,34 +167,25 @@ El navegador recuerda si el panel quedó abierto.
 
 Ilustraciones anatómicas 2D del cuerpo (`app/src/ui/FiguraCorporal.tsx`, imágenes en `app/public/cuerpo/`), con dos selectores sobre la figura:
 
+- **Qué mostrar:** Órganos, Músculos o Huesos. En la silueta **solo aparece lo pedido**: la ilustración de esa categoría y sus zonas.
 - **Vista:** Frente o Espalda.
-- **Capa:** Órganos, Músculos o Esqueleto.
 
-La elección se recuerda en el dispositivo. Si se pide un sistema que no se ve desde la vista actual (por ejemplo, los ojos de espaldas), la figura se gira sola.
+La elección se recuerda en el dispositivo. Si se pide un sistema que no está en lo que se ve (por ejemplo, los huesos con la categoría Órganos, o los ojos de espaldas), la figura cambia sola de categoría o de vista.
 
-**Cómo se integran las imágenes:** se muestran sin su fondo oscuro (un filtro SVG convierte la luminancia en transparencia, así que no hace falta editarlas) y se alinean en un lienzo común. Sobre ellas se dibuja la zona de cada sistema, teñida con su nivel y **recortada con la propia figura**, de modo que el color solo cae sobre el cuerpo y el dibujo se sigue viendo. Las zonas se definen una vez por vista y se trasladan a cada ilustración con sus puntos de referencia (mentón, hombros, entrepierna, rodillas y brazos), porque cada dibujo tiene proporciones algo distintas.
+**Cómo se integran las imágenes:** se muestran sin su fondo oscuro (un filtro SVG convierte la luminancia en transparencia, así que no hace falta editarlas) y se alinean en un lienzo común. Sobre cada una se dibujan sus zonas anatómicas, teñidas con su nivel y **recortadas con la propia figura**, de modo que el color solo cae sobre el cuerpo y el dibujo se sigue viendo.
 
-| Sistema | Zona (frente) | Zona (espalda) |
+| Categoría | Zonas (frente) | Zonas (espalda) |
 |---|---|---|
-| Cerebro / mente | Cráneo | Cráneo |
-| Ojos | Ojos | (no visible: se gira a frente) |
-| Oído interno | A cada lado de la cabeza | A cada lado de la cabeza |
-| Pulmones | Pulmones | Pulmones |
-| Corazón y vasos | Corazón | (no visible: se gira a frente) |
-| Metabolismo | Hígado y estómago | Riñones |
-| Intestino | Intestino | Intestino |
-| Huesos | Pelvis y rodillas | Columna, pelvis y rodillas |
-| Sistema inmune | Ganglios del cuello, axilas e ingle | Ganglios del cuello |
-| Músculos | Brazos | Brazos |
-| Piernas | Piernas | Piernas |
-| Todo el cuerpo (radiación) | Halo de toda la figura | Halo de toda la figura |
+| Órganos | Cerebro, ojos, oído interno, tráquea, pulmones, corazón, hígado, estómago, intestinos, ganglios linfáticos | Cerebro, oído interno, tráquea, pulmones, riñones, intestinos, ganglios |
+| Músculos | Cuello, hombros (deltoides), pectorales, bíceps, antebrazos, abdominales, cuádriceps, tibial y gemelos | Trapecio, deltoides, dorsales, tríceps, antebrazos, glúteos, isquiotibiales, gemelos |
+| Huesos | Cráneo, columna cervical y lumbar, clavículas, esternón, costillas, pelvis, húmeros, radio y cúbito, manos, fémures, rodillas, tibias y peronés, pies | Cráneo, escápulas, columna vertebral, costillas, pelvis y sacro, húmeros, radio y cúbito, manos, fémures, rodillas, tibias, pies |
 
-- **Color = el peor nivel** entre los riesgos activos de ese sistema: verde normal, azul info, amarillo aviso, rojo alerta; sin datos, sin tinte. Lo que está en alerta pulsa suavemente.
-- **Interacción:** al pasar el mouse se marca el contorno de la zona y aparece su nombre y nivel; con clic (o Tab y Enter) se selecciona y se ve su detalle en la lista **Sistemas del cuerpo**. Lo seleccionado queda resaltado. Un clic en el resto de la figura selecciona **Todo el cuerpo**.
+- **Color = el peor nivel** entre el sistema de la zona (por ejemplo, Huesos) y su **región del cuerpo** (por ejemplo, un golpe en el cráneo tiñe el cráneo): verde normal, azul info, amarillo aviso, rojo alerta; sin datos, sin tinte. Lo que está en alerta pulsa suavemente. **Todo el cuerpo (radiación)** se ve como un halo alrededor de la figura.
+- **Interacción:** al pasar el mouse se marca el contorno de la zona; con clic (o Tab y Enter) se selecciona, debajo aparece su nombre, sistema y nivel, y se ve el detalle en la lista **Sistemas del cuerpo**.
 
 ### 2. Motor de detección
 
-Ocho reglas, una por riesgo (`app/src/core/reglas/`). Cada una lee el historial, lo compara con la **línea base personal** cuando aplica y **tiene en cuenta el contexto**. Devuelve un *hallazgo* con: nivel, explicación simple, detalle técnico, acción (que puede variar según la ubicación), guía paso a paso (en alertas), ruta, si es privado, si puede dejar al astronauta incapacitado y de qué anexo sale.
+Once reglas, una por riesgo (`app/src/core/reglas/`). Cada una lee el historial, lo compara con la **línea base personal** cuando aplica y **tiene en cuenta el contexto**. Devuelve un *hallazgo* con: nivel, explicación simple, detalle técnico, acción (que puede variar según la ubicación), guía paso a paso (en alertas), ruta, si es privado, si puede dejar al astronauta incapacitado y de qué anexo sale.
 
 | Riesgo | Sensor | Cómo evalúa (umbrales provisionales) |
 |---|---|---|
@@ -205,8 +197,15 @@ Ocho reglas, una por riesgo (`app/src/core/reglas/`). Cada una lee el historial,
 | Estrés (privado) | `estres` (0–100) | ≥60 → aviso, ≥80 → alerta (compatible con crisis de pánico) |
 | Ejercicio | `minutosEjercicio` (acumulado del día) | Meta de 90 min/día: <90 → info, <45 → aviso |
 | Radiación | `dosisRadiacion` (mSv acumulados) | **Tormenta solar activa**: alerta fuera del hábitat, aviso dentro. Tasa ≥1 mSv/h → alerta. Acumulado: 50 % del límite → info, 80 % → aviso, 100 % → alerta |
+| Traumatismo craneal | `impactoCabeza` (g, acelerómetro del casco) + `orientacion` posterior | ≥8 g → info, ≥15 g → aviso, ≥40 g **o** ≥15 g con orientación ≤7/10 después del golpe → alerta (posible incapacidad, región cráneo, guía paso a paso). Tras el golpe, Higia **inicia sola el chequeo de orientación** |
+| Desorientación y deterioro cognitivo (privado) | `orientacion` (0–10), `cognicion` (0–100, tipo batería Cognition), `tiempoReaccion` (ms, PVT) | Orientación ≤7 → aviso, ≤4 → alerta. Respecto a su línea base: prueba cognitiva −15 % → aviso, −30 % → alerta; tiempo de reacción +25 % → aviso, +50 % → alerta |
+| Posibles síntomas psicóticos (privado) | `marcadoresPsicoticos` (0–10, señales en la conversación) + `horasSueno` + `estres` | ≥3, o ≥1 con sueño <5 h o estrés ≥70 → aviso; ≥6, o ≥4 con sueño bajo **y** estrés alto → alerta (no dejarlo solo, avisar al médico). Sin señales en la conversación no se evalúa: la falta de sueño sola no es psicosis |
 
 Para ahorrar energía, cuando llega una lectura **solo se evalúan las reglas que usan ese sensor**. Cuando cambia el contexto, se reevalúan todas.
+
+**Datos en cada análisis clínico.** Todo hallazgo guarda los datos exactos que usó la regla (sensor, valor, hora, fuente y línea base de la persona). En **Mensajes** cada aviso muestra "Datos usados en este análisis". La IA recibe esos datos, su serie reciente, las líneas base y la historia clínica, y su evaluación debe incluir **"Datos que usó"** (cada dato con su valor) y **"Limitaciones"** (qué falta: por ejemplo, una sola medición o ningún chequeo después de un golpe). Si la IA no cita datos, la app lo advierte.
+
+**Chequeo de orientación.** Cuatro preguntas (nombre, dónde estás, en qué mes estamos y cuánto es veinte menos siete) que Higia hace por voz o texto y evalúa en el dispositivo, sin IA. Mientras dura, las respuestas no necesitan decir "Higia"; "cancela" lo detiene y un pedido de ayuda lo interrumpe. El resultado (4 aciertos = 10/10, 3 = 7, 2 = 5, 1 = 3) entra como dato `orientacion`. Se inicia solo tras un golpe en la cabeza, o al decir "no sé dónde estoy", "estoy confundido" o "hazme un chequeo de orientación".
 
 ### 3. Contexto y entorno
 
@@ -302,6 +301,9 @@ Los mensajes retenidos se entregan solos cuando cambia el contexto (al despertar
 | "Higia, pide ayuda" / "necesito ayuda, llama a la base" | Avisa de inmediato a todos los que están al alcance (o al destino nombrado) y deja una alerta. Sin IA también funciona |
 | "Dile a Tierra que terminé la reparación" / "avísale a Kai que voy para allá" | Envía el mensaje; si no hay enlace, queda en cola y sale al reconectar |
 | "Me duele el pecho" / "estoy mareado" | Emite una alerta o un aviso nuevo en el sistema del cuerpo que corresponde (se ve en la figura y en Mensajes) |
+| "Me golpeé la cabeza con la escotilla" | Aviso en el cráneo y chequeo de orientación |
+| "No sé dónde estoy" / "estoy confundido" | Chequeo de orientación (cuatro preguntas evaluadas en el dispositivo) |
+| "Oigo voces" / "alguien me vigila" | Registra señales de alteración de la percepción; Higia responde con calma, sin discutir lo que percibe, y la regla decide si avisar al médico |
 | "Higia, estoy bien" | Responde a las alertas que esperan confirmación y cancela el aviso a otros |
 | "Abre mi historia clínica", "muéstrame el corazón", "silencia la voz" | Navega y controla la app |
 | "Salgo a EVA", "empiezo a entrenar" | Actualiza el contexto |
@@ -355,10 +357,14 @@ En la barra superior: **silenciar o activar** la voz, **pausar y reanudar**, **d
 | Día sin ejercicio | Contramedida para huesos y músculos |
 | Tormenta solar | Clima espacial de tormenta + subida de dosis → al refugio |
 | Aviso de madrugada | Aviso retenido a las 03:00; se entrega al cambiar la hora a 08:00 |
+| EVA: golpe fuerte en la cabeza | 46 g en el casco → alerta de posible traumatismo craneal, cráneo en rojo en la figura (Huesos) y chequeo de orientación automático |
+| Golpe en la cabeza en el hábitat | 18 g → aviso y chequeo; si fallas preguntas, pasa a alerta |
+| Desorientación y lentitud | Orientación 6/10, prueba cognitiva y tiempo de reacción peores que la línea base tras noches cortas |
+| Señales de alteración de la percepción | Dice oír voces, con poco sueño y estrés alto → alerta sensible de posibles síntomas psicóticos |
 
 ### Tests
 
-`npm test` (21 tests sobre el núcleo) verifica:
+`npm test` (49 tests sobre el núcleo, el asistente y la voz) verifica:
 
 - **Canales:** EVA → auricular; lo privado nunca va a la pantalla compartida; retención durante el sueño; las alertas interrumpen de madrugada.
 - **Cuándo habla:** solo cuando cambia algo; recordatorios según la experiencia.

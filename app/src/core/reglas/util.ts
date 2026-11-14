@@ -1,5 +1,5 @@
 import type { Historial } from '../historial';
-import type { Contexto, Hallazgo, Perfil, Regla } from '../tipos';
+import type { Contexto, DatoClinico, Hallazgo, Lectura, Perfil, Regla } from '../tipos';
 
 export const MINUTO = 60_000;
 export const HORA = 60 * MINUTO;
@@ -7,7 +7,16 @@ export const DIA = 24 * HORA;
 
 export type DatosHallazgo = Omit<Hallazgo, 'riesgoId' | 'sistema' | 'fuente' | 'timestamp'>;
 
-/** Crea una regla completando automáticamente id, sistema, fuente y timestamp del hallazgo. */
+/** El dato de una lectura, con la línea base de la persona si la tiene. */
+export function dato(l: Lectura, p: Perfil): DatoClinico {
+  return { sensor: l.sensor, valor: l.valor, timestamp: l.timestamp, fuente: l.fuente, lineaBase: p.lineaBase[l.sensor] };
+}
+
+/**
+ * Crea una regla completando automáticamente id, sistema, fuente y timestamp del hallazgo.
+ * Si la regla no dice qué datos usó, se registran las últimas lecturas de sus sensores:
+ * todo análisis queda trazable a los datos concretos en que se apoya.
+ */
 export function definirRegla(
   meta: Omit<Regla, 'evaluar'>,
   evaluar: (h: Historial, p: Perfil, ahora: number, c: Contexto) => DatosHallazgo | null,
@@ -16,7 +25,9 @@ export function definirRegla(
     ...meta,
     evaluar(h, p, ahora, c) {
       const d = evaluar(h, p, ahora, c);
-      return d && { ...d, riesgoId: meta.id, sistema: meta.sistema, fuente: meta.fuente, timestamp: ahora };
+      if (!d) return null;
+      const datos = d.datos ?? meta.sensores.map((s) => h.ultima(s)).filter((l): l is Lectura => !!l).map((l) => dato(l, p));
+      return { ...d, datos, riesgoId: meta.id, sistema: meta.sistema, fuente: meta.fuente, timestamp: ahora };
     },
   };
 }

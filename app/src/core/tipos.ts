@@ -33,7 +33,46 @@ export type TipoSensor =
   | 'animo'               // autoevaluación 1–10
   | 'estres'              // índice 0–100 (p. ej. derivado de VFC)
   | 'minutosEjercicio'    // minutos acumulados en el día
-  | 'dosisRadiacion';     // mSv acumulados (dosímetro)
+  | 'dosisRadiacion'      // mSv acumulados (dosímetro)
+  | 'orientacion'         // 0–10, chequeo de orientación (persona, lugar, tiempo, atención)
+  | 'cognicion'           // 0–100, prueba cognitiva breve (tipo batería Cognition / WinSCAT)
+  | 'tiempoReaccion'      // ms, prueba de vigilancia psicomotora (PVT)
+  | 'marcadoresPsicoticos' // 0–10, señales en la conversación (voces, ideas de persecución, discurso desorganizado)
+  | 'impactoCabeza';      // g, pico de aceleración medido en el casco o el traje
+
+/** Nombre y unidad de cada dato, para mostrar qué datos usó cada análisis. */
+export const INFO_SENSOR: Record<TipoSensor, { nombre: string; unidad: string }> = {
+  frecuenciaCardiaca: { nombre: 'Frecuencia cardíaca', unidad: 'lpm' },
+  presionSistolica: { nombre: 'Presión sistólica', unidad: 'mmHg' },
+  presionDiastolica: { nombre: 'Presión diastólica', unidad: 'mmHg' },
+  spo2: { nombre: 'Saturación de oxígeno', unidad: '%' },
+  temperatura: { nombre: 'Temperatura', unidad: '°C' },
+  glucemia: { nombre: 'Glucemia', unidad: 'mg/dL' },
+  horasSueno: { nombre: 'Horas de sueño', unidad: 'h' },
+  animo: { nombre: 'Ánimo', unidad: '/10' },
+  estres: { nombre: 'Índice de estrés', unidad: '/100' },
+  minutosEjercicio: { nombre: 'Ejercicio del día', unidad: 'min' },
+  dosisRadiacion: { nombre: 'Dosis de radiación acumulada', unidad: 'mSv' },
+  orientacion: { nombre: 'Chequeo de orientación', unidad: '/10' },
+  cognicion: { nombre: 'Prueba cognitiva', unidad: '/100' },
+  tiempoReaccion: { nombre: 'Tiempo de reacción (PVT)', unidad: 'ms' },
+  marcadoresPsicoticos: { nombre: 'Señales de alteración de la percepción', unidad: '/10' },
+  impactoCabeza: { nombre: 'Impacto en la cabeza', unidad: 'g' },
+};
+
+/** Dato concreto en el que se apoya un análisis clínico (trazabilidad). */
+export interface DatoClinico {
+  sensor: TipoSensor;
+  valor: number;
+  timestamp: number;
+  fuente: Lectura['fuente'];
+  /** Valor habitual de la persona, si la regla lo compara. */
+  lineaBase?: number;
+}
+
+/** Región del cuerpo: permite señalar dónde está el problema (p. ej. un golpe en el cráneo). */
+export type RegionCuerpo = 'craneo' | 'cara' | 'cuello' | 'torax' | 'abdomen' | 'columna' | 'pelvis' | 'brazos' | 'piernas';
+export const REGIONES: RegionCuerpo[] = ['craneo', 'cara', 'cuello', 'torax', 'abdomen', 'columna', 'pelvis', 'brazos', 'piernas'];
 
 export interface Lectura {
   sensor: TipoSensor;
@@ -196,6 +235,10 @@ export interface Hallazgo {
   /** Referencia al documento del desafío (anexo/tabla) que respalda la regla. */
   fuente: string;
   timestamp: number;
+  /** Datos exactos en que se basó el análisis (trazabilidad clínica). */
+  datos?: DatoClinico[];
+  /** Región del cuerpo afectada, si se conoce (se destaca en la figura). */
+  region?: RegionCuerpo;
 }
 
 export interface Regla {

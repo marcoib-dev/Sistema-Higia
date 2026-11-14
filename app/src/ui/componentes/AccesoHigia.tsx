@@ -26,7 +26,7 @@ export function AccesoHigia({ asistente: a, onAbrir }: { asistente: Asistente; o
     <div className={`acceso-higia ${a.estadoEscucha === 'llamado' || a.dictando ? 'atento' : ''}`} aria-label="Asistente Higia">
       {verUltimo && ultimo && !abierto && (
         <div className="acceso-burbuja" role="status">
-          <p className="acceso-pregunta">«{ultimo.pregunta}»</p>
+          {ultimo.pregunta && <p className="acceso-pregunta">«{ultimo.pregunta}»</p>}
           <p>{ultimo.respuesta}</p>
           {ultimo.hechos.length > 0 && <ul className="hechos">{ultimo.hechos.map((h) => <li key={h}><Icono nombre="check" tamano={14} /> {h}</li>)}</ul>}
         </div>

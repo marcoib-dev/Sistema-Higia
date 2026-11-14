@@ -1,15 +1,17 @@
 /**
- * FIGURA ANATÓMICA 2D — ilustraciones del cuerpo (frente y espalda; órganos, músculos y esqueleto).
- * Las imágenes se muestran sin su fondo (un filtro SVG convierte la luminancia en transparencia) y
- * sobre ellas se dibujan las zonas de cada sistema, teñidas con el peor nivel de sus riesgos. El tinte
- * se recorta con la propia figura (máscara), así que solo colorea el cuerpo y respeta el dibujo.
+ * FIGURA ANATÓMICA 2D — ilustraciones del cuerpo por categoría (órganos, músculos, huesos) y vista
+ * (frente, espalda). En cada categoría solo aparece lo que se pidió: su ilustración y sus zonas.
  *
- * Las zonas se definen una vez por vista (sobre la imagen de órganos) y se trasladan a cada ilustración
- * con sus puntos de referencia (mentón, hombros, entrepierna, rodillas y brazos), porque cada dibujo
- * tiene proporciones algo distintas. Lienzo común: 400 × 900, eje del cuerpo en x = 200.
+ * Las imágenes se muestran sin su fondo (un filtro SVG convierte la luminancia en transparencia) y
+ * sobre ellas se dibujan las zonas anatómicas (cráneo, costillas, pectorales, hígado…). Cada zona se
+ * tiñe con el peor nivel entre su sistema (p. ej. huesos) y su región del cuerpo (p. ej. un golpe en el
+ * cráneo). El tinte se recorta con la propia figura, así que solo colorea el cuerpo y respeta el dibujo.
+ * Lienzo común: 400 × 900, eje del cuerpo en x = 200. Las coordenadas de cada zona son las de su ilustración.
  */
-import { useEffect, useId, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { NOMBRE_SISTEMA, ORDEN_NIVEL, type EstadoCorporal, type Nivel, type SistemaCorporal } from '../core/tipos';
+import { useEffect, useId, useState, type KeyboardEvent } from 'react';
+import {
+  NOMBRE_SISTEMA, ORDEN_NIVEL, type EstadoCorporal, type Nivel, type RegionCuerpo, type SistemaCorporal,
+} from '../core/tipos';
 import { NOMBRE_NIVEL } from './componentes/basicos';
 
 type EstadoVisual = Nivel | 'sinDatos';
@@ -24,191 +26,228 @@ export function peorEstado(estado: EstadoCorporal, sistemas: SistemaCorporal[]):
   return peor;
 }
 
+const peor = (a: EstadoVisual, b: EstadoVisual | undefined): EstadoVisual =>
+  !b || b === 'sinDatos' ? a : a === 'sinDatos' || ORDEN_NIVEL[b] > ORDEN_NIVEL[a] ? b : a;
+
 // ── Ilustraciones ──────────────────────────────────────────────────────
 
 type Vista = 'frente' | 'espalda';
-type Capa = 'organos' | 'musculos' | 'esqueleto';
+export type Categoria = 'organos' | 'musculos' | 'huesos';
 
 const ANCHO = 400;
 const ALTO = 900;
 const EJE = ANCHO / 2;
 
-interface Ilustracion {
-  /** Tamaño original y caja de la figura dentro de la imagen (px). */
-  W: number;
-  H: number;
-  caja: [number, number, number, number];
-  /** Puntos de referencia en el lienzo común: coronilla, mentón, hombros, entrepierna, rodillas, pies. */
-  y: [number, number, number, number, number, number];
-  /** Medio ancho de hombros. */
-  hombro: number;
-  /** Brazo izquierdo del espectador: hombro, codo, muñeca y punta de la mano (x, y). */
-  brazo: [number, number, number, number, number, number, number, number];
-}
+/** Archivo de cada categoría (public/cuerpo/<vista>-<archivo>.jpg). */
+const ARCHIVO: Record<Categoria, string> = { organos: 'organos', musculos: 'musculos', huesos: 'esqueleto' };
 
-const ILUSTRACIONES: Record<Vista, Record<Capa, Ilustracion>> = {
+/** Tamaño original y caja de la figura dentro de cada imagen (px). */
+const ILUSTRACIONES: Record<Vista, Record<Categoria, { W: number; H: number; caja: [number, number, number, number] }>> = {
   frente: {
-    organos: { W: 1408, H: 768, caja: [589, 37, 818, 734], y: [19, 133, 201, 495, 644, 879], hombro: 102, brazo: [98, 212, 78, 369, 72, 495, 83, 534] },
-    musculos: { W: 1024, H: 572, caja: [428, 25, 595, 538], y: [19, 141, 196, 499, 620, 878], hombro: 109, brazo: [94, 212, 72, 369, 69, 455, 78, 526] },
-    esqueleto: { W: 1408, H: 768, caja: [585, 29, 822, 742], y: [19, 141, 196, 471, 644, 878], hombro: 94, brazo: [106, 204, 83, 353, 72, 455, 83, 534] },
+    organos: { W: 1408, H: 768, caja: [589, 37, 818, 734] },
+    musculos: { W: 1024, H: 572, caja: [428, 25, 595, 538] },
+    huesos: { W: 1408, H: 768, caja: [585, 29, 822, 742] },
   },
   espalda: {
-    organos: { W: 1024, H: 572, caja: [426, 25, 597, 549], y: [19, 149, 201, 495, 652, 878], hombro: 109, brazo: [95, 212, 72, 377, 72, 487, 83, 534] },
-    musculos: { W: 1600, H: 871, caja: [634, 37, 1001, 844], y: [19, 149, 188, 502, 667, 878], hombro: 117, brazo: [91, 204, 59, 345, 44, 455, 28, 518] },
-    esqueleto: { W: 1280, H: 720, caja: [520, 11, 760, 689], y: [19, 126, 149, 416, 597, 878], hombro: 94, brazo: [106, 173, 83, 298, 67, 408, 67, 479] },
+    organos: { W: 1024, H: 572, caja: [426, 25, 597, 549] },
+    musculos: { W: 1600, H: 871, caja: [634, 37, 1001, 844] },
+    huesos: { W: 1280, H: 720, caja: [520, 11, 760, 689] },
   },
 };
 
 /** Relativa al documento (la app navega con #), así funciona igual en desarrollo y en un build publicado en otra ruta. */
-const ruta = (v: Vista, c: Capa) => `cuerpo/${v}-${c}.jpg`;
+const ruta = (v: Vista, c: Categoria) => `cuerpo/${v}-${ARCHIVO[c]}.jpg`;
 
 /** Ubica la imagen para que la figura ocupe el lienzo (de y = 20 a y = 880), centrada en el eje. */
-function ubicacion(il: Ilustracion) {
+function ubicacion(v: Vista, c: Categoria) {
+  const il = ILUSTRACIONES[v][c];
   const [x0, y0, x1, y1] = il.caja;
   const s = 860 / (y1 - y0);
   return { x: EJE - ((x0 + x1) / 2) * s, y: 20 - y0 * s, width: il.W * s, height: il.H * s };
 }
 
-// ── Zonas de cada sistema (en las coordenadas de la imagen de órganos de cada vista) ──
+// ── Zonas anatómicas ───────────────────────────────────────────────────
 
-type Zona =
-  | { tipo: 'elipse'; cx: number; cy: number; rx: number; ry: number }
-  | { tipo: 'poligono'; puntos: [number, number][] }
-  | { tipo: 'brazos' };
+type Forma = { cx: number; cy: number; rx: number; ry: number; rot?: number } | { puntos: [number, number][] };
 
-const elipse = (cx: number, cy: number, rx: number, ry: number): Zona => ({ tipo: 'elipse', cx, cy, rx, ry });
-const parElipses = (cx: number, cy: number, rx: number, ry: number): Zona[] => [elipse(cx, cy, rx, ry), elipse(2 * EJE - cx, cy, rx, ry)];
-const PIERNA: [number, number][] = [[126, 480], [134, 600], [142, 660], [140, 760], [150, 860], [184, 860], [190, 760], [192, 660], [198, 600], [200, 505]];
-const espejoPuntos = (p: [number, number][]): [number, number][] => p.map(([x, y]) => [2 * EJE - x, y]);
-const piernas: Zona[] = [{ tipo: 'poligono', puntos: PIERNA }, { tipo: 'poligono', puntos: espejoPuntos(PIERNA) }];
-
-/** Orden de dibujo: lo de atrás primero; lo que se dibuja después tiene prioridad al hacer clic. */
-const ZONAS: Record<Vista, [SistemaCorporal, Zona[]][]> = {
-  frente: [
-    ['piernas', piernas],
-    ['musculos', [{ tipo: 'brazos' }]],
-    ['intestino', [elipse(200, 408, 58, 48)]],
-    ['metabolismo', [elipse(200, 333, 60, 30)]],
-    ['pulmones', [elipse(166, 242, 31, 54), elipse(236, 242, 33, 54)]],
-    ['corazon', [elipse(212, 252, 22, 26)]],
-    ['huesos', [...parElipses(152, 466, 24, 18), ...parElipses(166, 646, 15, 17)]],
-    ['inmune', [...parElipses(184, 150, 7, 7), ...parElipses(120, 218, 9, 9), ...parElipses(174, 480, 8, 8)]],
-    ['cerebro', [elipse(200, 58, 40, 36)]],
-    ['oidoInterno', parElipses(157, 86, 7, 11)],
-    ['ojos', parElipses(183, 92, 10, 6)],
-  ],
-  espalda: [
-    ['piernas', piernas],
-    ['musculos', [{ tipo: 'brazos' }]],
-    ['intestino', [elipse(200, 428, 58, 40)]],
-    ['pulmones', [elipse(167, 240, 30, 52), elipse(233, 240, 30, 52)]],
-    ['metabolismo', parElipses(168, 337, 13, 18)],
-    ['huesos', [{ tipo: 'poligono', puntos: [[194, 165], [206, 165], [207, 300], [206, 445], [194, 445], [193, 300]] }, ...parElipses(160, 462, 24, 18), ...parElipses(166, 650, 15, 17)]],
-    ['inmune', parElipses(185, 152, 7, 7)],
-    ['cerebro', [elipse(200, 58, 40, 36)]],
-    ['oidoInterno', parElipses(156, 86, 7, 11)],
-  ],
-};
-
-/** Traslada un punto de la vista base a una ilustración, por tramos entre sus puntos de referencia. */
-function trasladar(base: Ilustracion, il: Ilustracion, x: number, y: number): [number, number] {
-  const a = base.y, b = il.y;
-  let i = 0;
-  while (i < a.length - 2 && y > a[i + 1]) i++;
-  const t = (y - a[i]) / (a[i + 1] - a[i]);
-  const ny = b[i] + t * (b[i + 1] - b[i]);
-  // La cabeza conserva su ancho; del cuello para abajo se ajusta al ancho de hombros.
-  const k = y < base.y[1] ? 1 : il.hombro / base.hombro;
-  return [EJE + (x - EJE) * k, ny];
+interface ZonaFigura {
+  id: string;
+  nombre: string;
+  /** Sistema de salud cuyo estado tiñe la zona (y que se selecciona al hacer clic). */
+  sistema: SistemaCorporal;
+  /** Región del cuerpo: un hallazgo localizado (p. ej. golpe en el cráneo) también la tiñe. */
+  region?: RegionCuerpo;
+  formas: Forma[];
 }
 
-function formas(z: Zona, base: Ilustracion, il: Ilustracion, clave: string): ReactNode {
-  if (z.tipo === 'brazos') {
-    const [hx, hy, cx, cy, mx, my, px, py] = il.brazo;
-    const d = `M${hx} ${hy} L${cx} ${cy} L${mx} ${my} L${px} ${py}`;
-    return (
-      <g key={clave} className="zona-brazos">
-        <path d={d} />
-        <path d={d} transform={`translate(${2 * EJE} 0) scale(-1 1)`} />
-      </g>
-    );
-  }
-  if (z.tipo === 'elipse') {
-    const [cx, cy] = trasladar(base, il, z.cx, z.cy);
-    const [, arriba] = trasladar(base, il, z.cx, z.cy - z.ry);
-    const [, abajo] = trasladar(base, il, z.cx, z.cy + z.ry);
-    const k = z.cy < base.y[1] ? 1 : il.hombro / base.hombro;
-    return <ellipse key={clave} cx={cx} cy={cy} rx={z.rx * k} ry={(abajo - arriba) / 2} />;
-  }
-  return <polygon key={clave} points={z.puntos.map(([x, y]) => trasladar(base, il, x, y).join(',')).join(' ')} />;
+const e = (cx: number, cy: number, rx: number, ry: number, rot = 0): Forma => ({ cx, cy, rx, ry, rot });
+/** Elipse y su espejo (para estructuras pares). El ángulo se refleja. */
+const par = (cx: number, cy: number, rx: number, ry: number, rot = 0): Forma[] => [e(cx, cy, rx, ry, rot), e(2 * EJE - cx, cy, rx, ry, -rot)];
+const z = (id: string, nombre: string, sistema: SistemaCorporal, region: RegionCuerpo | undefined, ...formas: (Forma | Forma[])[]): ZonaFigura =>
+  ({ id, nombre, sistema, region, formas: formas.flat() });
+
+/** Orden de dibujo: lo de atrás primero; lo que se dibuja después tiene prioridad al hacer clic. */
+const ZONAS: Record<Vista, Record<Categoria, ZonaFigura[]>> = {
+  frente: {
+    organos: [
+      z('intestino', 'Intestinos', 'intestino', 'abdomen', e(200, 408, 58, 48)),
+      z('higado', 'Hígado', 'metabolismo', 'abdomen', e(172, 322, 34, 20)),
+      z('estomago', 'Estómago', 'intestino', 'abdomen', e(232, 322, 22, 18)),
+      z('pulmones', 'Pulmones', 'pulmones', 'torax', e(166, 242, 31, 54), e(236, 242, 33, 54)),
+      z('corazon', 'Corazón', 'corazon', 'torax', e(212, 252, 22, 26)),
+      z('traquea', 'Tráquea', 'pulmones', 'cuello', e(200, 182, 6, 18)),
+      z('ganglios', 'Ganglios linfáticos', 'inmune', undefined, par(184, 150, 7, 7), par(120, 218, 9, 9), par(174, 480, 8, 8)),
+      z('cerebro', 'Cerebro', 'cerebro', 'craneo', e(200, 58, 40, 36)),
+      z('oido', 'Oído interno', 'oidoInterno', 'craneo', par(157, 86, 7, 11)),
+      z('ojos', 'Ojos', 'ojos', 'cara', par(183, 92, 10, 6)),
+    ],
+    musculos: [
+      z('cuello-m', 'Cuello', 'musculos', 'cuello', e(200, 160, 20, 18)),
+      z('pectorales', 'Pectorales', 'musculos', 'torax', par(164, 232, 34, 28)),
+      z('abdominales', 'Abdominales', 'musculos', 'abdomen', e(200, 342, 36, 60)),
+      z('biceps', 'Brazos (bíceps)', 'musculos', 'brazos', par(85, 298, 17, 58, 8)),
+      z('antebrazos-m', 'Antebrazos', 'musculos', 'brazos', par(72, 408, 14, 50, 6)),
+      z('deltoides', 'Hombros (deltoides)', 'musculos', 'brazos', par(103, 214, 17, 22)),
+      z('cuadriceps', 'Muslos (cuádriceps)', 'piernas', 'piernas', par(155, 553, 30, 84)),
+      z('piernas-m', 'Piernas (tibial y gemelos)', 'piernas', 'piernas', par(145, 725, 22, 78)),
+    ],
+    huesos: [
+      z('costillas', 'Costillas', 'huesos', 'torax', e(200, 272, 70, 66)),
+      z('esternon', 'Esternón', 'huesos', 'torax', e(200, 255, 8, 42)),
+      z('claviculas', 'Clavículas', 'huesos', 'torax', par(172, 197, 26, 6)),
+      z('cervical', 'Columna cervical', 'huesos', 'cuello', e(200, 165, 6, 14)),
+      z('lumbar', 'Columna lumbar', 'huesos', 'columna', e(200, 366, 8, 34)),
+      z('pelvis', 'Pelvis', 'huesos', 'pelvis', e(200, 430, 70, 42)),
+      z('humeros', 'Húmeros', 'huesos', 'brazos', par(94, 278, 8, 72, 9)),
+      z('antebrazos-h', 'Radio y cúbito', 'huesos', 'brazos', par(78, 404, 9, 50, 6)),
+      z('manos', 'Manos', 'huesos', 'brazos', par(78, 494, 12, 38)),
+      z('femures', 'Fémures', 'huesos', 'piernas', par(154, 545, 11, 85)),
+      z('rodillas', 'Rodillas', 'huesos', 'piernas', par(150, 644, 12, 14)),
+      z('tibias', 'Tibias y peronés', 'huesos', 'piernas', par(150, 741, 11, 82)),
+      z('pies', 'Pies', 'huesos', 'piernas', par(137, 850, 38, 28)),
+      z('craneo', 'Cráneo', 'huesos', 'craneo', e(200, 55, 33, 32)),
+    ],
+  },
+  espalda: {
+    organos: [
+      z('intestino', 'Intestinos', 'intestino', 'abdomen', e(200, 428, 58, 40)),
+      z('pulmones', 'Pulmones', 'pulmones', 'torax', e(167, 240, 30, 52), e(233, 240, 30, 52)),
+      z('rinones', 'Riñones', 'metabolismo', 'abdomen', par(168, 337, 13, 18)),
+      z('traquea', 'Tráquea', 'pulmones', 'cuello', e(200, 175, 6, 16)),
+      z('ganglios', 'Ganglios linfáticos', 'inmune', undefined, par(185, 152, 7, 7)),
+      z('cerebro', 'Cerebro', 'cerebro', 'craneo', e(200, 58, 40, 36)),
+      z('oido', 'Oído interno', 'oidoInterno', 'craneo', par(156, 86, 7, 11)),
+    ],
+    musculos: [
+      z('trapecio', 'Trapecio', 'musculos', 'cuello', e(200, 200, 50, 62)),
+      z('dorsales', 'Dorsales', 'musculos', 'torax', par(155, 330, 26, 45)),
+      z('triceps', 'Brazos (tríceps)', 'musculos', 'brazos', par(92, 282, 15, 58, 10)),
+      z('antebrazos-m', 'Antebrazos', 'musculos', 'brazos', par(64, 400, 13, 52, 10)),
+      z('deltoides', 'Hombros (deltoides)', 'musculos', 'brazos', par(98, 212, 17, 22)),
+      z('gluteos', 'Glúteos', 'piernas', 'pelvis', par(167, 455, 30, 32)),
+      z('isquiotibiales', 'Muslos (isquiotibiales)', 'piernas', 'piernas', par(156, 568, 30, 68)),
+      z('gemelos', 'Gemelos', 'piernas', 'piernas', par(152, 700, 22, 62)),
+    ],
+    huesos: [
+      z('costillas', 'Costillas', 'huesos', 'torax', e(200, 240, 68, 64)),
+      z('escapulas', 'Escápulas', 'huesos', 'torax', par(153, 181, 22, 26)),
+      z('columna', 'Columna vertebral', 'huesos', 'columna', { puntos: [[193, 105], [207, 105], [207, 405], [193, 405]] }),
+      z('pelvis', 'Pelvis y sacro', 'huesos', 'pelvis', e(200, 372, 72, 38)),
+      z('humeros', 'Húmeros', 'huesos', 'brazos', par(95, 235, 8, 60, 10)),
+      z('antebrazos-h', 'Radio y cúbito', 'huesos', 'brazos', par(75, 353, 9, 55, 8)),
+      z('manos', 'Manos', 'huesos', 'brazos', par(67, 443, 12, 35)),
+      z('femures', 'Fémures', 'huesos', 'piernas', par(153, 502, 10, 65)),
+      z('rodillas', 'Rodillas', 'huesos', 'piernas', par(153, 597, 11, 13)),
+      z('tibias', 'Tibias y peronés', 'huesos', 'piernas', par(153, 722, 10, 60)),
+      z('pies', 'Pies', 'huesos', 'piernas', par(145, 856, 18, 14)),
+      z('craneo', 'Cráneo', 'huesos', 'craneo', e(200, 63, 33, 38)),
+    ],
+  },
+};
+
+const VISTAS: [Vista, string][] = [['frente', 'Frente'], ['espalda', 'Espalda']];
+export const CATEGORIAS: [Categoria, string][] = [['organos', 'Órganos'], ['musculos', 'Músculos'], ['huesos', 'Huesos']];
+
+/** Dónde mostrar un sistema: primero la vista y categoría actuales, luego las demás. */
+function ubicarSistema(s: SistemaCorporal, vista: Vista, categoria: Categoria): { vista: Vista; categoria: Categoria } | null {
+  const vistas: Vista[] = [vista, vista === 'frente' ? 'espalda' : 'frente'];
+  const categorias: Categoria[] = [categoria, ...(['organos', 'musculos', 'huesos'] as Categoria[]).filter((c) => c !== categoria)];
+  for (const c of categorias) for (const v of vistas) if (ZONAS[v][c].some((zona) => zona.sistema === s)) return { vista: v, categoria: c };
+  return null;
 }
 
 // ── Componente ─────────────────────────────────────────────────────────
 
 interface Props {
   estado: EstadoCorporal;
+  /** Peor nivel por región del cuerpo (hallazgos localizados, p. ej. golpe en el cráneo). */
+  regiones?: Partial<Record<RegionCuerpo, Nivel>>;
   seleccion: SistemaCorporal[] | null;
   onSeleccionar: (sistemas: SistemaCorporal[]) => void;
 }
 
 const CLAVE_VISTA = 'higia.figura';
-const leerPreferencia = (): { vista: Vista; capa: Capa } => {
+const leerPreferencia = (): { vista: Vista; categoria: Categoria } => {
   try {
-    const v = JSON.parse(localStorage.getItem(CLAVE_VISTA) ?? '{}') as { vista?: Vista; capa?: Capa };
-    return { vista: v.vista === 'espalda' ? 'espalda' : 'frente', capa: v.capa === 'musculos' || v.capa === 'esqueleto' ? v.capa : 'organos' };
-  } catch { return { vista: 'frente', capa: 'organos' }; }
+    const v = JSON.parse(localStorage.getItem(CLAVE_VISTA) ?? '{}') as { vista?: Vista; categoria?: Categoria };
+    return { vista: v.vista === 'espalda' ? 'espalda' : 'frente', categoria: v.categoria === 'musculos' || v.categoria === 'huesos' ? v.categoria : 'organos' };
+  } catch { return { vista: 'frente', categoria: 'organos' }; }
 };
 
-const VISTAS: [Vista, string][] = [['frente', 'Frente'], ['espalda', 'Espalda']];
-const CAPAS: [Capa, string][] = [['organos', 'Órganos'], ['musculos', 'Músculos'], ['esqueleto', 'Esqueleto']];
-
-export function FiguraCorporal({ estado, seleccion, onSeleccionar }: Props) {
-  const [{ vista, capa }, setPreferencia] = useState(leerPreferencia);
+export function FiguraCorporal({ estado, regiones = {}, seleccion, onSeleccionar }: Props) {
+  const [{ vista, categoria }, setPreferencia] = useState(leerPreferencia);
+  const [zonaActiva, setZonaActiva] = useState<string | null>(null);
   const id = useId().replace(/:/g, '');
-  const il = ILUSTRACIONES[vista][capa];
-  const base = ILUSTRACIONES[vista].organos;
-  const pos = ubicacion(il);
+  const pos = ubicacion(vista, categoria);
+  const zonas = ZONAS[vista][categoria];
 
-  const cambiar = (p: Partial<{ vista: Vista; capa: Capa }>) => setPreferencia((prev) => {
+  const cambiar = (p: Partial<{ vista: Vista; categoria: Categoria }>) => setPreferencia((prev) => {
     const nuevo = { ...prev, ...p };
     try { localStorage.setItem(CLAVE_VISTA, JSON.stringify(nuevo)); } catch { /* sin almacenamiento */ }
     return nuevo;
   });
 
-  // Precarga las seis ilustraciones para que cambiar de vista o capa sea instantáneo.
+  // Precarga las seis ilustraciones para que cambiar de vista o categoría sea instantáneo.
   useEffect(() => {
-    for (const v of ['frente', 'espalda'] as Vista[]) for (const c of ['organos', 'musculos', 'esqueleto'] as Capa[]) new Image().src = ruta(v, c);
+    for (const v of ['frente', 'espalda'] as Vista[]) for (const c of ['organos', 'musculos', 'huesos'] as Categoria[]) new Image().src = ruta(v, c);
   }, []);
 
-  // Si piden un sistema que no se ve desde esta vista (p. ej. los ojos de espaldas), se gira la figura.
+  // Si piden un sistema que no aparece en lo que se ve (p. ej. los huesos con la categoría Órganos), se cambia a donde está.
   useEffect(() => {
     const s = seleccion?.[0];
-    if (!s || s === 'cuerpo') return;
-    const enVista = (v: Vista) => ZONAS[v].some(([x]) => x === s);
-    if (!enVista(vista)) cambiar({ vista: vista === 'frente' ? 'espalda' : 'frente' });
+    if (!s || s === 'cuerpo' || zonas.some((zona) => zona.sistema === s)) return;
+    const destino = ubicarSistema(s, vista, categoria);
+    if (destino) cambiar(destino);
   }, [seleccion]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const elegir = (s: SistemaCorporal) => onSeleccionar([s]);
-  const alTeclear = (s: SistemaCorporal) => (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); elegir(s); } };
-  const clases = (s: SistemaCorporal) => `sistema-svg nivel-${peorEstado(estado, [s])} ${seleccion?.includes(s) ? 'seleccionado' : ''}`;
-  const etiqueta = (s: SistemaCorporal) => `${NOMBRE_SISTEMA[s]}: ${NOMBRE_NIVEL[peorEstado(estado, [s])]}`;
+  const nivelZona = (zona: ZonaFigura): EstadoVisual => peor(peorEstado(estado, [zona.sistema]), zona.region ? regiones[zona.region] : undefined);
+  const etiqueta = (zona: ZonaFigura) => `${zona.nombre} · ${NOMBRE_SISTEMA[zona.sistema]}: ${NOMBRE_NIVEL[nivelZona(zona)]}`;
+  // Si se tocó una zona, se resalta solo esa; si el sistema se eligió desde la lista, todas sus zonas.
+  const activa = zonas.find((x) => x.id === zonaActiva && seleccion?.includes(x.sistema));
+  const elegida = (zona: ZonaFigura) => (activa ? zona.id === activa.id : !!seleccion?.includes(zona.sistema));
+  const elegir = (zona: ZonaFigura) => { setZonaActiva(zona.id); onSeleccionar([zona.sistema]); };
+  const alTeclear = (f: () => void) => (ev: KeyboardEvent) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); f(); } };
 
-  const imagen = (filtro: string) => (
-    <image href={ruta(vista, capa)} {...pos} preserveAspectRatio="none" filter={`url(#${filtro})`} />
-  );
+  const nivelCuerpo = peorEstado(estado, ['cuerpo']);
+
+  const formas = (zona: ZonaFigura) => zona.formas.map((f, i) => ('puntos' in f
+    ? <polygon key={i} points={f.puntos.map((p) => p.join(',')).join(' ')} />
+    : <ellipse key={i} cx={f.cx} cy={f.cy} rx={f.rx} ry={f.ry} transform={f.rot ? `rotate(${f.rot} ${f.cx} ${f.cy})` : undefined} />));
+
+  const imagen = (filtro: string) => <image href={ruta(vista, categoria)} {...pos} preserveAspectRatio="none" filter={`url(#${filtro})`} />;
 
   return (
     <div className="figura">
       <div className="figura-controles">
+        <div className="figura-selector" role="group" aria-label="Qué mostrar">
+          {CATEGORIAS.map(([c, n]) => <button key={c} aria-pressed={categoria === c} onClick={() => cambiar({ categoria: c })}>{n}</button>)}
+        </div>
         <div className="figura-selector" role="group" aria-label="Vista">
           {VISTAS.map(([v, n]) => <button key={v} aria-pressed={vista === v} onClick={() => cambiar({ vista: v })}>{n}</button>)}
         </div>
-        <div className="figura-selector" role="group" aria-label="Capa">
-          {CAPAS.map(([c, n]) => <button key={c} aria-pressed={capa === c} onClick={() => cambiar({ capa: c })}>{n}</button>)}
-        </div>
       </div>
 
-      <svg viewBox={`0 0 ${ANCHO} ${ALTO}`} className="figura-svg" aria-label={`Figura anatómica (${vista}, ${CAPAS.find(([c]) => c === capa)![1].toLowerCase()}) con el estado de salud por sistema`}>
+      <svg viewBox={`0 0 ${ANCHO} ${ALTO}`} className="figura-svg" aria-label={`Figura anatómica: ${CATEGORIAS.find(([c]) => c === categoria)![1].toLowerCase()}, vista de ${vista}`}>
         <defs>
           {/* Luminancia → transparencia: quita el fondo oscuro y deja la figura en un blanco azulado del tema. */}
           <filter id={`${id}-figura`} colorInterpolationFilters="sRGB">
@@ -223,35 +262,40 @@ export function FiguraCorporal({ estado, seleccion, onSeleccionar }: Props) {
 
         {/* Todo el cuerpo (radiación): el halo de la figura toma su color. */}
         <g
-          className={`${clases('cuerpo')} aura-cuerpo`} role="button" tabIndex={0} aria-label={etiqueta('cuerpo')}
-          aria-pressed={!!seleccion?.includes('cuerpo')} onClick={() => elegir('cuerpo')} onKeyDown={alTeclear('cuerpo')}
+          className={`sistema-svg nivel-${nivelCuerpo} aura-cuerpo ${seleccion?.includes('cuerpo') ? 'seleccionado' : ''}`}
+          role="button" tabIndex={0} aria-label={`Todo el cuerpo (radiación): ${NOMBRE_NIVEL[nivelCuerpo]}`}
+          aria-pressed={!!seleccion?.includes('cuerpo')} onClick={() => { setZonaActiva(null); onSeleccionar(['cuerpo']); }}
+          onKeyDown={alTeclear(() => { setZonaActiva(null); onSeleccionar(['cuerpo']); })}
         >
-          <title>{etiqueta('cuerpo')}</title>
+          <title>{`Todo el cuerpo (radiación): ${NOMBRE_NIVEL[nivelCuerpo]}`}</title>
           {imagen(`${id}-figura`)}
         </g>
 
-        {/* Tinte por sistema, recortado con la figura. */}
+        {/* Tinte por zona, recortado con la figura. */}
         <g mask={`url(#${id}-mascara)`} className="tintes" aria-hidden>
-          {ZONAS[vista].map(([s, zonas]) => (
-            <g key={s} className={`tinte ${clases(s)}`}>{zonas.map((z, i) => formas(z, base, il, `${s}${i}`))}</g>
+          {zonas.map((zona) => (
+            <g key={zona.id} className={`tinte sistema-svg nivel-${nivelZona(zona)} ${elegida(zona) ? 'seleccionado' : ''}`}>{formas(zona)}</g>
           ))}
         </g>
 
-        {/* Zonas interactivas (invisibles salvo el contorno al seleccionar). */}
+        {/* Zonas interactivas (invisibles salvo el contorno al pasar o seleccionar). */}
         <g className="zonas">
-          {ZONAS[vista].map(([s, zonas]) => (
+          {zonas.map((zona) => (
             <g
-              key={s} className={`zona-sistema ${clases(s)}`} role="button" tabIndex={0} aria-label={etiqueta(s)}
-              aria-pressed={!!seleccion?.includes(s)} onClick={() => elegir(s)} onKeyDown={alTeclear(s)}
+              key={zona.id} className={`zona-sistema sistema-svg nivel-${nivelZona(zona)} ${elegida(zona) ? 'seleccionado' : ''}`}
+              role="button" tabIndex={0} aria-label={etiqueta(zona)} aria-pressed={elegida(zona)}
+              onClick={() => elegir(zona)} onKeyDown={alTeclear(() => elegir(zona))}
             >
-              <title>{etiqueta(s)}</title>
-              {zonas.map((z, i) => formas(z, base, il, `${s}${i}`))}
+              <title>{etiqueta(zona)}</title>
+              {formas(zona)}
             </g>
           ))}
         </g>
       </svg>
 
-      <p className="ayuda">Pasa el mouse o usa Tab para ver cada sistema · clic o Enter para ver su detalle</p>
+      <p className="figura-zona" aria-live="polite">
+        {activa ? <><strong>{activa.nombre}</strong> · {NOMBRE_SISTEMA[activa.sistema]}: {NOMBRE_NIVEL[nivelZona(activa)]}</> : 'Pasa el mouse o usa Tab para ver cada zona · clic o Enter para ver su detalle'}
+      </p>
       <ul className="leyenda">
         {(['normal', 'info', 'aviso', 'alerta', 'sinDatos'] as EstadoVisual[]).map((n) => (
           <li key={n}><span className={`punto nivel-${n}`} />{NOMBRE_NIVEL[n]}</li>

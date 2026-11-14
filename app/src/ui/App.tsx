@@ -5,10 +5,11 @@ import { AdaptadorEjemplo } from '../adaptadores/interop/ejemploNasa';
 import { ESCENARIOS, type Escenario } from '../adaptadores/simulador/escenarios';
 import { PERFILES } from '../adaptadores/simulador/perfiles';
 import { respuestaSimulada } from '../adaptadores/simulador/tripulacion';
-import { detener, hablar } from '../adaptadores/voz/voz';
+import { aceptarRespuestaSinNombre, detener, hablar } from '../adaptadores/voz/voz';
 import type { Accion } from '../core/acciones';
 import { interpretar } from '../core/conversacion';
 import { NucleoSalud } from '../core/nucleo';
+import { ChequeoOrientacion } from '../core/orientacion';
 import { REGLAS } from '../core/reglas';
 import { NOMBRE_SISTEMA, type Comunicacion, type Contexto, type HistoriaClinica, type Lectura, type Mensaje, type Perfil, type SistemaCorporal } from '../core/tipos';
 import { useAsistente, type ResultadoConversacion } from './asistente';
@@ -79,6 +80,11 @@ export function App() {
   const [avisoComunicacion, setAvisoComunicacion] = useState<{ mensaje: Mensaje; ids: string[] } | null>(null);
   const turnos = useRef<TurnoConversacion[]>([]);
   const preavisados = useRef(new Set<string>());
+  /** Chequeo de orientación en curso (preguntas que Higia hace y evalúa en el dispositivo). */
+  const chequeo = useRef<ChequeoOrientacion | null>(null);
+  /** Impactos en la cabeza para los que ya se pidió el chequeo (no repetirlo al reevaluar). */
+  const impactosChequeados = useRef(new Set<number>());
+  const decirRef = useRef<(texto: string, hechos?: string[]) => void>(() => {});
   const vozRef = useRef(vozActiva);
   vozRef.current = vozActiva;
 
@@ -148,9 +154,25 @@ export function App() {
     }
   }, [nucleo]);
 
+  /** Empieza el chequeo de orientación y devuelve la primera pregunta (con su presentación). */
+  const iniciarChequeo = useCallback((): string => {
+    chequeo.current = new ChequeoOrientacion(nucleo.perfil, nucleo.contexto);
+    aceptarRespuestaSinNombre(30_000);
+    return `Te haré ${chequeo.current.total} preguntas rápidas; responde sin apuro. ${chequeo.current.pregunta()}`;
+  }, [nucleo]);
+
   const procesar = useCallback(async (nuevos: Mensaje[]) => {
     if (vozRef.current) nuevos.filter((m) => m.voz).forEach((m) => hablar(m.texto));
     if (nuevos.length) setMensajes((prev) => [...nuevos, ...prev].slice(0, 100));
+    // Tras un golpe en la cabeza medido por el casco, Higia evalúa la orientación por su cuenta.
+    for (const m of nuevos) {
+      if (m.hallazgo.riesgoId !== 'trauma.craneal' || m.esRecordatorio || m.hallazgo.nivel === 'normal' || m.hallazgo.nivel === 'info') continue;
+      const impacto = m.hallazgo.datos?.find((d) => d.sensor === 'impactoCabeza');
+      const yaEvaluado = m.hallazgo.datos?.some((d) => d.sensor === 'orientacion');
+      if (!impacto || yaEvaluado || impactosChequeados.current.has(impacto.timestamp) || chequeo.current) continue;
+      impactosChequeados.current.add(impacto.timestamp);
+      decirRef.current(iniciarChequeo(), ['Inicié un chequeo de orientación por el golpe en la cabeza']);
+    }
     // Una comunicación de emergencia (escalada o pedido de ayuda) se destaca en toda la app.
     const comunicado = nuevos.find((m) => m.escalamiento?.comunicaciones?.length);
     if (comunicado) {
@@ -164,7 +186,7 @@ export function App() {
       await interop.enviar(nucleo.tomarPendientesReporte(), nucleo.perfil);
     }
     refrescar();
-  }, [nucleo, interop, evaluarConIA, programarRespuestas]);
+  }, [nucleo, interop, evaluarConIA, programarRespuestas, iniciarChequeo]);
 
   // Cada segundo: preaviso y escalada de alertas sin respuesta. Cada minuto: recordatorios.
   useEffect(() => {
@@ -225,6 +247,7 @@ export function App() {
   const pedirAyuda = (motivo = 'Pedido manual desde la app.') => void procesar([nucleo.pedirAyuda('todos', motivo)]);
 
   /** Ejecuta lo que pidió el asistente. Devuelve, para cada acción, qué se hizo (se muestra en el chat). */
+  let chequeoPendiente: string | null = null;
   const ejecutarAcciones = (acciones: Accion[]): string[] => {
     const hechos: string[] = [];
     for (const a of acciones) {
@@ -286,6 +309,9 @@ export function App() {
           hechos.push(`Historia clínica: agregué "${a.valor}"`);
           break;
         }
+        case 'chequeo_orientacion':
+          if (!chequeo.current) { chequeoPendiente = iniciarChequeo(); hechos.push('Inicié un chequeo de orientación'); }
+          break;
         case 'ejecutar_escenario': {
           const e = ESCENARIOS.find((x) => x.id === a.escenario || normal(x.nombre) === normal(a.escenario));
           if (e) { ejecutarEscenario(e); hechos.push(`Escenario de la demo: ${e.nombre}`); }
@@ -325,10 +351,36 @@ export function App() {
     });
   };
 
+  /** Respuesta a una pregunta del chequeo de orientación en curso. */
+  const responderChequeo = (frase: string): ResultadoConversacion => {
+    const c = chequeo.current!;
+    if (/\b(cancela|cancelar|basta|deten|para el chequeo)\b/.test(normal(frase))) {
+      chequeo.current = null;
+      return { texto: 'De acuerdo, cancelo el chequeo de orientación.', fuente: 'local', hechos: ['Chequeo de orientación cancelado'] };
+    }
+    c.responder(frase);
+    if (!c.terminado) {
+      aceptarRespuestaSinNombre(30_000);
+      return { texto: c.pregunta()!, fuente: 'local', hechos: [] };
+    }
+    chequeo.current = null;
+    void procesar(nucleo.registrar({ sensor: 'orientacion', valor: c.valor, timestamp: Date.now(), fuente: 'voz' }));
+    const texto = c.aciertos === c.total
+      ? `Gracias. Respondiste bien las ${c.total} preguntas: estás orientado.`
+      : `Gracias. Respondiste bien ${c.aciertos} de ${c.total}. Lo registro y lo tengo en cuenta para cuidarte.`;
+    return { texto, fuente: 'local', hechos: [`Chequeo de orientación: ${c.aciertos} de ${c.total} (${c.valor}/10)`] };
+  };
+
   const conversar = async (frase: string): Promise<ResultadoConversacion> => {
     // Seguridad primero: lo urgente que entiende el intérprete local (pedir ayuda, "estoy bien",
     // un síntoma grave) se ejecuta ya, sin esperar a la IA ni depender de la red.
     const local = interpretar(frase, nucleo);
+    // Durante el chequeo de orientación, la frase es una respuesta; un pedido de ayuda lo interrumpe.
+    if (chequeo.current) {
+      if (local.acciones.some((a) => a.tipo === 'pedir_ayuda')) chequeo.current = null;
+      else return responderChequeo(frase);
+    }
+    chequeoPendiente = null;
     const urgentes = local.acciones.filter(esUrgente);
     const hechos = ejecutarAcciones(urgentes);
     const yaHecha = (a: Accion) => urgentes.some((u) => u.tipo === a.tipo && (a.tipo !== 'emitir_alerta' || (u.tipo === 'emitir_alerta' && u.sistema === a.sistema)));
@@ -339,6 +391,8 @@ export function App() {
       if (!iaActiva) throw new Error('');
       const r = await conversarIA({ frase, historial: turnos.current, estado: estadoParaIA(nucleo, estadoApp()) });
       lecturas = lecturasDesdeIA(r);
+      // Lo que el intérprete local detecta de forma determinista (señales de percepción) se registra siempre.
+      lecturas.push(...local.lecturas.filter((l) => l.sensor === 'marcadoresPsicoticos' && !lecturas.some((x) => x.sensor === l.sensor)));
       hechos.push(...ejecutarAcciones(r.acciones.filter((a) => !yaHecha(a))));
       resultado = { texto: r.respuesta, fuente: 'ia', hechos };
     } catch (e) {
@@ -348,12 +402,14 @@ export function App() {
       const motivo = e instanceof Error && e.message ? `IA no disponible (${e.message}). ` : '';
       resultado = { texto: local.texto, fuente: 'local', hechos, nota: motivo ? `${motivo}Respondió el intérprete local.` : undefined };
     }
+    if (chequeoPendiente) resultado = { ...resultado, texto: `${resultado.texto} ${chequeoPendiente}` };
     turnos.current = [...turnos.current, { rol: 'astronauta' as const, texto: frase }, { rol: 'higia' as const, texto: resultado.texto }].slice(-12);
     if (lecturas.length) void procesar(nucleo.registrar(lecturas));
     return resultado;
   };
 
   const asistente = useAsistente(conversar, vozActiva);
+  decirRef.current = asistente.decir;
 
   const vencimientos = nucleo.confirmacionesPendientes();
   const pendientes = mensajes.filter((m) => vencimientos.has(m.id)).map((m) => ({ mensaje: m, vence: vencimientos.get(m.id)! }));
@@ -388,7 +444,7 @@ export function App() {
           )}
           {seccion === 'resumen' && (
             <VistaResumen
-              perfil={nucleo.perfil} contexto={c} estado={nucleo.estadoCorporal()} hallazgos={nucleo.hallazgosActuales()}
+              perfil={nucleo.perfil} contexto={c} estado={nucleo.estadoCorporal()} regiones={nucleo.estadoRegiones()} hallazgos={nucleo.hallazgosActuales()}
               seleccion={seleccion} onSeleccionar={setSeleccion} onIrMensajes={() => ir('mensajes')}
             />
           )}

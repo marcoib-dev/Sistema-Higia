@@ -5,7 +5,7 @@
  * Se puede editar aquí o hablando: «Higia, soy alérgico al látex».
  */
 import { Fragment, useState } from 'react';
-import { NOMBRE_SISTEMA, SISTEMAS, type Antecedente, type HistoriaClinica, type Perfil, type SistemaCorporal } from '../../core/tipos';
+import { INFO_SENSOR, NOMBRE_SISTEMA, SISTEMAS, type Antecedente, type HistoriaClinica, type Perfil, type SistemaCorporal, type TipoSensor } from '../../core/tipos';
 import { EncabezadoSeccion, Etiqueta } from '../componentes/basicos';
 import { Icono } from '../iconos';
 
@@ -18,8 +18,6 @@ interface Props {
 const FORMACION: Record<Perfil['formacionMedica'], string> = { ninguna: 'Sin formación médica', basica: 'Formación básica', medico: 'Médica/o' };
 const EXPERIENCIA: Record<Perfil['experiencia'], string> = { novato: 'Novato', intermedio: 'Intermedio', veterano: 'Veterano' };
 const SEXO: Record<HistoriaClinica['sexo'], string> = { femenino: 'Femenino', masculino: 'Masculino', otro: 'Otro' };
-const SENSOR: Record<string, string> = { frecuenciaCardiaca: 'Pulso en reposo', animo: 'Ánimo habitual', estres: 'Estrés habitual' };
-const UNIDAD: Record<string, string> = { frecuenciaCardiaca: 'lpm', animo: '/10', estres: '/100' };
 
 type CampoLista = 'alergias' | 'medicacion' | 'cirugias' | 'antecedentesFamiliares' | 'notas';
 
@@ -60,7 +58,7 @@ export function VistaPerfil({ perfil: p, onHistoria, onRestablecer }: Props) {
             <dt>Tolerancia al estrés</dt><dd>{p.toleranciaEstres}{p.propensoPanico ? ' · propenso al pánico' : ''}</dd>
             <dt>Horario de sueño</dt><dd>{p.horarioSueno.inicio}:00 a {p.horarioSueno.fin}:00</dd>
             {Object.entries(p.lineaBase).map(([s, v]) => (
-              <Fragment key={s}><dt>{SENSOR[s] ?? s}</dt><dd>{v} {UNIDAD[s] ?? ''}</dd></Fragment>
+              <Fragment key={s}><dt>{INFO_SENSOR[s as TipoSensor].nombre} (habitual)</dt><dd>{v} {INFO_SENSOR[s as TipoSensor].unidad}</dd></Fragment>
             ))}
           </dl>
         </section>

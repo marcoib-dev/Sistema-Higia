@@ -1,5 +1,5 @@
 import { redactar } from '../../core/personalizador';
-import { antecedentesDe, NOMBRE_SISTEMA, ORDEN_NIVEL, SISTEMAS, type Contexto, type EstadoCorporal, type Hallazgo, type Perfil, type SistemaCorporal } from '../../core/tipos';
+import { antecedentesDe, NOMBRE_SISTEMA, ORDEN_NIVEL, SISTEMAS, type Contexto, type EstadoCorporal, type Hallazgo, type Nivel, type Perfil, type RegionCuerpo, type SistemaCorporal } from '../../core/tipos';
 import { EncabezadoSeccion, InsigniaNivel, NOMBRE_NIVEL, Punto, sinTitulo } from '../componentes/basicos';
 import { FiguraCorporal } from '../FiguraCorporal';
 import { Icono } from '../iconos';
@@ -8,13 +8,14 @@ interface Props {
   perfil: Perfil;
   contexto: Contexto;
   estado: EstadoCorporal;
+  regiones: Partial<Record<RegionCuerpo, Nivel>>;
   hallazgos: Hallazgo[];
   seleccion: SistemaCorporal[] | null;
   onSeleccionar: (s: SistemaCorporal[] | null) => void;
   onIrMensajes: () => void;
 }
 
-export function VistaResumen({ perfil, contexto, estado, hallazgos, seleccion, onSeleccionar, onIrMensajes }: Props) {
+export function VistaResumen({ perfil, contexto, estado, regiones, hallazgos, seleccion, onSeleccionar, onIrMensajes }: Props) {
   const atencion = hallazgos
     .filter((h) => ORDEN_NIVEL[h.nivel] >= ORDEN_NIVEL.aviso)
     .sort((a, b) => ORDEN_NIVEL[b.nivel] - ORDEN_NIVEL[a.nivel]);
@@ -27,7 +28,7 @@ export function VistaResumen({ perfil, contexto, estado, hallazgos, seleccion, o
       <div className="resumen">
         <section className="tarjeta tarjeta-figura" aria-labelledby="titulo-cuerpo">
           <h2 id="titulo-cuerpo" className="titulo-tarjeta">Cuerpo</h2>
-          <FiguraCorporal estado={estado} seleccion={seleccion} onSeleccionar={onSeleccionar} />
+          <FiguraCorporal estado={estado} regiones={regiones} seleccion={seleccion} onSeleccionar={onSeleccionar} />
         </section>
 
         <div className="resumen-lateral">

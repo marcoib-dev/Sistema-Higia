@@ -10,7 +10,7 @@ import type { DestinoPedido } from './acciones';
 import {
   NOMBRE_DESTINO_COMUNICACION, NOMBRE_SISTEMA, ORDEN_NIVEL, RETARDO_TIERRA, SISTEMAS, resumenClinico,
   type Comunicacion, type Contexto, type DestinoComunicacion, type EstadoCorporal, type Hallazgo, type Lectura,
-  type Mensaje, type Nivel, type Perfil, type Regla, type SistemaCorporal,
+  type Mensaje, type Nivel, type Perfil, type RegionCuerpo, type Regla, type SistemaCorporal,
 } from './tipos';
 
 /** Cómo llega una comunicación a su destino con el contexto actual. */
@@ -170,14 +170,14 @@ export class NucleoSalud {
    * Entra al mismo flujo que un hallazgo de sensores: figura del cuerpo, canal, confirmación y escalada.
    */
   alertaDesdeConversacion(
-    d: { nivel: Exclude<Nivel, 'normal'>; sistema: SistemaCorporal; titulo: string; detalle: string },
+    d: { nivel: Exclude<Nivel, 'normal'>; sistema: SistemaCorporal; titulo: string; detalle: string; region?: RegionCuerpo },
     ahora = Date.now(),
   ): Mensaje[] {
     const accion = d.nivel === 'alerta'
       ? 'Detén lo que estás haciendo y ponte en un lugar seguro. Si no respondes, Higia avisará a otros.'
       : 'Higia lo seguirá de cerca; cuéntale si empeora.';
     const h: Hallazgo = {
-      riesgoId: `conversacion.${d.sistema}`, sistema: d.sistema, nivel: d.nivel, titulo: d.titulo,
+      riesgoId: `conversacion.${d.region ?? d.sistema}`, sistema: d.sistema, nivel: d.nivel, titulo: d.titulo, region: d.region,
       resumenSimple: d.detalle, detalleTecnico: `${d.detalle} (reportado por el astronauta)`, accion,
       ruta: d.nivel === 'info' ? 'autogestion' : 'reporte', sensible: d.sistema === 'cerebro',
       fuente: 'Reporte del astronauta en la conversación', timestamp: ahora,
@@ -196,6 +196,17 @@ export class NucleoSalud {
       if (actual === 'sinDatos' || ORDEN_NIVEL[h.nivel] > ORDEN_NIVEL[actual]) e[h.sistema] = h.nivel;
     }
     return e;
+  }
+
+  /** Peor nivel por región del cuerpo (para destacar, p. ej., el cráneo tras un golpe). */
+  estadoRegiones(): Partial<Record<RegionCuerpo, Nivel>> {
+    const r: Partial<Record<RegionCuerpo, Nivel>> = {};
+    for (const h of this.hallazgos.values()) {
+      if (!h.region || h.nivel === 'normal') continue;
+      const actual = r[h.region];
+      if (!actual || ORDEN_NIVEL[h.nivel] > ORDEN_NIVEL[actual]) r[h.region] = h.nivel;
+    }
+    return r;
   }
 
   hallazgosActuales(): Hallazgo[] {
