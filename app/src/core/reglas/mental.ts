@@ -89,6 +89,12 @@ export const reglaEstres = definirRegla(
         textoCalmado: 'Tómate un momento. Respira lento y profundo.',
         accion: 'Pausa lo que haces, respira lento: cuatro segundos inhalando, seis exhalando. Avisa a un compañero.',
         accionPorUbicacion: { eva: accionEva },
+        pasos: [
+          'Asegúrate de estar sujeto y en un lugar seguro.',
+          'Respira cuatro segundos, retén dos y exhala seis. Repite cinco veces.',
+          'Nombra en voz baja cinco cosas que ves a tu alrededor.',
+          'Si puedes, habla con un compañero.',
+        ],
         ruta: 'reporte', sensible: true,
       };
     }

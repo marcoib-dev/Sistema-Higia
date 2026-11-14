@@ -12,9 +12,23 @@ export const reglaRadiacion = definirRegla(
     sensores: ['dosisRadiacion'],
     fuente: 'Anexo A: peligro de radiación · Anexo F: dosímetros',
   },
-  (h) => {
+  (h, _p, _ahora, c) => {
     const ult = h.ultima('dosisRadiacion');
     if (!ult) return null;
+
+    // Contexto: tormenta solar reportada (por el hábitat, sensores de entorno o la IA de cámara).
+    if (c.climaEspacial === 'tormentaSolar') {
+      const fuera = c.ubicacion !== 'habitat';
+      return {
+        nivel: fuera ? 'alerta' : 'aviso',
+        titulo: fuera ? 'Tormenta solar activa estando fuera del hábitat' : 'Tormenta solar activa',
+        detalleTecnico: `Evento de partículas solares en curso · acumulado ${r1(ult.valor)} mSv`,
+        resumenSimple: fuera ? 'Hay una tormenta solar y estás expuesto.' : 'Hay una tormenta solar en curso.',
+        accion: fuera ? 'Regresa al hábitat y ve al refugio de inmediato.' : 'Permanece en la zona blindada hasta que termine.',
+        accionPorUbicacion: { rover: 'Vuelve al hábitat o activa el blindaje del rover.' },
+        ruta: fuera ? 'reporte' : 'autogestion', sensible: false,
+      };
+    }
 
     // Tasa entre las dos últimas lecturas, en mSv/h (Δt mínimo de 5 min para evitar picos por ruido).
     const [ant] = h.ultimas('dosisRadiacion', 2);

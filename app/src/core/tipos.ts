@@ -66,19 +66,38 @@ export interface Perfil {
   horarioSueno: { inicio: number; fin: number };
 }
 
-// ── Contexto: dónde está y qué hay disponible ───────────────────────────
+// ── Contexto: dónde está, qué hace y qué hay disponible ─────────────────
 export type Ubicacion = 'habitat' | 'eva' | 'rover';
+export type Destino = 'orbita' | 'luna' | 'marte';
+export type Actividad = 'reposo' | 'trabajo' | 'ejercicio';
+export type ClimaEspacial = 'calmo' | 'tormentaSolar';
 
 export interface Contexto {
   ubicacion: Ubicacion;
+  destino: Destino;
+  actividad: Actividad;
+  climaEspacial: ClimaEspacial;
   /** Hora local del hábitat, 0–23. */
   hora: number;
   pantallaHabitat: boolean;
   pantallaPersonal: boolean;
   auricular: boolean;
+  /** Hay un compañero al alcance de la radio de proximidad (no necesita la red del hábitat). */
+  companeroCercano: boolean;
+  /** No siempre hay alguien con formación médica en la tripulación. */
+  medicoABordo: boolean;
   conexionHabitat: boolean;
   conexionTierra: boolean;
 }
+
+/** Retardo de la comunicación con Tierra (solo ida), según el destino. */
+export const RETARDO_TIERRA: Record<Destino, string> = {
+  orbita: 'menos de 1 s',
+  luna: '~1,3 s',
+  marte: 'entre 3 y 22 min',
+};
+
+export const NOMBRE_DESTINO: Record<Destino, string> = { orbita: 'Órbita', luna: 'Luna', marte: 'Marte' };
 
 // ── Salida del motor de detección ───────────────────────────────────────
 export type Ruta = 'autogestion' | 'reporte';
@@ -96,6 +115,10 @@ export interface Hallazgo {
   textoCalmado?: string;
   accion: string;
   accionPorUbicacion?: Partial<Record<Ubicacion, string>>;
+  /** Guía paso a paso para cuando no hay médico a bordo. */
+  pasos?: string[];
+  /** El astronauta podría no estar en condiciones de responder (hipoxia, desmayo…): se escala antes. */
+  posibleIncapacidad?: boolean;
   ruta: Ruta;
   /** Salud mental u otros datos privados: nunca a una pantalla compartida. */
   sensible: boolean;
@@ -111,8 +134,8 @@ export interface Regla {
   /** Sensores que disparan la regla: solo se evalúa cuando llega uno de estos (ahorro de energía). */
   sensores: TipoSensor[];
   fuente: string;
-  /** Devuelve null si no hay datos suficientes. */
-  evaluar(h: Historial, p: Perfil, ahora: number): Hallazgo | null;
+  /** Devuelve null si no hay datos suficientes. El contexto permite ajustar la evaluación (p. ej. en ejercicio). */
+  evaluar(h: Historial, p: Perfil, ahora: number, c: Contexto): Hallazgo | null;
 }
 
 // ── Salida hacia el astronauta ──────────────────────────────────────────
@@ -131,6 +154,12 @@ export interface Mensaje {
   motivo: string;
   esRecordatorio: boolean;
   reporte?: string;
+  /** Guía paso a paso (solo si no hay médico a bordo y el astronauta no tiene formación médica). */
+  pasos?: string[];
+  /** Las alertas piden confirmación ("Estoy bien"); si no llega a tiempo, se escala. */
+  requiereConfirmacion: boolean;
+  /** Presente si este mensaje es una escalada por falta de respuesta. */
+  escalamiento?: { destinos: string[]; motivo: string };
   timestamp: number;
 }
 

@@ -7,23 +7,34 @@ export const reglaFrecuenciaCardiaca = definirRegla(
     sensores: ['frecuenciaCardiaca'],
     fuente: 'Anexo F: frecuencia cardíaca · Anexo B: adaptaciones cardiovasculares y arritmias',
   },
-  (h, p) => {
+  (h, p, _ahora, c) => {
     const ult = h.ultima('frecuenciaCardiaca');
     if (!ult) return null;
     const fc = ult.valor;
     const base = p.lineaBase.frecuenciaCardiaca ?? 65;
-    const detalle = `FC ${fc} lpm (línea base ${base}, ${signo(fc - base)})`;
+    // Contexto: en ejercicio o en EVA es esperable un pulso más alto.
+    const enEsfuerzo = c.actividad === 'ejercicio' || c.ubicacion === 'eva';
+    const margen = c.actividad === 'ejercicio' ? 60 : c.ubicacion === 'eva' ? 30 : 0;
+    const maximo = enEsfuerzo ? 170 : 140;
+    const detalle = `FC ${fc} lpm (línea base ${base}, ${signo(fc - base)})${enEsfuerzo ? ' · en esfuerzo físico' : ''}`;
 
-    if (fc >= 140 || fc < 40) {
+    if (fc >= maximo || fc < 40) {
       return {
         nivel: 'alerta', titulo: 'Frecuencia cardíaca fuera de rango', detalleTecnico: detalle,
         resumenSimple: fc < 40 ? 'Tu corazón late demasiado lento.' : 'Tu corazón late muy rápido.',
         accion: 'Detén la actividad y respira lento. Si no baja en 5 minutos, avisa a un compañero.',
         accionPorUbicacion: { eva: 'Detén la tarea y asegura tu arnés. Avisa a tu compañero de EVA.' },
+        pasos: [
+          'Detén toda actividad y quédate quieto, sentado o sujeto.',
+          'Respira lento: cuatro segundos inhalando y seis exhalando, durante dos minutos.',
+          'Si sientes dolor en el pecho, falta de aire o mareo, avisa a un compañero de inmediato.',
+          'Vuelve a medir el pulso en cinco minutos.',
+        ],
+        posibleIncapacidad: fc < 40 || fc >= 180,
         ruta: 'reporte', sensible: false,
       };
     }
-    if (fc - base >= 30) {
+    if (fc - base >= 30 + margen) {
       return {
         nivel: 'aviso', titulo: 'Frecuencia cardíaca elevada', detalleTecnico: detalle,
         resumenSimple: 'Tu corazón late más rápido de lo habitual para ti.',
@@ -31,7 +42,7 @@ export const reglaFrecuenciaCardiaca = definirRegla(
         ruta: 'autogestion', sensible: false,
       };
     }
-    if (fc - base >= 15) {
+    if (fc - base >= 15 + margen) {
       return {
         nivel: 'info', titulo: 'Frecuencia cardíaca algo elevada', detalleTecnico: detalle,
         resumenSimple: 'Tu pulso está un poco por encima de lo habitual.',
@@ -59,6 +70,14 @@ export const reglaPresionArterial = definirRegla(
         nivel: 'alerta', titulo: 'Presión arterial muy baja', detalleTecnico: detalle,
         resumenSimple: 'Tu presión está muy baja y podrías desmayarte.',
         accion: 'Recuéstate con las piernas elevadas y bebe líquido. Avisa a un compañero.',
+        pasos: [
+          'Recuéstate de inmediato; en microgravedad, sujétate a una superficie.',
+          'Eleva las piernas por encima del nivel del corazón.',
+          'Bebe medio litro de agua o de solución con electrolitos.',
+          'No te levantes durante 15 minutos y vuelve a medir la presión.',
+          'Si pierdes la visión, te confundes o te desmayas, un compañero debe asistirte.',
+        ],
+        posibleIncapacidad: true,
         ruta: 'reporte', sensible: false,
       };
     }
@@ -75,6 +94,11 @@ export const reglaPresionArterial = definirRegla(
         nivel: 'alerta', titulo: 'Presión arterial muy alta', detalleTecnico: detalle,
         resumenSimple: 'Tu presión está muy alta.',
         accion: 'Descansa sentado 10 minutos y repite la medición. Se notificará al equipo médico.',
+        pasos: [
+          'Siéntate o sujétate y descansa 10 minutos sin hablar.',
+          'Repite la medición.',
+          'Si aparece dolor de cabeza intenso, visión borrosa o dolor en el pecho, avisa a un compañero.',
+        ],
         ruta: 'reporte', sensible: false,
       };
     }

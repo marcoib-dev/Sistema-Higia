@@ -83,3 +83,52 @@ select { width: 100%; }
 .comparacion { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
 .comparacion p { margin: 4px 0 0; }
 .etiqueta-ejemplo { background: var(--aviso); color: var(--fondo); font-size: 10px; padding: 1px 6px; border-radius: 4px; vertical-align: 2px; }
+
+/* ── Higia: componentes agregados ─────────────────────────────── */
+button:disabled { opacity: .45; cursor: not-allowed; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.tarjeta-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.nota { font-size: 12px; margin: 4px 0 8px; }
+.error { color: var(--alerta); margin: 8px 0 0; }
+.etiqueta-grupo { margin: 8px 0 4px; font-size: 12px; color: var(--texto-suave); }
+.acciones-cab { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.chip-ia { background: linear-gradient(90deg, #8f7cff, var(--acento)); color: var(--fondo); }
+
+/* Control de voz */
+.control-voz { display: flex; align-items: center; gap: 6px; background: var(--superficie); border: 1px solid var(--borde); border-radius: 10px; padding: 4px 8px; }
+.control-voz button { padding: 4px 8px; }
+.control-voz input[type='range'] { width: 90px; padding: 0; accent-color: var(--acento); }
+.indicador-voz { font-size: 12px; color: var(--texto-suave); min-width: 96px; }
+.indicador-voz.hablando { color: var(--ok); }
+.indicador-voz.pausada { color: var(--aviso); }
+.interruptor { display: flex; align-items: center; gap: 4px; font-size: 13px; }
+
+/* Figura 3D */
+.lienzo-3d { width: 100%; height: 420px; cursor: grab; touch-action: none; }
+.lienzo-3d:active { cursor: grabbing; }
+.ayuda { margin: 4px 0 8px; font-size: 12px; color: var(--texto-suave); text-align: center; }
+.regiones-accesibles { display: flex; flex-wrap: wrap; gap: 4px; }
+.regiones-accesibles button { font-size: 11px; padding: 3px 7px; display: inline-flex; align-items: center; gap: 2px; }
+.regiones-accesibles button[aria-pressed='true'] { background: var(--borde); color: var(--texto); border-color: var(--acento); }
+
+/* Confirmación, escalada y guía */
+.confirmacion { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0; padding: 8px; border-radius: 8px; background: color-mix(in srgb, var(--alerta) 14%, transparent); }
+.boton-ok { background: var(--ok); color: var(--fondo); border-color: var(--ok); font-weight: 600; }
+.mensaje.escalado { background: color-mix(in srgb, var(--alerta) 12%, var(--fondo)); }
+.pasos { margin: 8px 0; padding: 8px 10px; border-radius: 8px; border: 1px dashed var(--borde); }
+.pasos p { margin: 0 0 4px; font-size: 12px; color: var(--texto-suave); }
+.pasos ol { margin: 0; padding-left: 20px; display: grid; gap: 2px; }
+
+/* Conversación */
+.chat .fuente { font-size: 11px; color: var(--texto-suave); margin-right: 4px; }
+.chat .pensando { color: var(--texto-suave); font-style: italic; }
+
+/* Cámara */
+.video { width: 100%; border-radius: 8px; background: #000; margin-bottom: 8px; }
+.video.oculto { display: none; }
+.fila-botones { display: flex; flex-wrap: wrap; gap: 6px; }
+.boton-archivo { background: var(--superficie); border: 1px solid var(--borde); border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+.boton-archivo input { display: none; }
+.boton-archivo.deshabilitado { opacity: .45; cursor: not-allowed; }
+.analisis { margin-top: 10px; display: grid; gap: 6px; }
+.analisis p { margin: 0; }

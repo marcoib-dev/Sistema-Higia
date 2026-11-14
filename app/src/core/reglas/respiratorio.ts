@@ -19,6 +19,14 @@ export const reglaSaturacionOxigeno = definirRegla(
         resumenSimple: 'Te está llegando poco oxígeno. Puedes sentir confusión o dolor de cabeza.',
         accion: 'Detén la actividad, revisa la calidad del aire y avisa a un compañero.',
         accionPorUbicacion: { eva: accionEva },
+        pasos: [
+          'Detén toda actividad física.',
+          'Colócate la máscara o el suministro de oxígeno de emergencia.',
+          'Revisa el monitor de calidad del aire del módulo o el suministro del traje.',
+          'Si estás en EVA, regresa a la esclusa con tu compañero.',
+          'Avisa a alguien antes de que aparezca confusión: puede impedirte pedir ayuda después.',
+        ],
+        posibleIncapacidad: true,
         ruta: 'reporte', sensible: false,
       };
     }

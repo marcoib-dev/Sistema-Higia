@@ -19,7 +19,7 @@ export const ESCENARIOS: Escenario[] = [
   {
     id: 'base', nombre: 'Día normal en el hábitat',
     descripcion: 'Todos los sensores en rango. Sirve también para volver a la normalidad.',
-    contexto: { ubicacion: 'habitat', hora: 10 },
+    contexto: { ubicacion: 'habitat', hora: 10, actividad: 'trabajo', climaEspacial: 'calmo' },
     lecturas: (t, h) => [
       L('frecuenciaCardiaca', 64, t), L('presionSistolica', 118, t), L('presionDiastolica', 76, t),
       L('spo2', 98, t), L('animo', 7, t), L('estres', 25, t), L('minutosEjercicio', 95, t),
@@ -31,8 +31,20 @@ export const ESCENARIOS: Escenario[] = [
   {
     id: 'eva-estres', nombre: 'EVA: golpe en la estación',
     descripcion: 'Sale a reparar y el estrés se dispara. Debe llegar una indicación breve por auricular.',
-    contexto: { ubicacion: 'eva', hora: 10 },
+    contexto: { ubicacion: 'eva', hora: 10, actividad: 'trabajo' },
     lecturas: (t) => [L('frecuenciaCardiaca', 132, t), L('estres', 86, t), L('spo2', 96, t)],
+  },
+  {
+    id: 'crisis', nombre: 'Crisis sin respuesta',
+    descripcion: 'Hipoxia grave en EVA. No presiones "Estoy bien": a los 15 s Higia avisa al compañero o a la base.',
+    contexto: { ubicacion: 'eva', hora: 10 },
+    lecturas: (t) => [L('spo2', 82, t), L('frecuenciaCardiaca', 118, t)],
+  },
+  {
+    id: 'ejercicio', nombre: 'Sesión de ejercicio',
+    descripcion: 'Pulso de 125 lpm, pero en ejercicio: el contexto evita una falsa alarma.',
+    contexto: { ubicacion: 'habitat', actividad: 'ejercicio' },
+    lecturas: (t) => [L('frecuenciaCardiaca', 125, t), L('minutosEjercicio', 60, t)],
   },
   {
     id: 'animo', nombre: 'Descenso del ánimo',
@@ -62,7 +74,8 @@ export const ESCENARIOS: Escenario[] = [
   },
   {
     id: 'tormenta', nombre: 'Tormenta solar',
-    descripcion: 'La dosis sube de golpe: debe ir al refugio.',
+    descripcion: 'Se activa el clima espacial de tormenta y la dosis sube de golpe: debe ir al refugio.',
+    contexto: { climaEspacial: 'tormentaSolar' },
     lecturas: (t, h) => {
       const base = h.ultima('dosisRadiacion')?.valor ?? 120;
       return [L('dosisRadiacion', base, t - 30 * 60_000), L('dosisRadiacion', base + 2.5, t)];

@@ -1,5 +1,5 @@
 import type { Historial } from '../historial';
-import type { Hallazgo, Perfil, Regla } from '../tipos';
+import type { Contexto, Hallazgo, Perfil, Regla } from '../tipos';
 
 export const MINUTO = 60_000;
 export const HORA = 60 * MINUTO;
@@ -10,12 +10,12 @@ export type DatosHallazgo = Omit<Hallazgo, 'riesgoId' | 'sistema' | 'fuente' | '
 /** Crea una regla completando automáticamente id, sistema, fuente y timestamp del hallazgo. */
 export function definirRegla(
   meta: Omit<Regla, 'evaluar'>,
-  evaluar: (h: Historial, p: Perfil, ahora: number) => DatosHallazgo | null,
+  evaluar: (h: Historial, p: Perfil, ahora: number, c: Contexto) => DatosHallazgo | null,
 ): Regla {
   return {
     ...meta,
-    evaluar(h, p, ahora) {
-      const d = evaluar(h, p, ahora);
+    evaluar(h, p, ahora, c) {
+      const d = evaluar(h, p, ahora, c);
       return d && { ...d, riesgoId: meta.id, sistema: meta.sistema, fuente: meta.fuente, timestamp: ahora };
     },
   };

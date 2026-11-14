@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { PERFILES } from '../adaptadores/simulador/perfiles';
 import { interpretar } from './conversacion';
-import { NucleoSalud } from './nucleo';
+import { NucleoSalud, PLAZO_CONFIRMACION_INCAPACIDAD_MS, PLAZO_CONFIRMACION_MS } from './nucleo';
 import { REGLAS } from './reglas';
 import type { Contexto, Lectura, TipoSensor } from './tipos';
 
 const [MEDICA_VETERANA, NOVATO_PANICO] = PERFILES;
 const T = 1_700_000_000_000;
 const HABITAT: Contexto = {
-  ubicacion: 'habitat', hora: 10, pantallaHabitat: true, pantallaPersonal: true,
-  auricular: true, conexionHabitat: false, conexionTierra: false,
+  ubicacion: 'habitat', destino: 'luna', actividad: 'trabajo', climaEspacial: 'calmo', hora: 10,
+  pantallaHabitat: true, pantallaPersonal: true, auricular: true,
+  companeroCercano: false, medicoABordo: false, conexionHabitat: false, conexionTierra: false,
 };
 const L = (sensor: TipoSensor, valor: number, t = T): Lectura => ({ sensor, valor, timestamp: t, fuente: 'simulador' });
 const nuevo = (perfil = MEDICA_VETERANA, contexto: Partial<Contexto> = {}) =>
@@ -83,12 +84,83 @@ describe('personalización', () => {
   });
 });
 
-describe('interoperabilidad', () => {
-  it('sin conexión, los reportes quedan en cola', () => {
-    const n = nuevo(MEDICA_VETERANA, { conexionHabitat: false });
+describe('interoperabilidad y médico a bordo', () => {
+  it('sin médico ni conexión, los reportes quedan en cola y se pide avisar a un compañero', () => {
+    const n = nuevo(NOVATO_PANICO, { conexionHabitat: false, medicoABordo: false });
     const [m] = n.registrar(L('spo2', 85), T);
-    expect(m.reporte).toMatch(/Sin conexión/);
+    expect(m.reporte).toMatch(/avisa a un compañero/);
     expect(n.hayPendientesReporte()).toBe(1);
+  });
+
+  it('con médico a bordo, el reporte va al médico y no hay guía paso a paso', () => {
+    const [m] = nuevo(NOVATO_PANICO, { medicoABordo: true }).registrar(L('spo2', 85), T);
+    expect(m.reporte).toMatch(/médico de a bordo/);
+    expect(m.pasos).toBeUndefined();
+  });
+
+  it('sin médico a bordo, quien no tiene formación médica recibe la guía paso a paso', () => {
+    const [m] = nuevo(NOVATO_PANICO, { medicoABordo: false }).registrar(L('spo2', 85), T);
+    expect(m.pasos?.length).toBeGreaterThan(2);
+  });
+
+  it('la médica no recibe la guía paso a paso', () => {
+    const [m] = nuevo(MEDICA_VETERANA, { medicoABordo: false }).registrar(L('spo2', 85), T);
+    expect(m.pasos).toBeUndefined();
+  });
+});
+
+describe('confirmación y escalada', () => {
+  it('una alerta pide confirmación; si se confirma, no se escala', () => {
+    const n = nuevo(NOVATO_PANICO, { companeroCercano: true });
+    const [m] = n.registrar([L('presionSistolica', 170), L('presionDiastolica', 105)], T);
+    expect(m.requiereConfirmacion).toBe(true);
+    n.confirmar(m.id);
+    expect(n.verificarConfirmaciones(T + PLAZO_CONFIRMACION_MS + 1)).toHaveLength(0);
+  });
+
+  it('sin respuesta, escala al compañero cercano y a la base', () => {
+    const n = nuevo(NOVATO_PANICO, { companeroCercano: true, conexionHabitat: true });
+    n.registrar([L('presionSistolica', 170), L('presionDiastolica', 105)], T);
+    expect(n.verificarConfirmaciones(T + PLAZO_CONFIRMACION_MS - 1)).toHaveLength(0);
+    const [e] = n.verificarConfirmaciones(T + PLAZO_CONFIRMACION_MS);
+    expect(e.escalamiento?.destinos).toEqual(['Compañero cercano (radio de proximidad)', 'Base más cercana']);
+    expect(e.voz).toBe(true);
+  });
+
+  it('si hay riesgo de incapacidad (hipoxia), escala antes', () => {
+    const n = nuevo(NOVATO_PANICO, { companeroCercano: true });
+    n.registrar(L('spo2', 82), T);
+    expect(n.verificarConfirmaciones(T + PLAZO_CONFIRMACION_INCAPACIDAD_MS)).toHaveLength(1);
+  });
+
+  it('sin nadie al alcance, activa la baliza de emergencia', () => {
+    const n = nuevo(NOVATO_PANICO);
+    n.registrar(L('spo2', 82), T);
+    const [e] = n.verificarConfirmaciones(T + PLAZO_CONFIRMACION_INCAPACIDAD_MS);
+    expect(e.escalamiento?.destinos).toEqual(['Baliza de emergencia']);
+  });
+
+  it('el retardo con Tierra depende del destino', () => {
+    const n = nuevo(NOVATO_PANICO, { conexionTierra: true, destino: 'marte' });
+    expect(n.destinosEscalamiento()[0]).toMatch(/3 y 22 min/);
+  });
+});
+
+describe('contexto en la evaluación', () => {
+  it('un pulso de 125 lpm es aviso en reposo pero no en ejercicio', () => {
+    const [reposo] = nuevo(NOVATO_PANICO, { actividad: 'reposo' }).registrar(L('frecuenciaCardiaca', 125), T);
+    expect(reposo.hallazgo.nivel).toBe('aviso');
+    expect(nuevo(NOVATO_PANICO, { actividad: 'ejercicio' }).registrar(L('frecuenciaCardiaca', 125), T)).toHaveLength(0);
+  });
+
+  it('una tormenta solar es alerta fuera del hábitat y aviso dentro', () => {
+    const n = nuevo(MEDICA_VETERANA);
+    n.registrar(L('dosisRadiacion', 120), T);
+    const [dentro] = n.actualizarContexto({ climaEspacial: 'tormentaSolar' }, T + 1);
+    expect(dentro.hallazgo.nivel).toBe('aviso');
+    const [fuera] = n.actualizarContexto({ ubicacion: 'eva' }, T + 2);
+    expect(fuera.hallazgo.nivel).toBe('alerta');
+    expect(fuera.texto).toMatch(/refugio/);
   });
 });
 
