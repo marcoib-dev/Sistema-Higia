@@ -4,7 +4,7 @@ Prototipo para el NASA Space Apps Challenge 2026: *Create Health Monitoring Soft
 
 ## Documentos de referencia (no están en el repo)
 
-Las reglas citan anexos de dos documentos que **no se suben a git**. Pídeselos al equipo y ponlos en la raíz del repo (junto a `app/`):
+Las reglas citan anexos de dos documentos que **no se suben a git**. Pídeselos al equipo y ponlos en la raíz del repo, junto a este README:
 
 - `NASA Space Apps Challenge Sistema Autónomo de Monitoreo de Salud para Hábitats E.pdf`: documento de visión del proyecto.
 - `DESAFIO_HEALTH_MONITOR.md`: traducción del desafío con todos sus anexos (A–G). Cuando una regla dice "Anexo F", se refiere a este archivo.
@@ -14,6 +14,7 @@ Fuente oficial del desafío: https://www.spaceappschallenge.org/2026/challenges/
 ## Cómo correrlo
 
 ```bash
+cd app
 npm install
 npm run dev        # abre http://localhost:5173
 npm test           # tests del núcleo
@@ -26,11 +27,13 @@ Demo sugerida: **Día normal** → **EVA: golpe en la estación** → cambiar de
 
 ## Arquitectura
 
+Todo el código está en `app/`.
+
 ```
 Sensores / simulador / voz
           │  Lectura
           ▼
-┌──────────────────── NÚCLEO AUTÓNOMO (src/core) ─────────────────────┐
+┌──────────────────── NÚCLEO AUTÓNOMO (app/src/core) ─────────────────┐
 │ reglas/*  → Hallazgo (qué pasa, nivel, ruta, ¿sensible?, fuente)    │
 │ nucleo.ts → ¿cambió el nivel? (modo proactivo, recordatorios)       │
 │ personalizador.ts → texto según el perfil                           │
@@ -38,28 +41,28 @@ Sensores / simulador / voz
 └─────────────────────────────────────────────────────────────────────┘
           │  Mensaje                        │  Hallazgos para reporte
           ▼                                 ▼
-   GUI (src/ui) + voz              Interoperabilidad (EJEMPLO): solo con conexión
+   GUI (app/src/ui) + voz          Interoperabilidad (EJEMPLO): solo con conexión
 ```
 
-**Regla de oro:** `src/core` no importa nada de React ni del navegador. Corre igual en el traje,
-en un test o en un servidor. Todo lo que toque el mundo exterior va en `src/adaptadores`.
+**Regla de oro:** `app/src/core` no importa nada de React ni del navegador. Corre igual en el traje,
+en un test o en un servidor. Todo lo que toque el mundo exterior va en `app/src/adaptadores`.
 
 ## Estructura y reparto por líneas de trabajo
 
 | Línea | Carpeta | Qué hay | Pendiente |
 |---|---|---|---|
-| — | `src/core/tipos.ts` | **Contratos de datos.** Avisen antes de cambiarlos. | |
-| **A. Detección** | `src/core/reglas/` | 8 reglas: FC, presión, SpO₂, sueño, ánimo, estrés, ejercicio, radiación | Validar umbrales con los anexos; agregar huesos, temperatura, glucemia, vestibular |
-| **B. Perfil y canales** | `src/core/personalizador.ts`, `canales.ts`, `nucleo.ts` | Texto por perfil, elección de canal, sueño, sensibles, recordatorios | Perfil que aprende del uso; rutas de autogestión con guías paso a paso |
-| **C. GUI** | `src/ui/` | Figura coloreada, mensajes, simulador, comparación de perfiles | Gráficos de tendencia, vistas "pantalla del hábitat" y "auricular" |
-| **D. Voz e interop** | `src/adaptadores/voz`, `src/adaptadores/interop` | Web Speech API; exportación de ejemplo en formato FHIR | Reconocimiento de voz local (Vosk/whisper.cpp); más intenciones |
+| — | `app/src/core/tipos.ts` | **Contratos de datos.** Avisen antes de cambiarlos. | |
+| **A. Detección** | `app/src/core/reglas/` | 8 reglas: FC, presión, SpO₂, sueño, ánimo, estrés, ejercicio, radiación | Validar umbrales con los anexos; agregar huesos, temperatura, glucemia, vestibular |
+| **B. Perfil y canales** | `app/src/core/personalizador.ts`, `canales.ts`, `nucleo.ts` | Texto por perfil, elección de canal, sueño, sensibles, recordatorios | Perfil que aprende del uso; rutas de autogestión con guías paso a paso |
+| **C. GUI** | `app/src/ui/` | Figura coloreada, mensajes, simulador, comparación de perfiles | Gráficos de tendencia, vistas "pantalla del hábitat" y "auricular" |
+| **D. Voz e interop** | `app/src/adaptadores/voz`, `app/src/adaptadores/interop` | Web Speech API; exportación de ejemplo en formato FHIR | Reconocimiento de voz local (Vosk/whisper.cpp); más intenciones |
 
 ## Cómo agregar un riesgo
 
-1. Crea la regla en `src/core/reglas/<area>.ts` con `definirRegla(...)`. Mira `respiratorio.ts` como ejemplo corto.
+1. Crea la regla en `app/src/core/reglas/<area>.ts` con `definirRegla(...)`. Mira `respiratorio.ts` como ejemplo corto.
 2. Indica la `fuente` (anexo o tabla del desafío). Sin fuente no hay regla.
-3. Súmala a `REGLAS` en `src/core/reglas/index.ts`.
-4. Agrega un escenario en `src/adaptadores/simulador/escenarios.ts` y un test en `nucleo.test.ts`.
+3. Súmala a `REGLAS` en `app/src/core/reglas/index.ts`.
+4. Agrega un escenario en `app/src/adaptadores/simulador/escenarios.ts` y un test en `app/src/core/nucleo.test.ts`.
 
 ## Advertencias
 
