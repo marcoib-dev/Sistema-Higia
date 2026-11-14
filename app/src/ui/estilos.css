@@ -347,7 +347,9 @@ select, input[type='text'], input:not([type]) {
 
 /* ── Figura anatómica 2D ─────────────────────────────────────────────── */
 .figura-svg { max-height: 600px; margin: 0 auto; overflow: visible; }
-.figura-svg .contorno { fill: none; stroke: #8794b8; stroke-width: 1.3; pointer-events: none; }
+.figura-svg .contorno { fill: none; stroke: rgba(150, 166, 210, .42); stroke-width: 1; pointer-events: none; }
+.sombreado { pointer-events: none; }
+.sombreado .borde-interior { fill: none; stroke: #0a0e1a; stroke-width: 16; opacity: .55; }
 .sistema-svg { cursor: pointer; outline: none; --c: var(--sin-datos); transition: filter .15s, opacity .15s; }
 .sistema-svg.nivel-normal { --c: var(--ok); }
 .sistema-svg.nivel-info { --c: var(--info); }
@@ -356,26 +358,29 @@ select, input[type='text'], input:not([type]) {
 .sistema-svg.nivel-sinDatos { --c: #59648a; }
 
 .organo path, .organo circle { fill: color-mix(in srgb, var(--c) 62%, #0a0e1a); stroke: var(--c); stroke-width: 1.2; }
-.organo .detalle { fill: none; stroke: rgba(8, 12, 24, .55); stroke-width: 1.1; }
+.organo .detalle { fill: none; stroke: rgba(8, 12, 24, .42); stroke-width: 1; stroke-linecap: round; }
 .organo .trazo { fill: none; stroke: var(--c); stroke-width: 3; stroke-linecap: round; }
 .organo .trazo.grueso { stroke-width: 7; opacity: .55; }
 .organo .trazo.fino { stroke-width: 2; }
-.ojos path { fill: color-mix(in srgb, var(--c) 30%, #d9dee9); stroke-width: .8; }
-.relieve path, .relieve ellipse { fill: none; stroke: rgba(200, 210, 235, .16); stroke-width: 1.1; stroke-linecap: round; }
-.organo .pupila { fill: #0a0e1a; stroke: none; }
+.ojos path { fill: color-mix(in srgb, var(--c) 42%, var(--piel-centro)); stroke: color-mix(in srgb, var(--c) 55%, var(--piel-centro)); stroke-width: .6; }
+.ojos .parpado { fill: none; stroke: color-mix(in srgb, var(--c) 35%, #c9d6ff); stroke-width: .9; stroke-linecap: round; opacity: .55; }
+.relieve path, .relieve ellipse { fill: none; stroke: rgba(200, 210, 235, .13); stroke-width: 1; stroke-linecap: round; }
+.organo .area-clic { fill: transparent; stroke: none; }
+.organo .ganglio { fill: color-mix(in srgb, var(--c) 75%, #0a0e1a); stroke: none; }
 .zona path { fill: var(--c); opacity: .14; }
 .zona.nivel-sinDatos path { opacity: 0; }
 .zona.seleccionado path { opacity: .32; }
-.hueso rect, .hueso .hueso-relleno { fill: color-mix(in srgb, var(--c) 30%, #0a0e1a); stroke: var(--c); stroke-width: 1; }
+.hueso rect, .hueso .hueso-relleno { fill: color-mix(in srgb, var(--c) 32%, var(--piel-borde)); stroke: color-mix(in srgb, var(--c) 80%, transparent); stroke-width: 1; }
 .hueso .hueso-trazo { fill: none; stroke: var(--c); stroke-width: 2; stroke-linecap: round; opacity: .75; }
 .hueso .costilla { stroke-width: 1.6; opacity: .45; }
-.vaso path { fill: none; stroke: var(--c); stroke-width: 1.6; stroke-linecap: round; opacity: .5; }
+.hueso .largo { stroke-width: 3.2; opacity: .22; }
+.vaso path { fill: none; stroke: var(--c); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; opacity: .45; }
 .musculo path { fill: none; stroke: var(--c); stroke-width: 1.3; stroke-linecap: round; opacity: .55; }
 .aura path { stroke: var(--c); opacity: .3; pointer-events: stroke; }
 .aura.nivel-sinDatos path { opacity: .12; }
 
 .sistema-svg:hover { filter: brightness(1.3); }
-.sistema-svg.seleccionado, .sistema-svg:focus-visible { filter: drop-shadow(0 0 5px var(--c)) brightness(1.25); }
+.sistema-svg.seleccionado, .sistema-svg:focus-visible { filter: drop-shadow(0 0 4px color-mix(in srgb, var(--c) 70%, transparent)) brightness(1.2); }
 .sistema-svg.nivel-alerta { animation: pulso-alerta 1.6s ease-in-out infinite; }
 @keyframes pulso-alerta { 50% { opacity: .7; } }
 .latido path { transform-box: fill-box; transform-origin: center; animation: latir 1.1s ease-in-out infinite; }
