@@ -4,7 +4,7 @@ import { reglaCargaEva, reglaDescompresion } from './eva';
 import { reglaRuido } from './entorno';
 import { reglaFiebre, reglaMicrobioma, reglaReactivacion } from './inmune';
 import { reglaFatigaMenu, reglaGlucemia, reglaHidratacion, reglaIngesta, reglaPeso } from './metabolismo';
-import { reglaAnimo, reglaEstres, reglaSueno } from './mental';
+import { reglaAnimo, reglaAnimoSostenido, reglaCircadiano, reglaCohesion, reglaEstres, reglaSobrecarga, reglaSueno } from './mental';
 import { reglaAdherencia, reglaAptitud, reglaCargaDinamica, reglaEjercicio, reglaHueso } from './musculoesqueletico';
 import { reglaOrientacion, reglaPsicosis, reglaTraumaCraneal } from './neuro';
 import { reglaSANS } from './ojos';
@@ -46,4 +46,8 @@ export const REGLAS: Regla[] = [
   reglaHueso,
   reglaCargaDinamica,
   reglaRuido,
+  reglaAnimoSostenido,
+  reglaCohesion,
+  reglaCircadiano,
+  reglaSobrecarga,
 ];
