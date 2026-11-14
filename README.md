@@ -69,7 +69,7 @@ Fuente oficial del desafío: https://www.spaceappschallenge.org/2026/challenges/
 
 Sin IA, Higia funciona completa con el intérprete local. Para activar la conversación natural y el análisis de cámara:
 
-1. Copia `app/.env.example` como `app/.env.local` y pon tu clave: `ANTHROPIC_API_KEY=...`. Ese archivo no se sube a git.
+1. Copia `app/.env.example` como `app/.env.local` y pon tu clave: `DEEPSEEK_API_KEY=...` (clave de la [API de DeepSeek](https://platform.deepseek.com/)). La IA usa el modelo DeepSeek-V4.1-Flash (`deepseek-flash`) con pensamiento en esfuerzo bajo. Ese archivo no se sube a git.
 2. Reinicia `npm run dev`.
 3. En la app, abre **Demo → Contexto** y activa **Conexión con el hábitat**. La IA representa la computadora del hábitat, así que solo se usa con conexión.
 
@@ -280,7 +280,7 @@ Los mensajes retenidos se entregan solos cuando cambia el contexto (al despertar
 
 | Situación | Quién responde | Qué entiende |
 |---|---|---|
-| **Con conexión e IA configurada** | IA (Claude Opus 5.5, en el servidor del hábitat) | Frases libres ("anoche dormí como cinco horas y me siento cansado"). Responde breve y natural, adaptada al perfil, y **registra los datos que menciona** el astronauta (horas de sueño, ánimo, minutos de ejercicio) |
+| **Con conexión e IA configurada** | IA (DeepSeek-V4.1-Flash, en el servidor del hábitat) | Frases libres ("anoche dormí como cinco horas y me siento cansado"). Responde breve y natural, adaptada al perfil, y **registra los datos que menciona** el astronauta (horas de sueño, ánimo, minutos de ejercicio) |
 | **Sin conexión, o si la IA falla** | Intérprete local | Palabras clave: "dormí cinco horas", "mi ánimo es 4", "hice 30 minutos de ejercicio", "¿cómo está mi presión?", "¿cómo estoy?" |
 
 - La IA recibe el estado actual (perfil, contexto, hallazgos, últimas lecturas) **sin el nombre del astronauta**. Se le indica no diagnosticar ni inventar datos, y tratar con tacto los temas privados.
@@ -427,7 +427,7 @@ app/
 
 | Síntoma | Causa probable | Qué hacer |
 |---|---|---|
-| "IA inactiva" con la conexión encendida | No hay clave configurada | Crear `app/.env.local` con `ANTHROPIC_API_KEY` y reiniciar `npm run dev` |
+| "IA inactiva" con la conexión encendida | No hay clave configurada | Crear `app/.env.local` con `DEEPSEEK_API_KEY` y reiniciar `npm run dev` |
 | El asistente dice "IA no disponible (…)" | Error de la API (clave inválida, límite de uso, sin internet) | El mensaje indica el motivo; mientras tanto responde el intérprete local |
 | No aparece el botón del micrófono | El navegador no tiene reconocimiento de voz | Usar Chrome |
 | No se escucha la voz | Voz silenciada o volumen en 0 | Revisar el control de voz de la barra superior |
@@ -442,5 +442,5 @@ app/
 - El límite de radiación de 600 mSv (NASA-STD-3001) hay que **verificarlo** antes de citarlo.
 - La integración con sistemas médicos es una **interfaz de ejemplo**, no una API real de la NASA.
 - Los plazos de escalada (30 s y 15 s) son cortos para la demo; en un sistema real se definirían con criterio médico.
-- La IA envía a la API de Anthropic el estado de salud (sin nombre) y las fotos que se analizan. Cada consulta tiene costo según el uso de la clave.
+- La IA envía a la API de DeepSeek el estado de salud (sin nombre) y las fotos que se analizan. Cada consulta tiene costo según el uso de la clave.
 - El reconocimiento de voz del navegador (Chrome) usa servidores externos. La síntesis de voz sí funciona sin conexión.
