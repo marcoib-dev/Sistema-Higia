@@ -4,7 +4,7 @@ Prototipo para el NASA Space Apps Challenge 2026: *Create Health Monitoring Soft
 
 Higia vigila la salud de astronautas que viven en hábitats permanentes (base lunar, futura base en Marte). No pretende reinventar el diagnóstico: aplica criterios del desafío y del Human Research Program de la NASA. Su aporte está en **cómo** llega la información:
 
-- **Funciona sin conexión.** Toda la lógica esencial corre en el dispositivo; la conexión con el hábitat solo suma capacidades (IA, envío de reportes).
+- **Funciona sin conexión.** Toda la lógica esencial corre en el dispositivo; la IA y la conexión con el hábitat solo suman capacidades (conversación y evaluaciones con IA, envío de reportes).
 - **Se adapta a cada persona.** El mismo dato se comunica distinto a una médica veterana que a un ingeniero novato propenso al pánico.
 - **Elige cuándo y por dónde interrumpir.** Pantalla compartida, pantalla personal o auricular, según dónde esté el astronauta, qué esté haciendo y si la información es privada.
 - **No se queda callado ante una emergencia.** Si el astronauta no responde a una alerta, avisa a quien esté al alcance.
@@ -67,11 +67,10 @@ Fuente oficial del desafío: https://www.spaceappschallenge.org/2026/challenges/
 
 ### Activar la IA (opcional)
 
-Sin IA, Higia funciona completa con el intérprete local. Para activar la conversación natural y el análisis de cámara:
+Sin IA, Higia funciona completa con el intérprete local. Para activar la conversación natural, las evaluaciones con IA de cada hallazgo y el análisis de cámara:
 
 1. Copia `app/.env.example` como `app/.env.local` y pon tu clave: `DEEPSEEK_API_KEY=...` (clave de la [API de DeepSeek](https://platform.deepseek.com/)). La IA usa el modelo DeepSeek-V4.1-Flash (`deepseek-flash`) con pensamiento en esfuerzo bajo. Ese archivo no se sube a git.
-2. Reinicia `npm run dev`.
-3. En la app, abre **Demo → Contexto** y activa **Conexión con el hábitat**. La IA representa la computadora del hábitat, así que solo se usa con conexión.
+2. Reinicia `npm run dev`. El indicador de la barra superior pasa a **IA activa**: desde ese momento el asistente responde con la IA y cada hallazgo nuevo recibe una evaluación de la IA, sin necesidad de activar ningún interruptor.
 
 La IA solo existe con `npm run dev`, porque el servidor de desarrollo es el que guarda la clave. Un build estático (`npm run build`) funciona en modo local.
 
@@ -89,7 +88,7 @@ Abre el panel de demo con el botón **Demo** de la barra superior o la tecla **D
 6. **Crisis sin respuesta**: aparece la franja roja arriba, en cualquier sección. No presiones "Estoy bien": a los 15 s Higia avisa al compañero cercano. Queda registrado en **Reportes**.
 7. **Aviso de madrugada**: queda retenido. En **Contexto**, cambia la hora a 08:00 y se entrega.
 8. En **Contexto**, apaga **Médico a bordo** y ejecuta **Hipoxia**: aparece la guía paso a paso.
-9. Activa **Conexión con el hábitat**: se vacía la cola de reportes (**Reportes**) y, si hay clave, se activa la IA. Prueba el **Asistente** con "anoche dormí como cinco horas y me siento cansado".
+9. Activa **Conexión con el hábitat**: se vacía la cola de reportes (**Reportes**). Si hay clave, prueba el **Asistente** con "anoche dormí como cinco horas y me siento cansado" y mira la **Evaluación de Higia · IA** en cada mensaje.
 10. Para presentar, cierra el panel de demo (Esc o D): queda solo la interfaz del astronauta.
 
 ---
@@ -207,9 +206,9 @@ Para ahorrar energía, cuando llega una lectura **solo se evalúan las reglas qu
 | Pantallas y auricular | disponibles o no | Elección de canal |
 | Compañero cercano | sí/no | Primer destino de una escalada (radio de proximidad, no necesita red) |
 | Médico a bordo | sí/no | A quién va un reporte y si se da guía paso a paso |
-| Conexión con hábitat / Tierra | sí/no | IA, envío de reportes y escalada |
+| Conexión con hábitat / Tierra | sí/no | Envío de reportes y escalada |
 
-**Cámara** (sección Entorno, requiere conexión e IA): enciende la webcam y analiza un cuadro, o permite subir una foto. La IA describe el entorno, enumera peligros visibles (persona caída, humo, equipo suelto…) e infiere ubicación, destino y actividad **solo si se ven con claridad**. El botón **"Usar como contexto"** aplica esas inferencias al sistema.
+**Cámara** (sección Entorno, requiere IA): enciende la webcam y analiza un cuadro, o permite subir una foto. La IA describe el entorno, enumera peligros visibles (persona caída, humo, equipo suelto…) e infiere ubicación, destino y actividad **solo si se ven con claridad**. El botón **"Usar como contexto"** aplica esas inferencias al sistema.
 
 ### 4. Cuándo habla Higia
 
@@ -280,13 +279,14 @@ Los mensajes retenidos se entregan solos cuando cambia el contexto (al despertar
 
 | Situación | Quién responde | Qué entiende |
 |---|---|---|
-| **Con conexión e IA configurada** | IA (DeepSeek-V4.1-Flash, en el servidor del hábitat) | Frases libres ("anoche dormí como cinco horas y me siento cansado"). Responde breve y natural, adaptada al perfil, y **registra los datos que menciona** el astronauta (horas de sueño, ánimo, minutos de ejercicio) |
-| **Sin conexión, o si la IA falla** | Intérprete local | Palabras clave: "dormí cinco horas", "mi ánimo es 4", "hice 30 minutos de ejercicio", "¿cómo está mi presión?", "¿cómo estoy?" |
+| **Con IA configurada** | IA (DeepSeek-V4.1-Flash, en el servidor del hábitat) | Frases libres ("anoche dormí como cinco horas y me siento cansado"). Responde breve y natural, adaptada al perfil, y **registra los datos que menciona** el astronauta (horas de sueño, ánimo, minutos de ejercicio) |
+| **Sin clave, o si la IA falla** | Intérprete local | Palabras clave: "dormí cinco horas", "mi ánimo es 4", "hice 30 minutos de ejercicio", "¿cómo está mi presión?", "¿cómo estoy?" |
 
 - La IA recibe el estado actual (perfil, contexto, hallazgos, últimas lecturas) **sin el nombre del astronauta**. Se le indica no diagnosticar ni inventar datos, y tratar con tacto los temas privados.
 - Recuerda los últimos 6 intercambios de la conversación.
 - **Manos libres:** después de cada respuesta hablada, el micrófono se vuelve a abrir solo. Si el astronauta habla mientras Higia habla, la interrumpe.
 - Cada respuesta indica si vino de la IA o del intérprete local y, si la IA falló, por qué.
+- **Evaluaciones con IA:** cada hallazgo nuevo (aviso, alerta o información) recibe en **Mensajes** una "Evaluación de Higia · IA": qué significa en el contexto actual, cómo se relaciona con el resto del estado y el siguiente paso. El mensaje del motor local sale al instante; la evaluación llega después, así la seguridad nunca espera a la red. No se evalúan escaladas ni recordatorios.
 
 ### 10. Voz
 
@@ -351,7 +351,7 @@ Sensores / simulador / voz / cámara
           │  Mensaje                        │  Reportes            ▲ frases, fotos
           ▼                                 ▼                      │
    Interfaz (app/src/ui) + voz   Sistemas médicos (EJEMPLO)    IA (app/server)
-                                 ── solo con conexión al hábitat ──
+                                 ── con conexión al hábitat ──    ── con clave de API ──
 ```
 
 **Regla de oro:** `app/src/core` no importa nada de React, del navegador ni de la IA. Corre igual en el traje, en un test o en un servidor. Todo lo que toca el mundo exterior va en `app/src/adaptadores`. La IA está en `app/server` y siempre es opcional.
@@ -427,7 +427,7 @@ app/
 
 | Síntoma | Causa probable | Qué hacer |
 |---|---|---|
-| "IA inactiva" con la conexión encendida | No hay clave configurada | Crear `app/.env.local` con `DEEPSEEK_API_KEY` y reiniciar `npm run dev` |
+| "IA inactiva" | No hay clave configurada | Crear `app/.env.local` con `DEEPSEEK_API_KEY` y reiniciar `npm run dev` |
 | El asistente dice "IA no disponible (…)" | Error de la API (clave inválida, límite de uso, sin internet) | El mensaje indica el motivo; mientras tanto responde el intérprete local |
 | No aparece el botón del micrófono | El navegador no tiene reconocimiento de voz | Usar Chrome |
 | No se escucha la voz | Voz silenciada o volumen en 0 | Revisar el control de voz de la barra superior |

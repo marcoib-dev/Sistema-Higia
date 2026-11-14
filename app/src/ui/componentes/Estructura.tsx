@@ -32,7 +32,7 @@ export function BarraSuperior({ contexto: c, nombreAstronauta, iaActiva, iaConfi
           <Icono nombre={c.conexionHabitat ? 'conexion' : 'sinConexion'} tamano={16} />
           <span className="indicador-texto">{c.conexionHabitat ? 'Conectado' : 'Autónomo'}</span>
         </li>
-        <li className={iaActiva ? 'ia' : ''} title={iaActiva ? 'IA activa' : iaConfigurada ? 'La IA se activa con conexión al hábitat' : 'IA no configurada'}>
+        <li className={iaActiva ? 'ia' : ''} title={iaActiva ? 'IA activa (DeepSeek)' : iaConfigurada ? 'IA configurada' : 'IA no configurada: falta DEEPSEEK_API_KEY'}>
           <Icono nombre="ia" tamano={16} />
           <span className="indicador-texto">{iaActiva ? 'IA activa' : 'IA inactiva'}</span>
         </li>

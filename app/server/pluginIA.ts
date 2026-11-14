@@ -2,12 +2,13 @@
  * Monta la IA como endpoints del servidor de desarrollo de Vite:
  *   GET  /api/ia/estado     → ¿hay clave configurada?
  *   POST /api/ia/conversar  → conversación natural
+ *   POST /api/ia/evaluar    → evaluación personalizada de un hallazgo del motor
  *   POST /api/ia/entorno    → análisis de una foto de la cámara
  * Solo existe con `npm run dev`. Un build estático (`npm run build`) funciona sin IA, en modo local.
  */
 import type { IncomingMessage } from 'node:http';
 import type { Plugin } from 'vite';
-import { analizarEntorno, conversar, iaConfigurada, MODELO, traducirError } from './ia';
+import { analizarEntorno, conversar, evaluarHallazgo, iaConfigurada, MODELO, traducirError } from './ia';
 
 const MAX_BYTES = 5 * 1024 * 1024;
 
@@ -41,6 +42,7 @@ export function pluginIA(): Plugin {
           if (req.method === 'GET' && req.url === '/estado') return enviar(200, { configurada: iaConfigurada(), modelo: MODELO });
           if (req.method !== 'POST') return enviar(405, { error: 'Método no permitido.' });
           if (req.url === '/conversar') return enviar(200, await conversar(await leerJSON(req)));
+          if (req.url === '/evaluar') return enviar(200, await evaluarHallazgo(await leerJSON(req)));
           if (req.url === '/entorno') return enviar(200, await analizarEntorno(await leerJSON(req)));
           return enviar(404, { error: 'Ruta no encontrada.' });
         } catch (e) {

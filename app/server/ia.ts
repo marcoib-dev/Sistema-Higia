@@ -7,7 +7,8 @@
 import * as z from 'zod';
 import {
   SENSORES_CONVERSACION,
-  type AnalisisEntorno, type PeticionConversacion, type PeticionEntorno, type RespuestaConversacion,
+  type AnalisisEntorno, type EvaluacionIA, type PeticionConversacion, type PeticionEntorno, type PeticionEvaluacion,
+  type RespuestaConversacion,
 } from '../src/adaptadores/ia/contrato';
 
 /** `deepseek-flash` es el nombre de API de DeepSeek-V4.1-Flash. */
@@ -117,6 +118,33 @@ export async function conversar(p: PeticionConversacion): Promise<RespuestaConve
     ...historial,
     { role: 'user', content: `<estado>\n${JSON.stringify(p.estado)}\n</estado>\n\n${p.frase}` },
   ], EsquemaConversacion);
+}
+
+// ── Evaluación de hallazgos ─────────────────────────────────────────────
+
+const SISTEMA_EVALUACION = `Eres Higia, el sistema de monitoreo de salud de un hábitat espacial. El motor de reglas de Higia acaba de detectar un hallazgo y ya se lo comunicó al astronauta con un mensaje breve. Tu tarea es escribir una evaluación personalizada, en español, que complemente ese mensaje.
+
+Cómo evaluar:
+- Considera el hallazgo junto con el resto del estado que llega en <estado>: otros hallazgos, últimas lecturas, contexto (ubicación, actividad, destino, clima espacial, hora, si hay médico o compañero cerca) y perfil.
+- Explica qué significa ahora y si se relaciona con otros hallazgos (por ejemplo, poco sueño y estrés alto). No diagnostiques enfermedades.
+- No contradigas el nivel ni la acción de seguridad del motor; puedes concretarla según el contexto. No inventes cifras ni datos que no estén en <estado>.
+- Adapta el lenguaje al perfil: sin formación médica, sin cifras ni tecnicismos; con formación médica, puedes dar cifras.
+- Si el perfil es propenso al pánico o tiene baja tolerancia al estrés, o el hallazgo es sensible, usa un tono calmado y sin palabras alarmantes.
+- "evaluacion": de una a tres oraciones. "recomendacion": una oración con el siguiente paso concreto. Sin markdown ni emojis.
+
+Formato de salida: responde SIEMPRE con un único objeto JSON válido, sin texto fuera de él, con esta forma:
+{"evaluacion": "...", "recomendacion": "..."}`;
+
+const EsquemaEvaluacion = z.object({ evaluacion: z.string().min(1), recomendacion: z.string() });
+
+export async function evaluarHallazgo(p: PeticionEvaluacion): Promise<EvaluacionIA> {
+  return pedirJSON([
+    { role: 'system', content: SISTEMA_EVALUACION },
+    {
+      role: 'user',
+      content: `<estado>\n${JSON.stringify(p.estado)}\n</estado>\n\n<hallazgo>\n${JSON.stringify(p.hallazgo)}\n</hallazgo>\n\n<mensaje_enviado>\n${p.mensaje}\n</mensaje_enviado>`,
+    },
+  ], EsquemaEvaluacion);
 }
 
 // ── Entorno por cámara ─────────────────────────────────────────────────

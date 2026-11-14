@@ -50,3 +50,18 @@ export interface EstadoIA {
   configurada: boolean;
   modelo: string;
 }
+
+/** Hallazgo del motor de reglas que la IA evalúa en el contexto del estado completo. */
+export interface PeticionEvaluacion {
+  hallazgo: { titulo: string; nivel: Nivel; resumen: string; detalle: string; accion: string; sensible: boolean; fuente: string };
+  /** Lo que Higia ya le dijo al astronauta (texto del motor local). */
+  mensaje: string;
+  estado: EstadoParaIA;
+}
+
+export interface EvaluacionIA {
+  /** Evaluación personalizada: qué significa ahora, considerando el resto del estado. */
+  evaluacion: string;
+  /** Qué hacer a continuación, en una oración. */
+  recomendacion: string;
+}

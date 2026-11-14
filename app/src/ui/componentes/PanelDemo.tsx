@@ -131,7 +131,7 @@ export function PanelDemo({ abierto, onCerrar, perfil, contexto: c, onPerfil, on
 
             <fieldset>
               <legend>Enlaces</legend>
-              <Interruptor etiqueta="Conexión con el hábitat" descripcion="Activa la IA y el envío de reportes" activo={c.conexionHabitat} onCambio={(v) => onContexto({ conexionHabitat: v })} />
+              <Interruptor etiqueta="Conexión con el hábitat" descripcion="Activa el envío de reportes y la escalada a la base" activo={c.conexionHabitat} onCambio={(v) => onContexto({ conexionHabitat: v })} />
               <Interruptor etiqueta="Conexión con Tierra" descripcion={`Retardo actual: ${RETARDO_TIERRA[c.destino]}`} activo={c.conexionTierra} onCambio={(v) => onContexto({ conexionTierra: v })} />
             </fieldset>
 

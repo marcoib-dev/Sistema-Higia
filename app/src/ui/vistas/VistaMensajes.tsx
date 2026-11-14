@@ -7,6 +7,12 @@ import { Icono } from '../iconos';
 
 type Filtro = 'todos' | 'alertas' | 'retenidos' | 'escalados';
 
+/** Evaluación de la IA asociada a un mensaje del motor. */
+export type EvaluacionMensaje =
+  | { estado: 'cargando' }
+  | { estado: 'lista'; evaluacion: string; recomendacion: string }
+  | { estado: 'error'; error: string };
+
 const FILTROS: { id: Filtro; nombre: string; aplica: (m: Mensaje) => boolean }[] = [
   { id: 'todos', nombre: 'Todos', aplica: () => true },
   { id: 'alertas', nombre: 'Alertas', aplica: (m) => m.hallazgo.nivel === 'alerta' && !m.escalamiento },
@@ -16,6 +22,7 @@ const FILTROS: { id: Filtro; nombre: string; aplica: (m: Mensaje) => boolean }[]
 
 interface Props {
   mensajes: Mensaje[];
+  evaluaciones: Record<string, EvaluacionMensaje>;
   pendientes: Map<string, number>;
   ahora: number;
   contexto: Contexto;
@@ -23,7 +30,7 @@ interface Props {
   onAbrirDemo: () => void;
 }
 
-export function VistaMensajes({ mensajes, pendientes, ahora, contexto, onConfirmar, onAbrirDemo }: Props) {
+export function VistaMensajes({ mensajes, evaluaciones, pendientes, ahora, contexto, onConfirmar, onAbrirDemo }: Props) {
   const [filtro, setFiltro] = useState<Filtro>('todos');
   const visibles = mensajes.filter(FILTROS.find((f) => f.id === filtro)!.aplica);
 
@@ -48,7 +55,7 @@ export function VistaMensajes({ mensajes, pendientes, ahora, contexto, onConfirm
       ) : (
         <ol className="lista-mensajes">
           {visibles.map((m) => (
-            <TarjetaMensaje key={m.id} mensaje={m} vence={pendientes.get(m.id)} ahora={ahora} contexto={contexto} onConfirmar={onConfirmar} />
+            <TarjetaMensaje key={m.id} mensaje={m} evaluacion={evaluaciones[m.id]} vence={pendientes.get(m.id)} ahora={ahora} contexto={contexto} onConfirmar={onConfirmar} />
           ))}
         </ol>
       )}
@@ -56,8 +63,8 @@ export function VistaMensajes({ mensajes, pendientes, ahora, contexto, onConfirm
   );
 }
 
-function TarjetaMensaje({ mensaje: m, vence, ahora, contexto, onConfirmar }: {
-  mensaje: Mensaje; vence?: number; ahora: number; contexto: Contexto; onConfirmar: (id: string) => void;
+function TarjetaMensaje({ mensaje: m, evaluacion, vence, ahora, contexto, onConfirmar }: {
+  mensaje: Mensaje; evaluacion?: EvaluacionMensaje; vence?: number; ahora: number; contexto: Contexto; onConfirmar: (id: string) => void;
 }) {
   const canal = CANAL[m.canal];
   const segundos = vence ? Math.max(0, Math.ceil((vence - ahora) / 1000)) : 0;
@@ -90,6 +97,20 @@ function TarjetaMensaje({ mensaje: m, vence, ahora, contexto, onConfirmar }: {
         <p className="mensaje-destino"><Icono nombre="escalado" tamano={16} /> Avisados: {m.escalamiento.destinos.join(', ')}</p>
       )}
       {m.reporte && <p className="mensaje-destino"><Icono nombre="reportes" tamano={16} /> {m.reporte}</p>}
+
+      {evaluacion && (
+        <div className={`evaluacion-ia ${evaluacion.estado}`} aria-live="polite">
+          <p className="evaluacion-ia-titulo"><Icono nombre="ia" tamano={16} /> Evaluación de Higia · IA</p>
+          {evaluacion.estado === 'cargando' && <p className="texto-suave">La IA está evaluando este hallazgo…</p>}
+          {evaluacion.estado === 'lista' && (
+            <>
+              <p>{evaluacion.evaluacion}</p>
+              {evaluacion.recomendacion && <p className="evaluacion-ia-accion"><b>Siguiente paso:</b> {evaluacion.recomendacion}</p>}
+            </>
+          )}
+          {evaluacion.estado === 'error' && <p className="nota">IA no disponible ({evaluacion.error}). Vale el mensaje del motor local.</p>}
+        </div>
+      )}
 
       {m.pasos && (
         <div className="pasos">

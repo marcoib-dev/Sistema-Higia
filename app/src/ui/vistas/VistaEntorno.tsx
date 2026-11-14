@@ -118,7 +118,7 @@ function Camara({ iaActiva, onAnalizar, onAplicar }: Pick<Props, 'iaActiva' | 'o
     <section className="tarjeta camara" aria-labelledby="titulo-camara">
       <div className="tarjeta-cab">
         <h2 id="titulo-camara" className="titulo-tarjeta">Cámara</h2>
-        {iaActiva ? <Etiqueta icono="ia" tono="ia">Análisis con IA</Etiqueta> : <Etiqueta icono="sinConexion">Requiere conexión</Etiqueta>}
+        {iaActiva ? <Etiqueta icono="ia" tono="ia">Análisis con IA</Etiqueta> : <Etiqueta icono="sinConexion">Requiere IA</Etiqueta>}
       </div>
       <p className="texto-suave">Una foto del entorno ayuda a Higia a confirmar dónde estás, qué haces y si hay peligros a la vista.</p>
 
@@ -138,7 +138,7 @@ function Camara({ iaActiva, onAnalizar, onAplicar }: Pick<Props, 'iaActiva' | 'o
             <Icono nombre="subir" /> Subir foto
             <input type="file" accept="image/*" className="sr-only" disabled={!iaActiva || analizando} onChange={(e) => desdeArchivo(e.target.files?.[0])} />
           </label>
-          {!iaActiva && <p className="nota">El análisis corre en la computadora del hábitat: activa la conexión en la demo.</p>}
+          {!iaActiva && <p className="nota">El análisis requiere la IA: configura DEEPSEEK_API_KEY en app/.env.local y reinicia el servidor.</p>}
         </div>
       </div>
 

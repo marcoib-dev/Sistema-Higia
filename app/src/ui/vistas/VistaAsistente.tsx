@@ -76,7 +76,7 @@ export function VistaAsistente({ historial, vozActiva, iaActiva, onFrase }: Prop
         titulo="Asistente"
         descripcion={iaActiva
           ? 'Habla con naturalidad: Higia entiende frases libres y registra los datos que mencionas.'
-          : 'Sin conexión: responde el intérprete local por palabras clave.'}
+          : 'IA no configurada: responde el intérprete local por palabras clave.'}
         acciones={iaActiva ? <Etiqueta icono="ia" tono="ia">IA activa</Etiqueta> : <Etiqueta icono="sinConexion">Modo local</Etiqueta>}
       />
 

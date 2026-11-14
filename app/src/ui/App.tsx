@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { analizarEntornoIA, consultarEstadoIA, conversarIA, estadoParaIA } from '../adaptadores/ia/cliente';
+import { analizarEntornoIA, consultarEstadoIA, conversarIA, estadoParaIA, evaluarIA, peticionEvaluacion } from '../adaptadores/ia/cliente';
 import type { EstadoIA, RespuestaConversacion, TurnoConversacion } from '../adaptadores/ia/contrato';
 import { AdaptadorEjemplo } from '../adaptadores/interop/ejemploNasa';
 import type { Escenario } from '../adaptadores/simulador/escenarios';
@@ -14,7 +14,7 @@ import { PanelDemo } from './componentes/PanelDemo';
 import { SECCIONES, useSeccion } from './navegacion';
 import { VistaAsistente, type Intercambio, type ResultadoConversacion } from './vistas/VistaAsistente';
 import { VistaEntorno } from './vistas/VistaEntorno';
-import { VistaMensajes } from './vistas/VistaMensajes';
+import { VistaMensajes, type EvaluacionMensaje } from './vistas/VistaMensajes';
 import { VistaReportes } from './vistas/VistaReportes';
 import { VistaResumen } from './vistas/VistaResumen';
 
@@ -47,13 +47,17 @@ export function App() {
   const [vozActiva, setVozActiva] = useState(true);
   const [demoAbierta, setDemoAbierta] = useState(leerDemo);
   const [ia, setIa] = useState<EstadoIA>({ configurada: false, modelo: '' });
+  const [evaluaciones, setEvaluaciones] = useState<Record<string, EvaluacionMensaje>>({});
   const turnos = useRef<TurnoConversacion[]>([]);
   const vozRef = useRef(vozActiva);
   vozRef.current = vozActiva;
 
   const refrescar = () => setVersion((v) => v + 1);
   const c = nucleo.contexto;
-  const iaActiva = c.conexionHabitat && ia.configurada;
+  // La IA se usa siempre que el servidor tenga clave; si falla, todo sigue con el motor local.
+  const iaActiva = ia.configurada;
+  const iaRef = useRef(iaActiva);
+  iaRef.current = iaActiva;
 
   useEffect(() => { void consultarEstadoIA().then(setIa); }, []);
 
@@ -85,15 +89,32 @@ export function App() {
     return () => window.removeEventListener('keydown', alTeclear);
   }, [demoAbierta, alternarDemo]);
 
+  /**
+   * Evaluación de la IA para cada hallazgo nuevo. El mensaje local ya salió (la seguridad no espera a la red);
+   * la evaluación lo complementa cuando llega. No se evalúan escaladas, recordatorios ni hallazgos normales.
+   */
+  const evaluarConIA = useCallback((nuevos: Mensaje[]) => {
+    if (!iaRef.current) return;
+    for (const m of nuevos) {
+      if (m.escalamiento || m.esRecordatorio || m.hallazgo.nivel === 'normal') continue;
+      setEvaluaciones((prev) => ({ ...prev, [m.id]: { estado: 'cargando' } }));
+      evaluarIA(peticionEvaluacion(m, nucleo)).then(
+        (r) => setEvaluaciones((prev) => ({ ...prev, [m.id]: { estado: 'lista', ...r } })),
+        (e: unknown) => setEvaluaciones((prev) => ({ ...prev, [m.id]: { estado: 'error', error: e instanceof Error ? e.message : 'Error desconocido.' } })),
+      );
+    }
+  }, [nucleo]);
+
   const procesar = useCallback(async (nuevos: Mensaje[]) => {
     if (vozRef.current) nuevos.filter((m) => m.voz).forEach((m) => hablar(m.texto));
     if (nuevos.length) setMensajes((prev) => [...nuevos, ...prev].slice(0, 100));
+    evaluarConIA(nuevos);
     // La capa de interoperabilidad solo actúa con conexión; si no, el núcleo sigue solo.
     if (nucleo.contexto.conexionHabitat && nucleo.hayPendientesReporte()) {
       await interop.enviar(nucleo.tomarPendientesReporte(), nucleo.perfil);
     }
     refrescar();
-  }, [nucleo, interop]);
+  }, [nucleo, interop, evaluarConIA]);
 
   // Cada segundo: confirmaciones vencidas (escalada). Cada minuto: recordatorios.
   useEffect(() => {
@@ -183,7 +204,7 @@ export function App() {
             />
           )}
           {seccion === 'mensajes' && (
-            <VistaMensajes mensajes={mensajes} pendientes={vencimientos} ahora={ahora} contexto={c} onConfirmar={confirmar} onAbrirDemo={() => alternarDemo(true)} />
+            <VistaMensajes mensajes={mensajes} evaluaciones={evaluaciones} pendientes={vencimientos} ahora={ahora} contexto={c} onConfirmar={confirmar} onAbrirDemo={() => alternarDemo(true)} />
           )}
           {seccion === 'asistente' && <VistaAsistente historial={chat} vozActiva={vozActiva} iaActiva={iaActiva} onFrase={conversar} />}
           {seccion === 'entorno' && (
