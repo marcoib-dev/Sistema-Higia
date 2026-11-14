@@ -164,28 +164,32 @@ El navegador recuerda si el panel quedó abierto.
 
 ### 1. Figura anatómica
 
-Ilustración anatómica 2D en vista frontal, en SVG (`app/src/ui/FiguraCorporal.tsx`). Liviana, nítida en cualquier tamaño y sin dependencias externas.
+Ilustraciones anatómicas 2D del cuerpo (`app/src/ui/FiguraCorporal.tsx`, imágenes en `app/public/cuerpo/`), con dos selectores sobre la figura:
 
-- **Silueta con proporciones de adulto**, en estilo de ilustración médica: hombros más anchos que la cadera, cuello con trapecios, cintura, brazos junto al cuerpo con codo y muñeca a la altura correcta, manos de perfil con pulgar, rodillas, pantorrillas y tobillos. Relieve tenue de la superficie (cuello, ombligo, línea inguinal, rodillas, tobillos). Se genera con curvas suaves a partir de una lista de puntos del lado derecho, espejada para que sea simétrica.
-- **Cada sistema tiene su dibujo:**
+- **Vista:** Frente o Espalda.
+- **Capa:** Órganos, Músculos o Esqueleto.
 
-| Sistema | Qué se dibuja |
-|---|---|
-| Cerebro / mente | Cerebro con circunvoluciones y cisura central |
-| Ojos | Ojos con pupilas |
-| Oído interno | Cóclea a cada lado |
-| Pulmones | Tráquea, bronquios y pulmones con sus lóbulos |
-| Corazón y vasos | Corazón con forma anatómica y latido sutil, aorta y arterias hacia brazos y piernas |
-| Metabolismo | Hígado y estómago |
-| Intestino | Intestino grueso e intestino delgado |
-| Huesos | Columna vértebra por vértebra, costillas, clavículas, pelvis y rótulas |
-| Sistema inmune | Ganglios del cuello, axilas e ingle, bazo y piel del torso |
-| Músculos | Brazos y relieve de pectorales, bíceps, abdomen y cuádriceps |
-| Piernas | Piernas y relieve de las pantorrillas |
-| Todo el cuerpo (radiación) | Contorno fino alrededor de la silueta |
+La elección se recuerda en el dispositivo. Si se pide un sistema que no se ve desde la vista actual (por ejemplo, los ojos de espaldas), la figura se gira sola.
 
-- **Color = el peor nivel** entre los riesgos activos de ese sistema: verde normal, azul info, amarillo aviso, rojo alerta, gris sin datos. Lo que está en alerta pulsa suavemente.
-- **Interacción:** al pasar el mouse cada sistema se ilumina y muestra su nombre y nivel; con clic (o Tab y Enter) se selecciona y se ve su detalle en la lista **Sistemas del cuerpo**. Lo seleccionado queda resaltado.
+**Cómo se integran las imágenes:** se muestran sin su fondo oscuro (un filtro SVG convierte la luminancia en transparencia, así que no hace falta editarlas) y se alinean en un lienzo común. Sobre ellas se dibuja la zona de cada sistema, teñida con su nivel y **recortada con la propia figura**, de modo que el color solo cae sobre el cuerpo y el dibujo se sigue viendo. Las zonas se definen una vez por vista y se trasladan a cada ilustración con sus puntos de referencia (mentón, hombros, entrepierna, rodillas y brazos), porque cada dibujo tiene proporciones algo distintas.
+
+| Sistema | Zona (frente) | Zona (espalda) |
+|---|---|---|
+| Cerebro / mente | Cráneo | Cráneo |
+| Ojos | Ojos | (no visible: se gira a frente) |
+| Oído interno | A cada lado de la cabeza | A cada lado de la cabeza |
+| Pulmones | Pulmones | Pulmones |
+| Corazón y vasos | Corazón | (no visible: se gira a frente) |
+| Metabolismo | Hígado y estómago | Riñones |
+| Intestino | Intestino | Intestino |
+| Huesos | Pelvis y rodillas | Columna, pelvis y rodillas |
+| Sistema inmune | Ganglios del cuello, axilas e ingle | Ganglios del cuello |
+| Músculos | Brazos | Brazos |
+| Piernas | Piernas | Piernas |
+| Todo el cuerpo (radiación) | Halo de toda la figura | Halo de toda la figura |
+
+- **Color = el peor nivel** entre los riesgos activos de ese sistema: verde normal, azul info, amarillo aviso, rojo alerta; sin datos, sin tinte. Lo que está en alerta pulsa suavemente.
+- **Interacción:** al pasar el mouse se marca el contorno de la zona y aparece su nombre y nivel; con clic (o Tab y Enter) se selecciona y se ve su detalle en la lista **Sistemas del cuerpo**. Lo seleccionado queda resaltado. Un clic en el resto de la figura selecciona **Todo el cuerpo**.
 
 ### 2. Motor de detección
 
@@ -417,7 +421,7 @@ app/
 │       ├── componentes/       Barra superior, navegación, franja de alerta, panel de demo, piezas básicas
 │       ├── asistente.ts       Estado del asistente: conversación y escucha por «Higia»
 │       ├── vistas/            Higia, Resumen, Mensajes, Comunicaciones, Perfil, Entorno, Reportes
-│       ├── FiguraCorporal.tsx      Figura anatómica 2D (SVG)
+│       ├── FiguraCorporal.tsx      Figura anatómica 2D (ilustraciones de app/public/cuerpo + zonas SVG)
 │       └── estilos.css        Sistema de diseño
 ```
 
@@ -448,7 +452,7 @@ app/
 | Agregar un astronauta de ejemplo | `app/src/adaptadores/simulador/perfiles.ts` |
 | Cambiar los plazos de "Estoy bien" | `PLAZO_CONFIRMACION_MS` y `PLAZO_CONFIRMACION_INCAPACIDAD_MS` en `app/src/core/nucleo.ts` |
 | Cambiar la frecuencia de recordatorios | `intervaloRecordatorioMs` en `app/src/core/personalizador.ts` |
-| Ajustar la silueta o los órganos | Puntos de `LADO_DERECHO` y trazados en `app/src/ui/FiguraCorporal.tsx`; colores en la sección "Figura anatómica 2D" de `estilos.css` |
+| Cambiar las ilustraciones o ajustar las zonas | Imágenes en `app/public/cuerpo/` (`<vista>-<capa>.jpg`, p. ej. `frente-organos.jpg`); su caja y puntos de referencia en `ILUSTRACIONES` y las zonas en `ZONAS` de `app/src/ui/FiguraCorporal.tsx`; colores en la sección "Figura anatómica 2D" de `estilos.css` |
 | Cambiar lo que la IA dice o extrae | Instrucciones y esquemas en `app/server/ia.ts` |
 | Conectar un sistema médico real | Implementar `AdaptadorExterno` en `app/src/adaptadores/interop/` |
 | Agregar una sección | `SECCIONES` en `app/src/ui/navegacion.ts` y una vista en `app/src/ui/vistas/` |

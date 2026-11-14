@@ -350,45 +350,43 @@ select, input[type='text'], input[type='number'], input:not([type]) {
 .lista-registro summary { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--acento); font-size: 13px; }
 
 /* ── Figura anatómica 2D ─────────────────────────────────────────────── */
-.figura-svg { max-height: 600px; margin: 0 auto; overflow: visible; }
-.figura-svg .contorno { fill: none; stroke: rgba(150, 166, 210, .42); stroke-width: 1; pointer-events: none; }
-.sombreado { pointer-events: none; }
-.sombreado .borde-interior { fill: none; stroke: #0a0e1a; stroke-width: 16; opacity: .55; }
-.sistema-svg { cursor: pointer; outline: none; --c: var(--sin-datos); transition: filter .15s, opacity .15s; }
+.figura-controles { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 8px; }
+.figura-selector { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--superficie-2); border: 1px solid var(--borde); }
+.figura-selector button { border: 0; background: none; color: var(--texto-2); padding: 5px 12px; border-radius: 999px; font-size: 13px; cursor: pointer; }
+.figura-selector button:hover { color: var(--texto); }
+.figura-selector button[aria-pressed='true'] { background: var(--acento-suave); color: var(--acento); font-weight: 600; }
+.figura-svg { max-height: 640px; margin: 0 auto; }
+.sistema-svg { cursor: pointer; outline: none; --c: var(--sin-datos); }
 .sistema-svg.nivel-normal { --c: var(--ok); }
 .sistema-svg.nivel-info { --c: var(--info); }
 .sistema-svg.nivel-aviso { --c: var(--aviso); }
 .sistema-svg.nivel-alerta { --c: var(--alerta); }
-.sistema-svg.nivel-sinDatos { --c: #59648a; }
+.sistema-svg.nivel-sinDatos { --c: #7d8bb5; }
 
-.organo path, .organo circle { fill: color-mix(in srgb, var(--c) 62%, #0a0e1a); stroke: var(--c); stroke-width: 1.2; }
-.organo .detalle { fill: none; stroke: rgba(8, 12, 24, .42); stroke-width: 1; stroke-linecap: round; }
-.organo .trazo { fill: none; stroke: var(--c); stroke-width: 3; stroke-linecap: round; }
-.organo .trazo.grueso { stroke-width: 7; opacity: .55; }
-.organo .trazo.fino { stroke-width: 2; }
-.ojos path { fill: color-mix(in srgb, var(--c) 42%, var(--piel-centro)); stroke: color-mix(in srgb, var(--c) 55%, var(--piel-centro)); stroke-width: .6; }
-.ojos .parpado { fill: none; stroke: color-mix(in srgb, var(--c) 35%, #c9d6ff); stroke-width: .9; stroke-linecap: round; opacity: .55; }
-.relieve path, .relieve ellipse { fill: none; stroke: rgba(200, 210, 235, .13); stroke-width: 1; stroke-linecap: round; }
-.organo .area-clic { fill: transparent; stroke: none; }
-.organo .ganglio { fill: color-mix(in srgb, var(--c) 75%, #0a0e1a); stroke: none; }
-.zona path { fill: var(--c); opacity: .14; }
-.zona.nivel-sinDatos path { opacity: 0; }
-.zona.seleccionado path { opacity: .32; }
-.hueso rect, .hueso .hueso-relleno { fill: color-mix(in srgb, var(--c) 32%, var(--piel-borde)); stroke: color-mix(in srgb, var(--c) 80%, transparent); stroke-width: 1; }
-.hueso .hueso-trazo { fill: none; stroke: var(--c); stroke-width: 2; stroke-linecap: round; opacity: .75; }
-.hueso .costilla { stroke-width: 1.6; opacity: .45; }
-.hueso .largo { stroke-width: 3.2; opacity: .22; }
-.vaso path { fill: none; stroke: var(--c); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; opacity: .45; }
-.musculo path { fill: none; stroke: var(--c); stroke-width: 1.3; stroke-linecap: round; opacity: .55; }
-.aura path { stroke: var(--c); opacity: .3; pointer-events: stroke; }
-.aura.nivel-sinDatos path { opacity: .12; }
+/* Todo el cuerpo (radiación): halo de la figura */
+.aura-cuerpo { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--c) 55%, transparent)); transition: filter .2s; }
+.aura-cuerpo.nivel-sinDatos { filter: drop-shadow(0 0 6px rgba(150, 170, 230, .18)); }
+.aura-cuerpo.seleccionado, .aura-cuerpo:focus-visible { filter: drop-shadow(0 0 9px var(--c)) drop-shadow(0 0 2px var(--c)); }
 
-.sistema-svg:hover { filter: brightness(1.3); }
-.sistema-svg.seleccionado, .sistema-svg:focus-visible { filter: drop-shadow(0 0 4px color-mix(in srgb, var(--c) 70%, transparent)) brightness(1.2); }
-.sistema-svg.nivel-alerta { animation: pulso-alerta 1.6s ease-in-out infinite; }
-@keyframes pulso-alerta { 50% { opacity: .7; } }
-.latido path { transform-box: fill-box; transform-origin: center; animation: latir 1.1s ease-in-out infinite; }
-@keyframes latir { 0%, 40%, 100% { transform: scale(1); } 12% { transform: scale(1.05); } 26% { transform: scale(1.02); } }
+/* Tintes por sistema, recortados con la figura (máscara) */
+.tintes { pointer-events: none; }
+.tinte ellipse { fill: var(--c); opacity: .5; transition: opacity .15s; }
+.tinte polygon { fill: var(--c); opacity: .3; transition: opacity .15s; }
+.zona-brazos path { fill: none; stroke-width: 30; stroke-linecap: round; stroke-linejoin: round; }
+.tinte .zona-brazos path { stroke: var(--c); opacity: .3; }
+.tinte.nivel-sinDatos ellipse, .tinte.nivel-sinDatos polygon, .tinte.nivel-sinDatos .zona-brazos path { opacity: 0; }
+.tinte.seleccionado ellipse { opacity: .72; }
+.tinte.seleccionado polygon, .tinte.seleccionado .zona-brazos path { opacity: .5; }
+.tinte.nivel-sinDatos.seleccionado ellipse, .tinte.nivel-sinDatos.seleccionado polygon, .tinte.nivel-sinDatos.seleccionado .zona-brazos path { opacity: .35; }
+.tinte.nivel-alerta { animation: pulso-alerta 1.6s ease-in-out infinite; }
+@keyframes pulso-alerta { 50% { opacity: .55; } }
+
+/* Zonas interactivas: invisibles; contorno al pasar o seleccionar */
+.zona-sistema ellipse, .zona-sistema polygon { fill: transparent; stroke: transparent; stroke-width: 1.6; transition: stroke .15s; }
+.zona-sistema .zona-brazos path { stroke: transparent; pointer-events: stroke; }
+.zona-sistema:hover ellipse, .zona-sistema:hover polygon { stroke: color-mix(in srgb, var(--c) 70%, #fff); stroke-dasharray: 4 3; }
+.zona-sistema.seleccionado ellipse, .zona-sistema.seleccionado polygon,
+.zona-sistema:focus-visible ellipse, .zona-sistema:focus-visible polygon { stroke: color-mix(in srgb, var(--c) 80%, #fff); stroke-dasharray: none; filter: drop-shadow(0 0 4px var(--c)); }
 
 /* ── Botón de peligro (pedir ayuda) ──────────────────────────────────── */
 .boton-peligro { background: var(--alerta); border-color: var(--alerta); color: #fff; font-weight: 600; }
