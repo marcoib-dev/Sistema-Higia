@@ -61,34 +61,42 @@ export const reglaPresionArterial = definirRegla(
     fuente: 'Anexo F: presión arterial (riesgo de desmayo) · Anexo B: riesgo cardiovascular',
     hrp: ['cardiovascular'],
   },
-  (h) => {
+  (h, _p, _ahora, c) => {
     const sis = h.ultima('presionSistolica')?.valor;
     const dia = h.ultima('presionDiastolica')?.valor;
     if (sis === undefined || dia === undefined) return null;
-    const detalle = `PA ${sis}/${dia} mmHg`;
+    // Tras un cambio de gravedad (aterrizaje, llegada a la superficie) la presión baja es esperable y peligrosa al ponerse de pie.
+    const transicion = c.transicionGravedad;
+    const detalle = `PA ${sis}/${dia} mmHg${transicion ? ' · transición de gravedad reciente' : ''}`;
+    const contramedidas = 'Usa las prendas de compresión y bebe medio litro de líquido antes de ponerte de pie.';
 
     if (sis < 80) {
       return {
         nivel: 'alerta', titulo: 'Presión arterial muy baja', detalleTecnico: detalle,
         resumenSimple: 'Tu presión está muy baja y podrías desmayarte.',
-        accion: 'Recuéstate con las piernas elevadas y bebe líquido. Avisa a un compañero.',
+        accion: transicion
+          ? `Recuéstate con las piernas elevadas y no te levantes. ${contramedidas} Avisa a un compañero.`
+          : 'Recuéstate con las piernas elevadas y bebe líquido. Avisa a un compañero.',
         pasos: [
           'Recuéstate de inmediato; en microgravedad, sujétate a una superficie.',
           'Eleva las piernas por encima del nivel del corazón.',
           'Bebe medio litro de agua o de solución con electrolitos.',
+          ...(transicion ? ['Ponte las prendas de compresión de las piernas antes de intentar levantarte.'] : []),
           'No te levantes durante 15 minutos y vuelve a medir la presión.',
           'Si pierdes la visión, te confundes o te desmayas, un compañero debe asistirte.',
         ],
         posibleIncapacidad: true,
-        ruta: 'reporte', sensible: false,
+        ruta: 'reporte', sensible: false, bloquea: ['pilotaje', 'eva', 'ejercicioIntenso'],
       };
     }
-    if (sis < 90) {
+    if (sis < 90 || (transicion && sis < 100)) {
       return {
-        nivel: 'aviso', titulo: 'Presión arterial baja', detalleTecnico: detalle,
+        nivel: 'aviso', titulo: transicion ? 'Presión baja tras el cambio de gravedad' : 'Presión arterial baja', detalleTecnico: detalle,
         resumenSimple: 'Tu presión está baja; podrías marearte al moverte rápido.',
-        accion: 'Hidrátate y evita cambios bruscos de postura. Considera usar prendas de compresión.',
-        ruta: 'autogestion', sensible: false,
+        accion: transicion
+          ? `Levántate despacio, en dos tiempos. ${contramedidas}`
+          : 'Hidrátate y evita cambios bruscos de postura. Considera usar prendas de compresión.',
+        ruta: 'autogestion', sensible: false, bloquea: transicion ? ['pilotaje'] : undefined,
       };
     }
     if (sis >= 160 || dia >= 100) {
