@@ -4,6 +4,7 @@
  */
 import type { Historial } from './historial';
 import type { IdRiesgoHRP } from './riesgosHRP';
+import type { TipoSensor } from './sensores';
 
 // ── Cuerpo ──────────────────────────────────────────────────────────────
 export type SistemaCorporal =
@@ -23,69 +24,9 @@ export const NOMBRE_SISTEMA: Record<SistemaCorporal, string> = {
 };
 
 // ── Entradas: lecturas de sensores ──────────────────────────────────────
-export type TipoSensor =
-  | 'frecuenciaCardiaca'  // lpm
-  | 'presionSistolica'    // mmHg
-  | 'presionDiastolica'   // mmHg
-  | 'spo2'                // % saturación de oxígeno
-  | 'temperatura'         // °C
-  | 'glucemia'            // mg/dL
-  | 'horasSueno'          // horas de una noche
-  | 'animo'               // autoevaluación 1–10
-  | 'estres'              // índice 0–100 (p. ej. derivado de VFC)
-  | 'minutosEjercicio'    // minutos acumulados en el día
-  | 'dosisRadiacion'      // mSv acumulados (dosímetro)
-  | 'orientacion'         // 0–10, chequeo de orientación (persona, lugar, tiempo, atención)
-  | 'cognicion'           // 0–100, prueba cognitiva breve (tipo batería Cognition / WinSCAT)
-  | 'tiempoReaccion'      // ms, prueba de vigilancia psicomotora (PVT)
-  | 'marcadoresPsicoticos' // 0–10, señales en la conversación (voces, ideas de persecución, discurso desorganizado)
-  | 'impactoCabeza';      // g, pico de aceleración medido en el casco o el traje
-
-/** Familia de cada dato: el simulador agrupa sus controles por esto. */
-export type CategoriaSensor = 'vital' | 'sintoma' | 'prueba' | 'habito' | 'traje' | 'entorno' | 'laboratorio';
-
-export const NOMBRE_CATEGORIA_SENSOR: Record<CategoriaSensor, string> = {
-  vital: 'Signos vitales', sintoma: 'Síntomas reportados', prueba: 'Pruebas a bordo', habito: 'Hábitos y encuestas',
-  traje: 'Traje y vehículo', entorno: 'Entorno', laboratorio: 'Laboratorio',
-};
-
-export interface InfoSensor {
-  nombre: string;
-  unidad: string;
-  categoria: CategoriaSensor;
-  /** Rango válido: límites del control del simulador y de la validación de entradas (voz, IA). */
-  min: number;
-  max: number;
-  paso: number;
-  /** El astronauta lo puede reportar hablando. */
-  porVoz?: boolean;
-}
-
-/** Nombre, unidad y rango de cada dato. Lo usan la trazabilidad, el simulador y la validación de entradas. */
-export const INFO_SENSOR: Record<TipoSensor, InfoSensor> = {
-  frecuenciaCardiaca: { nombre: 'Frecuencia cardíaca', unidad: 'lpm', categoria: 'vital', min: 25, max: 220, paso: 1, porVoz: true },
-  presionSistolica: { nombre: 'Presión sistólica', unidad: 'mmHg', categoria: 'vital', min: 50, max: 240, paso: 1, porVoz: true },
-  presionDiastolica: { nombre: 'Presión diastólica', unidad: 'mmHg', categoria: 'vital', min: 30, max: 150, paso: 1, porVoz: true },
-  spo2: { nombre: 'Saturación de oxígeno', unidad: '%', categoria: 'vital', min: 60, max: 100, paso: 1, porVoz: true },
-  temperatura: { nombre: 'Temperatura', unidad: '°C', categoria: 'vital', min: 32, max: 42, paso: 0.1, porVoz: true },
-  glucemia: { nombre: 'Glucemia', unidad: 'mg/dL', categoria: 'laboratorio', min: 30, max: 400, paso: 1, porVoz: true },
-  horasSueno: { nombre: 'Horas de sueño', unidad: 'h', categoria: 'habito', min: 0, max: 14, paso: 0.5, porVoz: true },
-  animo: { nombre: 'Ánimo', unidad: '/10', categoria: 'habito', min: 1, max: 10, paso: 1, porVoz: true },
-  estres: { nombre: 'Índice de estrés', unidad: '/100', categoria: 'vital', min: 0, max: 100, paso: 1, porVoz: true },
-  minutosEjercicio: { nombre: 'Ejercicio del día', unidad: 'min', categoria: 'habito', min: 0, max: 300, paso: 5 },
-  dosisRadiacion: { nombre: 'Dosis de radiación acumulada', unidad: 'mSv', categoria: 'entorno', min: 0, max: 1000, paso: 0.5 },
-  orientacion: { nombre: 'Chequeo de orientación', unidad: '/10', categoria: 'prueba', min: 0, max: 10, paso: 1 },
-  cognicion: { nombre: 'Prueba cognitiva', unidad: '/100', categoria: 'prueba', min: 0, max: 100, paso: 1 },
-  tiempoReaccion: { nombre: 'Tiempo de reacción (PVT)', unidad: 'ms', categoria: 'prueba', min: 150, max: 1000, paso: 5 },
-  marcadoresPsicoticos: { nombre: 'Señales de alteración de la percepción', unidad: '/10', categoria: 'sintoma', min: 0, max: 10, paso: 1 },
-  impactoCabeza: { nombre: 'Impacto en la cabeza', unidad: 'g', categoria: 'traje', min: 0, max: 100, paso: 1 },
-};
-
-/** Recorta un valor al rango válido del dato. */
-export function enRango(s: TipoSensor, v: number): number {
-  const i = INFO_SENSOR[s];
-  return Math.min(i.max, Math.max(i.min, v));
-}
+// El catálogo completo de datos vive en `sensores.ts`.
+export type { CategoriaSensor, InfoSensor, TipoSensor } from './sensores';
+export { CATEGORIAS_SENSOR, INFO_SENSOR, NOMBRE_CATEGORIA_SENSOR, SENSORES, enRango, esSensor } from './sensores';
 
 /** Dato concreto en el que se apoya un análisis clínico (trazabilidad). */
 export interface DatoClinico {
@@ -132,6 +73,8 @@ export interface Perfil {
   horarioSueno: { inicio: number; fin: number };
   /** Historia clínica previa a la misión: la usan la IA, las evaluaciones y las comunicaciones de emergencia. */
   historiaClinica: HistoriaClinica;
+  /** Calorías diarias que necesita (plan nutricional de la misión). */
+  requerimientoCalorico: number;
 }
 
 // ── Historia clínica previa ─────────────────────────────────────────────
