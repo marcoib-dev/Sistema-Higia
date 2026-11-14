@@ -1,12 +1,15 @@
 import type { Regla } from '../tipos';
-import { reglaFrecuenciaCardiaca, reglaPresionArterial } from './cardiovascular';
+import { reglaArritmia, reglaFrecuenciaCardiaca, reglaPresionArterial, reglaTrombosis } from './cardiovascular';
+import { reglaCargaEva, reglaDescompresion } from './eva';
 import { reglaFiebre, reglaReactivacion } from './inmune';
 import { reglaGlucemia } from './metabolismo';
 import { reglaAnimo, reglaEstres, reglaSueno } from './mental';
 import { reglaEjercicio } from './musculoesqueletico';
 import { reglaOrientacion, reglaPsicosis, reglaTraumaCraneal } from './neuro';
+import { reglaSANS } from './ojos';
 import { reglaRadiacion } from './radiacion';
-import { reglaSaturacionOxigeno } from './respiratorio';
+import { reglaHipoxiaCabina, reglaSaturacionOxigeno } from './respiratorio';
+import { reglaCinetosis, reglaEquilibrio } from './sensoriomotor';
 
 /** Para agregar un riesgo: crea la regla con `definirRegla` y súmala aquí. */
 export const REGLAS: Regla[] = [
@@ -24,4 +27,12 @@ export const REGLAS: Regla[] = [
   reglaFiebre,
   reglaReactivacion,
   reglaGlucemia,
+  reglaCinetosis,
+  reglaEquilibrio,
+  reglaArritmia,
+  reglaTrombosis,
+  reglaDescompresion,
+  reglaHipoxiaCabina,
+  reglaCargaEva,
+  reglaSANS,
 ];
