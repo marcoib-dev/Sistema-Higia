@@ -69,7 +69,7 @@ Fuente oficial del desafío: https://www.spaceappschallenge.org/2026/challenges/
 
 Sin IA, Higia funciona completa con el intérprete local. Para activar la conversación natural, las evaluaciones con IA de cada hallazgo y el análisis de cámara:
 
-1. Copia `app/.env.example` como `app/.env.local` y pon tu clave: `DEEPSEEK_API_KEY=...` (clave de la [API de DeepSeek](https://platform.deepseek.com/)). La IA usa el modelo DeepSeek-V4.1-Flash (`deepseek-flash`) con pensamiento en esfuerzo bajo. Ese archivo no se sube a git.
+1. Copia `app/.env.example` como `app/.env.local` (o `app/.env`) y pon tu clave: `DEEPSEEK_API_KEY=...` (clave de la [API de DeepSeek](https://platform.deepseek.com/)). La IA usa el modelo DeepSeek-V4.1-Flash (`deepseek-flash`) y pide las respuestas estructuradas con una herramienta forzada, que es el modo fiable de obtener JSON del modelo. Ese archivo no se sube a git.
 2. Reinicia `npm run dev`. El indicador de la barra superior pasa a **IA activa**: desde ese momento el asistente responde con la IA y cada hallazgo nuevo recibe una evaluación de la IA, sin necesidad de activar ningún interruptor.
 
 La IA solo existe con `npm run dev`, porque el servidor de desarrollo es el que guarda la clave. Un build estático (`npm run build`) funciona en modo local.
@@ -427,7 +427,7 @@ app/
 
 | Síntoma | Causa probable | Qué hacer |
 |---|---|---|
-| "IA inactiva" | No hay clave configurada | Crear `app/.env.local` con `DEEPSEEK_API_KEY` y reiniciar `npm run dev` |
+| "IA inactiva" | No hay clave configurada | Crear `app/.env.local` (o `app/.env`) con `DEEPSEEK_API_KEY` y reiniciar `npm run dev` |
 | El asistente dice "IA no disponible (…)" | Error de la API (clave inválida, límite de uso, sin internet) | El mensaje indica el motivo; mientras tanto responde el intérprete local |
 | No aparece el botón del micrófono | El navegador no tiene reconocimiento de voz | Usar Chrome |
 | No se escucha la voz | Voz silenciada o volumen en 0 | Revisar el control de voz de la barra superior |

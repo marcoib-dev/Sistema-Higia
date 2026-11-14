@@ -1,8 +1,9 @@
 /**
  * IA DE HIGIA — capa opcional que corre en la computadora del hábitat (aquí: el servidor de desarrollo).
  * Solo se usa con conexión; sin ella, la app sigue con el intérprete local.
- * Usa la API de DeepSeek (formato compatible con OpenAI) con el modelo DeepSeek-V4.1-Flash en modo de
- * pensamiento con esfuerzo bajo. La clave de API vive en el servidor (app/.env.local) y nunca llega al navegador.
+ * Usa la API de DeepSeek con el modelo DeepSeek-V4.1-Flash. Las respuestas estructuradas se piden con
+ * una herramienta (function calling) forzada, que es la única forma fiable de obtener JSON del modelo.
+ * La clave de API vive en el servidor (app/.env o app/.env.local) y nunca llega al navegador.
  */
 import * as z from 'zod';
 import {
@@ -14,7 +15,6 @@ import {
 /** `deepseek-flash` es el nombre de API de DeepSeek-V4.1-Flash. */
 export const MODELO = 'deepseek-flash';
 const URL_BASE = (process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').replace(/\/+$/, '');
-const ESFUERZO = 'low';
 
 export class ErrorIA extends Error {
   constructor(message: string, readonly status: number) {
@@ -39,25 +39,50 @@ class ErrorAPI extends Error {
 }
 
 /**
- * Pide una respuesta en JSON (modo `json_object`, con pensamiento activado en esfuerzo bajo)
- * y la valida con el esquema de Zod.
+ * Herramienta (function calling) generada a partir del esquema de Zod. Es la forma fiable de obtener
+ * JSON de DeepSeek-V4.1-Flash: su modo `response_format: json_object` devuelve `content` vacío y, sin
+ * él, el modelo tiende a responder en prosa. Con una herramienta, el formato lo impone el esquema y la
+ * respuesta llega en `tool_calls` (no se fuerza `tool_choice`: el modo de pensamiento no lo admite).
  */
-async function pedirJSON<T>(messages: Mensaje[], esquema: z.ZodType<T>): Promise<T> {
-  if (!iaConfigurada()) throw new ErrorIA('IA no configurada: agrega DEEPSEEK_API_KEY en app/.env.local.', 503);
+function herramienta<T>(nombre: string, esquema: z.ZodType<T>) {
+  return {
+    type: 'function' as const,
+    function: {
+      name: nombre,
+      description: 'Devuelve el resultado con el formato exacto que pide el sistema.',
+      parameters: z.toJSONSchema(esquema, { io: 'output' }) as Record<string, unknown>,
+    },
+  };
+}
+
+/**
+ * Una llamada a la API. Fuerza la herramienta para garantizar el JSON: el modelo tiene que responder
+ * llamándola (si no se fuerza, con este prompt largo tiende a contestar en prosa).
+ *
+ * No se usa el modo de pensamiento: DeepSeek-V4.1-Flash rechaza `tool_choice` cuando piensa
+ * ("Thinking mode does not support this tool_choice"), y su `response_format: json_object` devuelve
+ * `content` vacío en muchas conversaciones. Sin pensamiento y con la herramienta forzada, el JSON
+ * llega siempre en `tool_calls`.
+ *
+ * Lanza ErrorAPI si la API responde con error y ErrorIA si la respuesta es inservible.
+ */
+async function pedirUnaVez<T>(messages: Mensaje[], esquema: z.ZodType<T>, nombreHerramienta: string): Promise<T> {
+  const cuerpo: Record<string, unknown> = {
+    model: MODELO,
+    messages,
+    tools: [herramienta(nombreHerramienta, esquema)],
+    tool_choice: { type: 'function', function: { name: nombreHerramienta } },
+    // Hay que desactivarlo explícitamente: si se omite, DeepSeek lo activa por defecto.
+    thinking: { type: 'disabled' },
+    max_tokens: 16000,
+  };
 
   let res: Response;
   try {
     res = await fetch(`${URL_BASE}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}` },
-      body: JSON.stringify({
-        model: MODELO,
-        messages,
-        thinking: { type: 'enabled' },
-        reasoning_effort: ESFUERZO,
-        response_format: { type: 'json_object' },
-        max_tokens: 16000,
-      }),
+      body: JSON.stringify(cuerpo),
       signal: AbortSignal.timeout(120_000),
     });
   } catch (e) {
@@ -65,14 +90,22 @@ async function pedirJSON<T>(messages: Mensaje[], esquema: z.ZodType<T>): Promise
   }
 
   if (!res.ok) {
-    const cuerpo = await res.json().catch(() => null) as { error?: { message?: string } } | null;
-    throw new ErrorAPI(cuerpo?.error?.message ?? res.statusText, res.status);
+    const cuerpoError = await res.json().catch(() => null) as { error?: { message?: string } } | null;
+    throw new ErrorAPI(cuerpoError?.error?.message ?? res.statusText, res.status);
   }
 
-  const datos = await res.json() as { choices?: { message?: { content?: string | null }; finish_reason?: string }[] };
+  const datos = await res.json() as {
+    choices?: {
+      finish_reason?: string;
+      message?: { content?: string | null; tool_calls?: { function?: { name?: string; arguments?: string } }[] };
+    }[];
+  };
   const eleccion = datos.choices?.[0];
   if (eleccion?.finish_reason === 'content_filter') throw new ErrorIA('La IA no pudo responder a esa petición.', 422);
-  const texto = eleccion?.message?.content?.trim();
+
+  // Preferimos la herramienta; si el modelo respondió en texto, se intenta leer el JSON de ahí.
+  const llamada = eleccion?.message?.tool_calls?.find((t) => t.function?.name === nombreHerramienta) ?? eleccion?.message?.tool_calls?.[0];
+  const texto = llamada?.function?.arguments?.trim() || extraerJSON(eleccion?.message?.content ?? '');
   if (!texto) throw new ErrorIA('La IA devolvió una respuesta vacía.', 502);
 
   let json: unknown;
@@ -80,6 +113,39 @@ async function pedirJSON<T>(messages: Mensaje[], esquema: z.ZodType<T>): Promise
   const r = esquema.safeParse(json);
   if (!r.success) throw new ErrorIA('La IA devolvió una respuesta con un formato inesperado.', 502);
   return r.data;
+}
+
+/**
+ * Deja solo el objeto JSON de la respuesta: quita los bloques de código con los que a veces
+ * el modelo envuelve el JSON y, si hay texto alrededor, toma desde la primera `{` hasta la última `}`.
+ */
+function extraerJSON(texto: string): string {
+  const limpio = texto.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  const inicio = limpio.indexOf('{');
+  const fin = limpio.lastIndexOf('}');
+  return inicio !== -1 && fin > inicio ? limpio.slice(inicio, fin + 1) : '';
+}
+
+/**
+ * Pide una respuesta en JSON y la valida con el esquema de Zod.
+ *
+ * La respuesta se obtiene mediante una herramienta (function calling) cuyo esquema se genera desde
+ * Zod. Se reintenta si la respuesta llega vacía o ilegible; los errores de la API no se reintentan.
+ */
+async function pedirJSON<T>(messages: Mensaje[], esquema: z.ZodType<T>, nombreHerramienta: string): Promise<T> {
+  if (!iaConfigurada()) throw new ErrorIA('IA no configurada: agrega DEEPSEEK_API_KEY en app/.env o app/.env.local.', 503);
+
+  let ultimo: ErrorIA | null = null;
+  for (let intento = 0; intento < 3; intento++) {
+    try {
+      return await pedirUnaVez(messages, esquema, nombreHerramienta);
+    } catch (e) {
+      // Los errores de la API (clave inválida, saldo, límite, petición rechazada) no se reintentan.
+      if (!(e instanceof ErrorIA) || e.status !== 502) throw e;
+      ultimo = e;
+    }
+  }
+  throw ultimo ?? new ErrorIA('La IA no devolvió una respuesta.', 502);
 }
 
 // ── Conversación (NUI) ─────────────────────────────────────────────────
@@ -97,7 +163,7 @@ Cómo responder:
 
 Registro de datos: si el astronauta menciona un dato que puede registrarse (horas dormidas, ánimo del 1 al 10, minutos de ejercicio que acaba de hacer), inclúyelo en "lecturas". Si no menciona ninguno, deja "lecturas" vacía. No conviertas impresiones vagas en números: "dormí mal" no es un número de horas.
 
-Formato de salida: responde SIEMPRE con un único objeto JSON válido, sin texto fuera de él, con esta forma:
+Formato de salida: entrega la respuesta llamando a la herramienta "responder", con esta forma:
 {"respuesta": "texto que se le dirá al astronauta", "lecturas": [{"sensor": "horasSueno", "valor": 5}]}
 Valores permitidos para "sensor": ${SENSORES_CONVERSACION.map((s) => `"${s}"`).join(', ')}.`;
 
@@ -117,7 +183,7 @@ export async function conversar(p: PeticionConversacion): Promise<RespuestaConve
     { role: 'system', content: SISTEMA_CONVERSACION },
     ...historial,
     { role: 'user', content: `<estado>\n${JSON.stringify(p.estado)}\n</estado>\n\n${p.frase}` },
-  ], EsquemaConversacion);
+  ], EsquemaConversacion, 'responder');
 }
 
 // ── Evaluación de hallazgos ─────────────────────────────────────────────
@@ -132,7 +198,7 @@ Cómo evaluar:
 - Si el perfil es propenso al pánico o tiene baja tolerancia al estrés, o el hallazgo es sensible, usa un tono calmado y sin palabras alarmantes.
 - "evaluacion": de una a tres oraciones. "recomendacion": una oración con el siguiente paso concreto. Sin markdown ni emojis.
 
-Formato de salida: responde SIEMPRE con un único objeto JSON válido, sin texto fuera de él, con esta forma:
+Formato de salida: entrega el resultado llamando a la herramienta "evaluar_hallazgo", con esta forma:
 {"evaluacion": "...", "recomendacion": "..."}`;
 
 const EsquemaEvaluacion = z.object({ evaluacion: z.string().min(1), recomendacion: z.string() });
@@ -144,7 +210,7 @@ export async function evaluarHallazgo(p: PeticionEvaluacion): Promise<Evaluacion
       role: 'user',
       content: `<estado>\n${JSON.stringify(p.estado)}\n</estado>\n\n<hallazgo>\n${JSON.stringify(p.hallazgo)}\n</hallazgo>\n\n<mensaje_enviado>\n${p.mensaje}\n</mensaje_enviado>`,
     },
-  ], EsquemaEvaluacion);
+  ], EsquemaEvaluacion, 'evaluar_hallazgo');
 }
 
 // ── Entorno por cámara ─────────────────────────────────────────────────
@@ -157,7 +223,7 @@ Recibes una foto de la cámara del astronauta y el contexto que Higia cree actua
 - En "peligros", enumera riesgos visibles (persona caída, humo, sangre, equipo suelto, poca luz…). Lista vacía si no hay.
 - En "recomendacion", una oración breve sobre qué debería tener en cuenta Higia. Escribe en español.
 
-Formato de salida: responde SIEMPRE con un único objeto JSON válido, sin texto fuera de él, con esta forma:
+Formato de salida: entrega el resultado llamando a la herramienta "analizar_entorno", con esta forma:
 {"descripcion": "...", "ubicacion": "habitat", "destino": "luna", "actividad": "trabajo", "peligros": ["..."], "recomendacion": "..."}
 Valores permitidos: ubicacion ∈ "habitat" | "eva" | "rover" | "desconocida"; destino ∈ "orbita" | "luna" | "marte" | "desconocido"; actividad ∈ "reposo" | "trabajo" | "ejercicio" | "desconocida".`;
 
@@ -180,7 +246,7 @@ export async function analizarEntorno(p: PeticionEntorno): Promise<AnalisisEntor
         { type: 'text', text: `Contexto actual según Higia: ${JSON.stringify(p.contexto)}` },
       ],
     },
-  ], EsquemaEntorno);
+  ], EsquemaEntorno, 'analizar_entorno');
 }
 
 /** Traduce los errores de la API a mensajes claros para la UI. */
@@ -188,13 +254,13 @@ export function traducirError(e: unknown): ErrorIA {
   if (e instanceof ErrorIA) return e;
   if (e instanceof ErrorAPI) {
     switch (e.status) {
-      case 401: return new ErrorIA('Clave de API inválida. Revisa DEEPSEEK_API_KEY en app/.env.local.', 401);
+      case 401: return new ErrorIA('Clave de API inválida. Revisa DEEPSEEK_API_KEY en app/.env o app/.env.local.', 401);
       case 402: return new ErrorIA('Saldo insuficiente en la cuenta de DeepSeek.', 402);
       case 429: return new ErrorIA('Límite de uso de la API alcanzado; intenta en un momento.', 429);
       case 400: case 422: return new ErrorIA(`Petición rechazada por la API: ${e.message}`, 400);
       default: return new ErrorIA(`Error de la API de IA (${e.status}).`, 502);
     }
   }
-  if (!iaConfigurada()) return new ErrorIA('IA no configurada: agrega DEEPSEEK_API_KEY en app/.env.local.', 503);
+  if (!iaConfigurada()) return new ErrorIA('IA no configurada: agrega DEEPSEEK_API_KEY en app/.env o app/.env.local.', 503);
   return new ErrorIA(e instanceof Error ? e.message : 'Error desconocido en la IA.', 500);
 }
