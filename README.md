@@ -590,6 +590,7 @@ El plan completo está en [`PLAN_RIESGOS_Y_SIMULADOR.md`](PLAN_RIESGOS_Y_SIMULAD
 | Síntoma | Causa probable | Qué hacer |
 |---|---|---|
 | "IA inactiva" | No hay clave configurada | Crear `app/.env.local` (o `app/.env`) con `DEEPSEEK_API_KEY` y reiniciar `npm run dev` |
+| "IA inactiva" aunque haya clave en `.env` | La clave se agregó con la app abierta (la interfaz solo consulta el estado al cargar) o quedó vacía | Recargar la página: la barra superior debe decir **IA activa**. Si no, reiniciar `npm run dev` y comprobar que `http://localhost:5173/api/ia/estado` devuelve `"configurada": true` |
 | El asistente dice "IA no disponible (…)" | Error de la API (clave inválida, límite de uso, sin internet) | El mensaje indica el motivo; mientras tanto responde el intérprete local |
 | No aparece el botón del micrófono | El navegador no puede capturar audio o la página no está en localhost/HTTPS | Abrir `http://localhost:5173` (no una IP de la red) y comprobar que el navegador permite micrófono; para Vosk hace falta además el modelo descargado |
 | El botón del micrófono está, pero no transcribe nada en **Brave/Firefox/Chromium** | Falta el modelo de Vosk o no se pudo descargar | Ejecutar `npm run voz:modelo` en `app/`, recargar y aceptar el micrófono. La app muestra el motivo en la sección Higia |
