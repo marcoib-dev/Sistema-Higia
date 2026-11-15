@@ -51,6 +51,7 @@ export function VistaAsistente({ asistente: a, iaActiva, perfil, hallazgos, aler
         descripcion={`Hola, ${perfil.nombre.split(' ')[0]}. Di «Higia» y lo que necesitas, o escríbelo. Puedo consultar tu estado, avisar a otros y manejar la app por ti.`}
         acciones={(
           <>
+            {a.motorVoz === 'local' && <Etiqueta icono="microfono" tono="ia">Voz local</Etiqueta>}
             {iaActiva ? <Etiqueta icono="ia" tono="ia">IA activa</Etiqueta> : <Etiqueta icono="sinConexion">Modo local</Etiqueta>}
             <button className="boton boton-peligro" onClick={onPedirAyuda}><Icono nombre="alerta" /> Pedir ayuda</button>
           </>
@@ -79,8 +80,13 @@ export function VistaAsistente({ asistente: a, iaActiva, perfil, hallazgos, aler
         <div className={`escucha-estado ${a.estadoEscucha} ${a.dictando ? 'dictando' : ''}`} aria-live="polite">
           <span className="escucha-punto" aria-hidden />
           {estadoEscucha}
-          {a.detalleEscucha && <span className="texto-suave"> · {a.detalleEscucha}</span>}
+          {a.detalleEscucha && !a.problemaVoz && <span className="texto-suave"> · {a.detalleEscucha}</span>}
         </div>
+        {a.problemaVoz && (
+          <p className="aviso-voz" role="status">
+            <Icono nombre="alerta" tamano={14} /> {a.problemaVoz}
+          </p>
+        )}
         <div className="chat-historial" aria-live="polite">
           {cronologico.length === 0 && !a.pensando && (
             <div className="chat-bienvenida">

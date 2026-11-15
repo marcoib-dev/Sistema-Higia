@@ -28,3 +28,6 @@ npm-debug.log*
 # Documentos del desafío (solo locales)
 /DESAFIO_HEALTH_MONITOR.md
 /*.pdf
+
+# Modelo de voz local (39 MB): se descarga con `npm run voz:modelo`
+app/public/voz/*.tar.gz

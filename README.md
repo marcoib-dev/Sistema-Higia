@@ -50,14 +50,18 @@ Higia vigila la salud de astronautas que viven en hábitats permanentes (base lu
 
 ## Cómo correrlo
 
-**Requisitos:** Node.js 18 o superior. Se recomienda Chrome, porque es el navegador con reconocimiento de voz.
+**Requisitos:** Node.js 18 o superior y un micrófono.
+
+- **Google Chrome o Microsoft Edge:** usan el reconocimiento de voz del navegador (necesita internet).
+- **Brave, Firefox o Chromium:** usan **Vosk local** (funciona sin conexión). Hay que descargar el modelo español una vez con `npm run voz:modelo` (39 MB).
 
 ```bash
 cd app
 npm install
-npm run dev        # abre http://localhost:5173
-npm test           # tests del núcleo
-npm run build      # chequeo de tipos y build de producción
+npm run voz:modelo  # modelo de voz local en español (39 MB, una sola vez; no se sube a git)
+npm run dev         # abre http://localhost:5173
+npm test            # tests del núcleo
+npm run build       # chequeo de tipos y build de producción
 ```
 
 ### Documentos de referencia (no están en el repo)
@@ -362,7 +366,15 @@ En la barra superior: **silenciar o activar** la voz, **pausar y reanudar**, **d
 
 - Higia lee en voz alta los mensajes que van al auricular y las respuestas del asistente.
 - La síntesis de voz funciona sin conexión, con las voces del sistema.
-- El reconocimiento de voz (micrófono) usa el del navegador; en Chrome depende de servidores de Google, así que **todavía no es autónomo**.
+- El reconocimiento de voz tiene **dos motores** y la app elige sola:
+  - **Navegador (Web Speech API)**: Chrome y Edge. Es más preciso, pero en Chrome usa servidores de Google y **necesita internet**.
+  - **Local (Vosk + WebAssembly)**: Brave, Firefox, Chromium y cualquier navegador compatible. Transcribe **en el dispositivo**, sin enviar el audio a nadie y **sin conexión**. Usa el modelo español pequeño (`vosk-model-small-es-0.42`, 39 MB, licencia Apache 2.0).
+- El modelo se descarga una vez con `npm run voz:modelo`, se extrae en la primera carga y queda guardado en IndexedDB; después arranca al instante. Ocupa unos 300 MB de memoria mientras escucha.
+- Para forzar un motor: `VITE_VOSK_MOTOR=local` (Vosk, también en Chrome, para una demo sin conexión) o `VITE_VOSK_MOTOR=navegador`. `VITE_VOSK_MODELO` permite usar otro modelo. Se configuran en `app/.env.local`.
+- Debe abrirse en **localhost o HTTPS**: en una IP de la red local (por ejemplo `http://192.168.1.20:5173`) el navegador bloquea el micrófono.
+- Si el audio queda suspendido hasta que haya un gesto, la app pide **tocar la pantalla una vez**.
+- Con Vosk, «Higia» puede aparecer transcrito como «guía», «y jia», «igia»… La app acepta esas variantes al principio de la frase.
+- **Brave no transcribe con el motor del navegador** (expone la API pero bloquea el servicio de Google); por eso usa Vosk automáticamente.
 
 ### 11. Reportes y sistemas médicos (interfaz de ejemplo)
 
@@ -400,7 +412,7 @@ Nuevos (25): `fiebre`, `herpes`, `cinetosis-llegada`, `rover-mareo`, `arritmia`,
 
 ### Tests
 
-`npm test` (200 tests) verifica:
+`npm test` (211 tests) verifica:
 
 - **Canales:** EVA → auricular; lo privado nunca va a la pantalla compartida; retención durante el sueño; las alertas interrumpen de madrugada.
 - **Cuándo habla:** solo cuando cambia algo; recordatorios según la experiencia.
@@ -409,6 +421,7 @@ Nuevos (25): `fiebre`, `herpes`, `cinetosis-llegada`, `rover-mareo`, `arritmia`,
 - **Escalada:** confirmación, plazos, destinos, baliza y retardo según el destino.
 - **Contexto:** ejercicio y tormenta solar.
 - **Conversación:** el intérprete local registra datos (también números en palabras), síntomas con intensidad y responde consultas.
+- **Voz:** variantes con que el reconocedor escribe «Higia» (incluida «guía», típica de Vosk), diagnóstico por navegador y mensajes de error.
 - **Reglas** (`core/reglas/*.test.ts`): cada umbral, agravante, `bloquea`, `sensible` y `posibleIncapacidad` de las 36 reglas.
 - **Cobertura** (`core/cobertura.test.ts`): los 18 riesgos tienen regla y escenario; todo dato del catálogo lo usa alguna regla.
 - **Escenarios** (`adaptadores/simulador/escenarios.test.ts`): los 40 escenarios corren sobre un núcleo real y cumplen su `esperado`; toda alerta trae pasos.
@@ -445,6 +458,7 @@ Sensores / simulador / voz / cámara
 ```
 app/
 ├── server/                    IA: servidor de desarrollo con la clave (conversación y visión)
+├── scripts/                   Descarga del modelo de voz local (npm run voz:modelo)
 ├── src/
 │   ├── core/                  Núcleo autónomo (sin dependencias de UI)
 │   │   ├── tipos.ts           Contratos de datos
@@ -459,7 +473,7 @@ app/
 │   │   └── nucleo.test.ts     Tests
 │   ├── adaptadores/
 │   │   ├── simulador/         Escenarios (escenarios/), reproductor, registro, tripulación y astronautas
-│   │   ├── voz/               Síntesis y reconocimiento de voz
+│   │   ├── voz/               Síntesis, Web Speech y Vosk local (WASM)
 │   │   ├── camara/            Captura de imagen
 │   │   ├── ia/                Cliente de la IA y contrato con el servidor
 │   │   └── interop/           Exportación FHIR (ejemplo)
@@ -481,7 +495,7 @@ app/
 | **A. Detección** | `app/src/core/reglas/` | 36 reglas que cubren los 18 riesgos HRP, con contexto, agravantes y guías paso a paso | Validar umbrales con los anexos y kinesiología |
 | **B. Perfil, canales y escalada** | `app/src/core/personalizador.ts`, `canales.ts`, `nucleo.ts` | Texto por perfil, canal, sueño, privacidad, recordatorios, confirmación y escalada | Perfil que aprende del uso |
 | **C. Interfaz** | `app/src/ui/` | Navegación por secciones, figura anatómica, panel de demo, franja de alerta, íconos SVG | Gráficos de tendencia, vistas dedicadas "pantalla del hábitat" y "auricular" |
-| **D. Voz, IA e integración** | `app/src/adaptadores/`, `app/server/` | Web Speech API, IA híbrida (conversación y visión), FHIR de ejemplo | Reconocimiento de voz local (Vosk o whisper.cpp) |
+| **D. Voz, IA e integración** | `app/src/adaptadores/`, `app/server/` | Web Speech API, **Vosk local (WASM, sin conexión)**, IA híbrida (conversación y visión), FHIR de ejemplo | Detección de «Higia» sin transcribir toda la frase y modelo más preciso |
 
 ---
 
@@ -562,11 +576,15 @@ El plan completo está en [`PLAN_RIESGOS_Y_SIMULADOR.md`](PLAN_RIESGOS_Y_SIMULAD
 |---|---|---|
 | "IA inactiva" | No hay clave configurada | Crear `app/.env.local` (o `app/.env`) con `DEEPSEEK_API_KEY` y reiniciar `npm run dev` |
 | El asistente dice "IA no disponible (…)" | Error de la API (clave inválida, límite de uso, sin internet) | El mensaje indica el motivo; mientras tanto responde el intérprete local |
-| No aparece el botón del micrófono | El navegador no tiene reconocimiento de voz | Usar Chrome |
-| "Sin micrófono" / Higia no responde a su nombre | Permiso de micrófono denegado o escucha apagada | Permitir el micrófono para `localhost` y encender **Escuchar «Higia»** en la sección Higia |
+| No aparece el botón del micrófono | El navegador no puede capturar audio o la página no está en localhost/HTTPS | Abrir `http://localhost:5173` (no una IP de la red) y comprobar que el navegador permite micrófono; para Vosk hace falta además el modelo descargado |
+| El botón del micrófono está, pero no transcribe nada en **Brave/Firefox/Chromium** | Falta el modelo de Vosk o no se pudo descargar | Ejecutar `npm run voz:modelo` en `app/`, recargar y aceptar el micrófono. La app muestra el motivo en la sección Higia |
+| "Preparando voz local…" no avanza | El audio está suspendido, el modelo se está extrayendo o faltan permisos | Tocar la pantalla una vez, esperar la primera extracción (39 MB) y revisar la pestaña Red/Consola |
+| Quiero Vosk en Chrome o la demo sin internet | Chrome usa el motor del navegador por defecto | Poner `VITE_VOSK_MOTOR=local` en `app/.env.local` y reiniciar `npm run dev` |
+| "Sin micrófono" / Higia no responde a su nombre | Permiso de micrófono denegado, escucha apagada o micrófono no detectado | Revisar el candado de la barra de direcciones, permitir el micrófono para `localhost`, comprobar el micrófono del sistema y encender **Escuchar «Higia»** en la sección Higia |
+| La IA no funciona después de `npm run build` | El build estático no incluye el servidor de IA | Usar `npm run dev` para la demo con IA |
+| La voz local no funciona después de `npm run build` | Falta el modelo en `dist/` | El build copia `public/voz`; si se borró, volver a ejecutar `npm run voz:modelo` y `npm run build` |
 | No se escucha la voz | Voz silenciada o volumen en 0 | Revisar el control de voz de la barra superior |
 | "No se pudo acceder a la cámara" | Permiso denegado en el navegador | Habilitar la cámara para `localhost` en la configuración del navegador |
-| La IA no funciona después de `npm run build` | El build estático no incluye el servidor de IA | Usar `npm run dev` para la demo con IA |
 
 ---
 
@@ -577,4 +595,6 @@ El plan completo está en [`PLAN_RIESGOS_Y_SIMULADOR.md`](PLAN_RIESGOS_Y_SIMULAD
 - La integración con sistemas médicos es una **interfaz de ejemplo**, no una API real de la NASA.
 - Los plazos de escalada (30 s y 15 s) son cortos para la demo; en un sistema real se definirían con criterio médico.
 - La IA envía a la API de DeepSeek el estado de salud (sin nombre) y las fotos que se analizan. Cada consulta tiene costo según el uso de la clave.
-- El reconocimiento de voz del navegador (Chrome) usa servidores externos. La síntesis de voz sí funciona sin conexión.
+- El reconocimiento de voz del navegador (Chrome/Edge) usa servidores externos; el motor **Vosk local no envía el audio a ningún lado**. La síntesis de voz usa las voces del sistema.
+- El modelo de Vosk (39 MB) **no se sube a git**: se descarga con `npm run voz:modelo`. Vosk local ocupa unos 300 MB de memoria mientras escucha.
+- Vosk es Apache 2.0 y el modelo español también; se puede usar en la demo sin restricciones.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectarLlamado } from './voz';
+import { detectarLlamado, diagnosticoReconocimiento, mensajeErrorReconocimiento } from './voz';
 
 describe('palabra clave «Higia»', () => {
   it('separa el pedido del nombre', () => {
@@ -10,6 +10,10 @@ describe('palabra clave «Higia»', () => {
 
   it('acepta las variantes con que el reconocedor escribe el nombre', () => {
     for (const v of ['Igia', 'Hijia', 'IGIA', 'Hygeia', 'Higea']) expect(detectarLlamado(`${v} estoy bien`)).toEqual({ llamado: true, resto: 'estoy bien' });
+    // Vosk en español suele transcribir «Higia» como «guía», a veces con una «y» delante.
+    expect(detectarLlamado('guía pide ayuda')).toEqual({ llamado: true, resto: 'pide ayuda' });
+    expect(detectarLlamado('y guía pide ayuda')).toEqual({ llamado: true, resto: 'pide ayuda' });
+    expect(detectarLlamado('y jia pide ayuda')).toEqual({ llamado: true, resto: 'pide ayuda' });
   });
 
   it('solo el nombre: llamado sin pedido (se espera la frase siguiente)', () => {
@@ -20,5 +24,38 @@ describe('palabra clave «Higia»', () => {
     expect(detectarLlamado('le dije a Higia que me ayude').llamado).toBe(false);
     expect(detectarLlamado('hija, ven aquí').llamado).toBe(false);
     expect(detectarLlamado('pide ayuda').llamado).toBe(false);
+  });
+});
+
+describe('diagnóstico del reconocimiento de voz', () => {
+  it('avisa cuando el navegador no expone la API', () => {
+    const m = diagnosticoReconocimiento({ disponible: false, seguro: true, agente: 'Mozilla/5.0 Firefox/130.0' });
+    expect(m).toMatch(/no tiene reconocimiento de voz/i);
+  });
+
+  it('distingue el contexto no seguro (IP o http)', () => {
+    const m = diagnosticoReconocimiento({ disponible: false, seguro: false, agente: 'Mozilla/5.0 Chrome/120' });
+    expect(m).toMatch(/HTTPS o en localhost/i);
+  });
+
+  it('detecta Brave, que expone la API pero no transcribe', () => {
+    const m = diagnosticoReconocimiento({ disponible: true, seguro: true, agente: 'Mozilla/5.0 Chrome/156 Safari/537.36 Brave/156' });
+    expect(m).toMatch(/Brave/i);
+    expect(m).toMatch(/Chrome|Edge/i);
+    // Brave puede ocultar su marca en el user agent: navigator.brave lo delata.
+    expect(diagnosticoReconocimiento({ disponible: true, seguro: true, agente: 'Mozilla/5.0 Chrome/156', brave: true })).toMatch(/Brave/i);
+  });
+
+  it('no inventa problemas en Chrome sobre localhost', () => {
+    expect(diagnosticoReconocimiento({ disponible: true, seguro: true, agente: 'Mozilla/5.0 Chrome/156' })).toBeUndefined();
+  });
+});
+
+describe('errores del reconocedor', () => {
+  it('explica los más comunes', () => {
+    expect(mensajeErrorReconocimiento('not-allowed')).toMatch(/permiso/i);
+    expect(mensajeErrorReconocimiento('audio-capture')).toMatch(/micrófono/i);
+    expect(mensajeErrorReconocimiento('network')).toMatch(/Brave|Chrome|internet/i);
+    expect(mensajeErrorReconocimiento('otro')).toMatch(/falló.*otro/i);
   });
 });

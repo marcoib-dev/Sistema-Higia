@@ -41,7 +41,7 @@ export function BarraSuperior({ contexto: c, nombreAstronauta, iaActiva, iaConfi
         </li>
         <li className={`escucha-${escucha}`} title={TEXTO_ESCUCHA[escucha]}>
           <Icono nombre="microfono" tamano={16} />
-          <span className="indicador-texto">{escucha === 'llamado' ? 'Te escucho' : escucha === 'esperando' ? '«Higia»' : escucha === 'error' ? 'Sin micrófono' : 'Escucha apagada'}</span>
+          <span className="indicador-texto">{escucha === 'llamado' ? 'Te escucho' : escucha === 'esperando' ? '«Higia»' : escucha === 'cargando' ? 'Voz local…' : escucha === 'error' ? 'Sin micrófono' : 'Escucha apagada'}</span>
         </li>
         <li title="Astronauta">
           <Icono nombre="usuario" tamano={16} />{nombreAstronauta}

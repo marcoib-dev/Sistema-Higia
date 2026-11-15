@@ -4,7 +4,8 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  detectarLlamado, detener, escuchar, escucharPalabraClave, estadoVoz, hablar, reconocimientoDisponible, type EstadoEscucha,
+  detectarLlamado, detener, escucharFrase, escucharPalabraClave, estadoVoz, hablar,
+  motivoSinReconocimiento, motorVozPreferido, type EstadoEscucha, type MotorVoz,
 } from '../adaptadores/voz/voz';
 
 export interface Intercambio {
@@ -39,6 +40,10 @@ export interface Asistente {
   /** Micrófono manual (sin palabra clave) abierto. */
   dictando: boolean;
   micDisponible: boolean;
+  /** Motor elegido: Vosk local, el del navegador o ninguno. */
+  motorVoz: MotorVoz;
+  /** Aviso persistente: por qué el reconocimiento de voz no puede funcionar (Brave, sin permiso, etc.). */
+  problemaVoz?: string;
   enviar: (frase: string, origen?: 'voz' | 'texto') => Promise<void>;
   /** Higia habla por iniciativa propia (p. ej. empieza un chequeo de orientación tras un golpe). */
   decir: (texto: string, hechos?: string[]) => void;
@@ -53,7 +58,11 @@ export function useAsistente(onFrase: (frase: string) => Promise<ResultadoConver
   const [estadoEscucha, setEstadoEscucha] = useState<EstadoEscucha>('apagada');
   const [detalleEscucha, setDetalleEscucha] = useState<string>();
   const [dictando, setDictando] = useState(false);
-  const micDisponible = reconocimientoDisponible();
+  const motorVoz = motorVozPreferido();
+  const micDisponible = motorVoz !== 'ninguno';
+  // Con Web Speech, Brave y algunos Chromium exponen la API pero nunca devuelven texto:
+  // avisar antes de que falle en silencio. Con Vosk local no hace falta ese aviso.
+  const [problemaVoz, setProblemaVoz] = useState<string | undefined>(() => (motorVoz === 'navegador' ? motivoSinReconocimiento() : undefined));
 
   // Referencias a lo último, para los callbacks del reconocedor (que viven más que un render).
   const onFraseRef = useRef(onFrase);
@@ -72,6 +81,7 @@ export function useAsistente(onFrase: (frase: string) => Promise<ResultadoConver
     try {
       const r = await onFraseRef.current(f);
       setHistorial((prev) => [{ id: Date.now(), pregunta: f, respuesta: r.texto, fuente: r.fuente, hechos: r.hechos, origen, nota: r.nota }, ...prev].slice(0, 40));
+      if (origen === 'voz') setProblemaVoz(undefined); // el reconocimiento funcionó
       if (vozRef.current) hablar(r.texto);
     } finally {
       pensandoRef.current = false;
@@ -81,18 +91,28 @@ export function useAsistente(onFrase: (frase: string) => Promise<ResultadoConver
 
   // Escucha por palabra clave: se apaga mientras se dicta con el micrófono manual.
   useEffect(() => {
-    if (!escuchaActiva || dictando || !micDisponible) {
-      if (!micDisponible && escuchaActiva) { setEstadoEscucha('error'); setDetalleEscucha('Este navegador no tiene reconocimiento de voz (usa Chrome o Edge).'); }
+    if (!escuchaActiva || dictando) return;
+    if (motorVoz === 'ninguno') {
+      const motivo = motivoSinReconocimiento() ?? 'Este navegador no tiene reconocimiento de voz (usa Chrome o Edge).';
+      setEstadoEscucha('error');
+      setDetalleEscucha(motivo);
+      setProblemaVoz(motivo);
       return;
     }
     const parar = escucharPalabraClave({
+      motor: motorVoz,
       onComando: (t) => { detener(); void enviar(t, 'voz'); },
-      onEstado: (e, d) => { setEstadoEscucha(e); setDetalleEscucha(d); },
+      onEstado: (e, d) => {
+        setEstadoEscucha(e);
+        setDetalleEscucha(d);
+        if (e === 'error' && d) setProblemaVoz(d);
+        if (e === 'esperando' || e === 'llamado') setProblemaVoz(undefined);
+      },
       // Mientras Higia habla no se escucha a sí misma.
       ignorar: () => estadoVoz() === 'hablando',
     });
     return parar;
-  }, [escuchaActiva, dictando, micDisponible, enviar]);
+  }, [escuchaActiva, dictando, motorVoz, enviar]);
 
   const decir = useCallback((texto: string, hechos: string[] = []) => {
     setHistorial((prev) => [{ id: Date.now(), pregunta: '', respuesta: texto, fuente: 'local' as const, hechos, origen: 'voz' as const }, ...prev].slice(0, 40));
@@ -108,8 +128,18 @@ export function useAsistente(onFrase: (frase: string) => Promise<ResultadoConver
   // Micrófono manual: arranca después de que se apague la escucha por palabra clave (un solo reconocedor a la vez).
   useEffect(() => {
     if (!dictando) return;
-    return escuchar((t) => void enviar(t, 'voz'), () => setDictando(false));
-  }, [dictando, enviar]);
+    let cancelar: (() => void) | undefined;
+    // Pequeña espera: el motor nativo de Chrome no permite iniciar un reconocedor mientras el anterior se cierra.
+    const arranque = setTimeout(() => {
+      cancelar = escucharFrase(
+        (t) => void enviar(t, 'voz'),
+        () => setDictando(false),
+        (m) => { setProblemaVoz(m); setDetalleEscucha(m); },
+        motorVoz,
+      );
+    }, 150);
+    return () => { clearTimeout(arranque); cancelar?.(); };
+  }, [dictando, enviar, motorVoz]);
 
   /** Micrófono manual: una frase, sin necesidad de decir «Higia». */
   const dictar = () => {
@@ -117,11 +147,12 @@ export function useAsistente(onFrase: (frase: string) => Promise<ResultadoConver
     setDictando(true);
   };
 
-  return { historial, pensando, escuchaActiva, estadoEscucha, detalleEscucha, dictando, micDisponible, enviar, decir, alternarEscucha, dictar };
+  return { historial, pensando, escuchaActiva, estadoEscucha, detalleEscucha, dictando, micDisponible, motorVoz, problemaVoz, enviar, decir, alternarEscucha, dictar };
 }
 
 export const TEXTO_ESCUCHA: Record<EstadoEscucha, string> = {
   apagada: 'Escucha apagada',
+  cargando: 'Preparando voz local…',
   esperando: 'Di «Higia» para hablarle',
   llamado: 'Te escucho…',
   error: 'Escucha no disponible',

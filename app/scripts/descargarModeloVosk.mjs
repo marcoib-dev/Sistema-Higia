@@ -1,0 +1,46 @@
+/**
+ * Descarga el modelo español pequeño de Vosk y lo empaqueta como tar.gz, que es el formato
+ * que espera vosk-browser. El archivo queda en public/voz/ y no se sube a git.
+ *
+ *   npm run voz:modelo            # descarga si falta
+ *   npm run voz:modelo -- --forzar
+ */
+import { execFileSync } from 'node:child_process';
+import { createWriteStream } from 'node:fs';
+import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+
+const MODELO = 'vosk-model-small-es-0.42';
+const URL_MODELO = `https://alphacephei.com/vosk/models/${MODELO}.zip`;
+const DESTINO = path.resolve('public/voz', `${MODELO}.tar.gz`);
+const FORZAR = process.argv.includes('--forzar');
+
+const existe = await stat(DESTINO).then((s) => s.size > 30 * 1024 * 1024).catch(() => false);
+if (existe && !FORZAR) {
+  console.log(`Ya existe ${path.relative(process.cwd(), DESTINO)} (usa --forzar para volver a descargarlo).`);
+  process.exit(0);
+}
+
+const temporal = await mkdtemp(path.join(tmpdir(), 'vosk-'));
+const zip = path.join(temporal, `${MODELO}.zip`);
+try {
+  console.log(`Descargando ${URL_MODELO} …`);
+  const respuesta = await fetch(URL_MODELO);
+  if (!respuesta.ok || !respuesta.body) throw new Error(`No se pudo descargar el modelo: HTTP ${respuesta.status}`);
+  await pipeline(Readable.fromWeb(respuesta.body), createWriteStream(zip));
+
+  console.log('Descomprimiendo…');
+  execFileSync('unzip', ['-q', zip, '-d', temporal]);
+
+  await mkdir(path.dirname(DESTINO), { recursive: true });
+  console.log('Empaquetando como tar.gz…');
+  execFileSync('tar', ['-czf', DESTINO, '-C', temporal, MODELO]);
+
+  const { size } = await stat(DESTINO);
+  console.log(`Listo: ${path.relative(process.cwd(), DESTINO)} (${(size / 1024 / 1024).toFixed(1)} MB)`);
+} finally {
+  await rm(temporal, { recursive: true, force: true });
+}
