@@ -18,6 +18,28 @@ const URL_MODELO = `https://alphacephei.com/vosk/models/${MODELO}.zip`;
 const DESTINO = path.resolve('public/voz', `${MODELO}.tar.gz`);
 const FORZAR = process.argv.includes('--forzar');
 
+/**
+ * Descomprime el .zip sin depender de `unzip`, que no viene en Windows.
+ * `tar` de Windows y de macOS (bsdtar) lee zip; en Linux se usa `unzip` y, si falta, `unzip -q`.
+ */
+function extraerZip(zip, destino) {
+  const conUnzip = () => execFileSync('unzip', ['-q', zip, '-d', destino], { stdio: 'ignore' });
+  const conTar = () => execFileSync('tar', ['-xf', zip, '-C', destino], { stdio: 'ignore' });
+  const intentos = process.platform === 'linux' ? [conUnzip, conTar] : [conTar, conUnzip];
+  let ultimoError;
+  for (const intento of intentos) {
+    try {
+      intento();
+      return;
+    } catch (e) {
+      ultimoError = e;
+    }
+  }
+  throw new Error(
+    `No se pudo descomprimir ${zip}. Instala "unzip" o descomprime el archivo a mano. (${ultimoError?.message})`,
+  );
+}
+
 const existe = await stat(DESTINO).then((s) => s.size > 30 * 1024 * 1024).catch(() => false);
 if (existe && !FORZAR) {
   console.log(`Ya existe ${path.relative(process.cwd(), DESTINO)} (usa --forzar para volver a descargarlo).`);
@@ -33,7 +55,7 @@ try {
   await pipeline(Readable.fromWeb(respuesta.body), createWriteStream(zip));
 
   console.log('Descomprimiendo…');
-  execFileSync('unzip', ['-q', zip, '-d', temporal]);
+  extraerZip(zip, temporal);
 
   await mkdir(path.dirname(DESTINO), { recursive: true });
   console.log('Empaquetando como tar.gz…');
