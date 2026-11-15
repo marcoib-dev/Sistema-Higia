@@ -14,6 +14,7 @@ import { INFO_SENSOR, ORDEN_NIVEL, type Hallazgo, type Lectura, type TipoSensor 
 import { hablar } from '../../adaptadores/voz/voz';
 import { EncabezadoSeccion, Etiqueta, InsigniaNivel } from '../componentes/basicos';
 import { Icono, type NombreIcono } from '../iconos';
+import { useT } from '../idioma';
 
 interface Props {
   nucleo: NucleoSalud;
@@ -71,9 +72,9 @@ const FICHAS: Ficha[] = [
 
 const coma = (x: string | number) => String(x).replace('.', ',');
 
-const hace = (t: number, ahora: number) => {
-  const min = Math.round((ahora - t) / 60_000);
-  return min < 1 ? 'ahora' : min < 60 ? `hace ${min} min` : min < 48 * 60 ? `hace ${Math.round(min / 60)} h` : `hace ${Math.round(min / 1440)} días`;
+const hace = (t: (s: string, v?: Record<string, string | number>) => string, ts: number, ahora: number) => {
+  const min = Math.round((ahora - ts) / 60_000);
+  return min < 1 ? t('ahora') : min < 60 ? t('hace {n} min', { n: min }) : min < 48 * 60 ? t('hace {n} h', { n: Math.round(min / 60) }) : t('hace {n} días', { n: Math.round(min / 1440) });
 };
 
 /** Contraindicaciones según lo que Higia ya sabe (hallazgos, últimas lecturas, contexto, historia clínica). */
@@ -98,6 +99,7 @@ function contraindicaciones(prueba: PruebaGuiada, n: NucleoSalud): string[] {
 }
 
 export function VistaPruebas({ nucleo: n, vozActiva, pedida, onPedidaAtendida, onRegistrar, onEvaluacionCognitiva, onChequeoOrientacion }: Props) {
+  const t = useT();
   const [abierta, setAbierta] = useState<PruebaGuiada | null>(null);
   const panel = useRef<HTMLDivElement>(null);
   const ahora = Date.now();
@@ -126,8 +128,8 @@ export function VistaPruebas({ nucleo: n, vozActiva, pedida, onPedidaAtendida, o
   return (
     <div className="pruebas">
       <EncabezadoSeccion
-        titulo="Pruebas a bordo"
-        descripcion="Pruebas breves que Higia guía y evalúa en el dispositivo, sin conexión. Cada resultado se compara con tu valor habitual antes del vuelo."
+        titulo={t('Pruebas a bordo')}
+        descripcion={t('Pruebas breves que Higia guía y evalúa en el dispositivo, sin conexión. Cada resultado se compara con tu valor habitual antes del vuelo.')}
       />
 
       <div ref={panel} className="ancla-prueba">
@@ -147,24 +149,24 @@ export function VistaPruebas({ nucleo: n, vozActiva, pedida, onPedidaAtendida, o
               <div className="tarjeta-prueba-cab">
                 <span className={`prueba-icono ${f.tono}`}><Icono nombre={f.icono} tamano={22} /></span>
                 <div>
-                  <h2>{f.nombre}</h2>
-                  <div className="prueba-meta"><Etiqueta icono="reloj">{f.duracion}</Etiqueta><Etiqueta tono="nasa">{f.riesgo}</Etiqueta></div>
+                  <h2>{t(f.nombre)}</h2>
+                  <div className="prueba-meta"><Etiqueta icono="reloj">{f.duracion}</Etiqueta><Etiqueta tono="nasa">{t(f.riesgo)}</Etiqueta></div>
                 </div>
               </div>
-              <p className="que-mide">{f.queMide}</p>
+              <p className="que-mide">{t(f.queMide)}</p>
               <div className="prueba-resultado">
                 {ult ? (
                   <>
                     <b>{f.formato(ult.valor)}</b>
                     <InsigniaNivel nivel={nivel} />
-                    <small>{hace(ult.timestamp, ahora)}{base !== undefined ? ` · habitual ${f.formato(base)}` : ''}</small>
+                    <small>{hace(t, ult.timestamp, ahora)}{base !== undefined ? ` · ${t('habitual {v}', { v: f.formato(base) })}` : ''}</small>
                   </>
-                ) : <small>Todavía no hay resultados.</small>}
+                ) : <small>{t('Todavía no hay resultados.')}</small>}
               </div>
               <div className="prueba-pie">
-                <small className="texto-suave">{f.id === 'cognitiva' || f.id === 'orientacion' ? 'Se hace conversando con Higia' : 'Guiada paso a paso'}</small>
+                <small className="texto-suave">{f.id === 'cognitiva' || f.id === 'orientacion' ? t('Se hace conversando con Higia') : t('Guiada paso a paso')}</small>
                 <button className="boton boton-primario" onClick={() => empezar(f)} disabled={abierta === f.id}>
-                  <Icono nombre="reproducir" tamano={16} /> Empezar
+                  <Icono nombre="reproducir" tamano={16} /> {t('Empezar')}
                 </button>
               </div>
             </article>
@@ -188,6 +190,7 @@ interface PropsPrueba {
 function CuentaAtras({ segundos, etiqueta, esfuerzo, alTerminar, children }: {
   segundos: number; etiqueta: string; esfuerzo?: boolean; alTerminar: () => void; children?: ReactNode;
 }) {
+  const t = useT();
   const [resta, setResta] = useState(segundos);
   const fin = useRef(alTerminar);
   fin.current = alTerminar;
@@ -204,7 +207,7 @@ function CuentaAtras({ segundos, etiqueta, esfuerzo, alTerminar, children }: {
   const C = 2 * Math.PI * 70;
   return (
     <div className="cuenta-atras">
-      <div className={`anillo ${esfuerzo ? 'esfuerzo' : ''}`} role="timer" aria-label={`${etiqueta}: ${resta} segundos`}>
+      <div className={`anillo ${esfuerzo ? 'esfuerzo' : ''}`} role="timer" aria-label={t('{etiqueta}: {n} segundos', { etiqueta, n: resta })}>
         <svg viewBox="0 0 160 160" aria-hidden>
           <circle className="fondo-anillo" cx="80" cy="80" r="70" />
           <circle className="avance" cx="80" cy="80" r="70" strokeDasharray={C} strokeDashoffset={C * (1 - resta / segundos)} />
@@ -217,14 +220,15 @@ function CuentaAtras({ segundos, etiqueta, esfuerzo, alTerminar, children }: {
 }
 
 function Advertencias({ motivos }: { motivos: string[] }) {
+  const t = useT();
   if (!motivos.length) return null;
   return (
     <div className="advertencia-prueba" role="alert">
       <Icono nombre="alerta" />
       <div>
-        <strong>Higia no recomienda hacer esta prueba ahora.</strong>
+        <strong>{t('Higia no recomienda hacer esta prueba ahora.')}</strong>
         <ul>{motivos.map((m) => <li key={m}>{m}</li>)}</ul>
-        Si la haces igual, que sea con un compañero al lado.
+        {t('Si la haces igual, que sea con un compañero al lado.')}
       </div>
     </div>
   );
@@ -244,6 +248,7 @@ const r1 = (x: number) => Math.round(x * 2) / 2;
 // ── Fuerza isométrica ──────────────────────────────────────────────────
 
 function PruebaIsometrica({ n, decir, onCancelar, onRegistrar }: PropsPrueba) {
+  const t = useT();
   const PASOS = [
     'Siéntate derecho, con el codo a 90° pegado al cuerpo y la muñeca recta.',
     'Intento 1: aprieta el dinamómetro con toda tu fuerza durante 5 segundos. No contengas el aire.',
@@ -265,32 +270,32 @@ function PruebaIsometrica({ n, decir, onCancelar, onRegistrar }: PropsPrueba) {
   const avanzar = () => setPaso((p) => Math.min(PASOS.length - 1, p + 1));
 
   return (
-    <section className="tarjeta panel-prueba" aria-label="Prueba de fuerza isométrica">
+    <section className="tarjeta panel-prueba" aria-label={t('Prueba de fuerza isométrica')}>
       <div className="tarjeta-cab">
-        <h2 className="titulo-tarjeta"><Icono nombre="mano" /> Fuerza isométrica · dinamómetro de mano</h2>
-        <button className="boton-icono" onClick={onCancelar} aria-label="Cancelar la prueba"><Icono nombre="cerrar" /></button>
+        <h2 className="titulo-tarjeta"><Icono nombre="mano" /> {t('Fuerza isométrica · dinamómetro de mano')}</h2>
+        <button className="boton-icono" onClick={onCancelar} aria-label={t('Cancelar la prueba')}><Icono nombre="cerrar" /></button>
       </div>
       <Advertencias motivos={motivos} />
       <div className="panel-prueba-cuerpo">
         <Pasos pasos={PASOS} actual={paso} />
         <div>
-          {paso === 0 && <button className="boton boton-primario" onClick={avanzar}>Estoy listo</button>}
-          {paso === 1 && <CuentaAtras segundos={5} etiqueta="¡aprieta!" esfuerzo alTerminar={avanzar} />}
-          {paso === 2 && <CuentaAtras segundos={10} etiqueta="descansa" alTerminar={avanzar} />}
-          {paso === 3 && <CuentaAtras segundos={5} etiqueta="¡aprieta!" esfuerzo alTerminar={avanzar} />}
+          {paso === 0 && <button className="boton boton-primario" onClick={avanzar}>{t('Estoy listo')}</button>}
+          {paso === 1 && <CuentaAtras segundos={5} etiqueta={t('¡aprieta!')} esfuerzo alTerminar={avanzar} />}
+          {paso === 2 && <CuentaAtras segundos={10} etiqueta={t('descansa')} alTerminar={avanzar} />}
+          {paso === 3 && <CuentaAtras segundos={5} etiqueta={t('¡aprieta!')} esfuerzo alTerminar={avanzar} />}
           {paso === 4 && (
             <div className="lectura-sim">
               <div className="campos">
                 {intentos.map((v, i) => (
                   <label key={i} className="campo">
-                    <span className="campo-etiqueta">Intento {i + 1} (kg)</span>
+                    <span className="campo-etiqueta">{t('Intento {n} (kg)', { n: i + 1 })}</span>
                     <input type="number" step={0.5} min={5} max={90} value={v}
                       onChange={(e) => setIntentos((xs) => { const c = [...xs] as [number, number]; c[i] = Number(e.target.value); return c; })} />
                   </label>
                 ))}
               </div>
-              <p className="resultado-calc">Mejor intento: <b>{coma(mejor)} kg</b> · habitual {coma(base)} kg ({caida > 0 ? '−' : '+'}{Math.abs(Math.round(caida * 100))} %)</p>
-              <small className="nota">Lectura simulada del dinamómetro; puedes corregirla.</small>
+              <p className="resultado-calc">{t('Mejor intento:')} <b>{coma(mejor)} kg</b> · {t('habitual {v}', { v: `${coma(base)} kg` })} ({caida > 0 ? '−' : '+'}{Math.abs(Math.round(caida * 100))} %)</p>
+              <small className="nota">{t('Lectura simulada del dinamómetro; puedes corregirla.')}</small>
             </div>
           )}
         </div>
@@ -300,10 +305,10 @@ function PruebaIsometrica({ n, decir, onCancelar, onRegistrar }: PropsPrueba) {
           <button className="boton boton-ok" onClick={() => onRegistrar(
             [{ sensor: 'fuerzaIsometrica', valor: mejor, timestamp: Date.now(), fuente: 'sensor' }],
             `Prueba de fuerza isométrica: ${coma(mejor)} kilos, tu habitual es ${coma(base)}.`,
-          )}><Icono nombre="check" /> Registrar resultado</button>
+          )}><Icono nombre="check" /> {t('Registrar resultado')}</button>
         )}
-        {paso > 0 && paso < 4 && <button className="boton" onClick={avanzar}>Saltar paso</button>}
-        <button className="boton boton-fantasma" onClick={onCancelar}>Cancelar</button>
+        {paso > 0 && paso < 4 && <button className="boton" onClick={avanzar}>{t('Saltar paso')}</button>}
+        <button className="boton boton-fantasma" onClick={onCancelar}>{t('Cancelar')}</button>
       </div>
     </section>
   );
@@ -312,6 +317,7 @@ function PruebaIsometrica({ n, decir, onCancelar, onRegistrar }: PropsPrueba) {
 // ── Maniobra de Valsalva ───────────────────────────────────────────────
 
 function PruebaValsalva({ n, decir, onCancelar, onRegistrar }: PropsPrueba) {
+  const t = useT();
   const PASOS = [
     'Siéntate derecho con el monitor cardíaco puesto y la boquilla del manómetro en la mano.',
     'Toma aire y sopla contra la boquilla manteniendo la aguja en 40 mmHg durante 15 segundos.',
@@ -343,39 +349,39 @@ function PruebaValsalva({ n, decir, onCancelar, onRegistrar }: PropsPrueba) {
   const avanzar = () => setPaso((p) => Math.min(PASOS.length - 1, p + 1));
 
   return (
-    <section className="tarjeta panel-prueba" aria-label="Maniobra de Valsalva">
+    <section className="tarjeta panel-prueba" aria-label={t('Maniobra de Valsalva')}>
       <div className="tarjeta-cab">
-        <h2 className="titulo-tarjeta"><Icono nombre="corazon" /> Maniobra de Valsalva · reflejo autonómico</h2>
-        <button className="boton-icono" onClick={onCancelar} aria-label="Cancelar la prueba"><Icono nombre="cerrar" /></button>
+        <h2 className="titulo-tarjeta"><Icono nombre="corazon" /> {t('Maniobra de Valsalva · reflejo autonómico')}</h2>
+        <button className="boton-icono" onClick={onCancelar} aria-label={t('Cancelar la prueba')}><Icono nombre="cerrar" /></button>
       </div>
       <Advertencias motivos={motivos} />
       <div className="panel-prueba-cuerpo">
         <Pasos pasos={PASOS} actual={paso} />
         <div>
-          {paso === 0 && <button className="boton boton-primario" onClick={avanzar}>{motivos.length ? 'Hacerla igual' : 'Estoy listo'}</button>}
+          {paso === 0 && <button className="boton boton-primario" onClick={avanzar}>{motivos.length ? t('Hacerla igual') : t('Estoy listo')}</button>}
           {paso === 1 && (
-            <CuentaAtras segundos={15} etiqueta="sopla" esfuerzo alTerminar={avanzar}>
-              <div className="manometro" aria-label={`Manómetro: ${presion} mmHg`}>
-                <span>Manómetro: <b>{presion} mmHg</b> (objetivo 40)</span>
+            <CuentaAtras segundos={15} etiqueta={t('sopla')} esfuerzo alTerminar={avanzar}>
+              <div className="manometro" aria-label={t('Manómetro: {n} mmHg', { n: presion })}>
+                <span>{t('Manómetro:')} <b>{presion} mmHg</b> ({t('objetivo 40')})</span>
                 <div className="manometro-pista"><span style={{ width: `${Math.min(100, (presion / 60) * 100)}%` }} /><i /></div>
               </div>
             </CuentaAtras>
           )}
-          {paso === 2 && <CuentaAtras segundos={15} etiqueta="respira" alTerminar={avanzar} />}
+          {paso === 2 && <CuentaAtras segundos={15} etiqueta={t('respira')} alTerminar={avanzar} />}
           {paso === 3 && (
             <div className="lectura-sim">
               <div className="campos">
                 <label className="campo">
-                  <span className="campo-etiqueta">Pulso máximo al soplar</span>
+                  <span className="campo-etiqueta">{t('Pulso máximo al soplar')}</span>
                   <input type="number" min={30} max={220} value={fc.max} onChange={(e) => setFc((x) => ({ ...x, max: Number(e.target.value) }))} />
                 </label>
                 <label className="campo">
-                  <span className="campo-etiqueta">Pulso mínimo al soltar</span>
+                  <span className="campo-etiqueta">{t('Pulso mínimo al soltar')}</span>
                   <input type="number" min={30} max={220} value={fc.min} onChange={(e) => setFc((x) => ({ ...x, min: Number(e.target.value) }))} />
                 </label>
               </div>
-              <p className="resultado-calc">Cociente de Valsalva: <b>{coma(valor.toFixed(2))}</b> · normal ≥ 1,20 · habitual {coma(base.toFixed(2))}</p>
-              <small className="nota">Lectura simulada del monitor cardíaco; puedes corregirla.</small>
+              <p className="resultado-calc">{t('Cociente de Valsalva:')} <b>{coma(valor.toFixed(2))}</b> · {t('normal ≥ 1,20 · habitual {v}', { v: coma(base.toFixed(2)) })}</p>
+              <small className="nota">{t('Lectura simulada del monitor cardíaco; puedes corregirla.')}</small>
             </div>
           )}
         </div>
@@ -385,10 +391,10 @@ function PruebaValsalva({ n, decir, onCancelar, onRegistrar }: PropsPrueba) {
           <button className="boton boton-ok" disabled={!(valor >= INFO_SENSOR.valsalva.min && valor <= INFO_SENSOR.valsalva.max)} onClick={() => onRegistrar(
             [{ sensor: 'valsalva', valor, timestamp: Date.now(), fuente: 'sensor' }],
             `Maniobra de Valsalva: cociente ${valor.toFixed(2).replace('.', ',')}, tu habitual es ${base.toFixed(2).replace('.', ',')}.`,
-          )}><Icono nombre="check" /> Registrar resultado</button>
+          )}><Icono nombre="check" /> {t('Registrar resultado')}</button>
         )}
-        {paso > 0 && paso < 3 && <button className="boton" onClick={avanzar}>Saltar paso</button>}
-        <button className="boton boton-fantasma" onClick={onCancelar}>Cancelar</button>
+        {paso > 0 && paso < 3 && <button className="boton" onClick={avanzar}>{t('Saltar paso')}</button>}
+        <button className="boton boton-fantasma" onClick={onCancelar}>{t('Cancelar')}</button>
       </div>
     </section>
   );
@@ -399,6 +405,7 @@ function PruebaValsalva({ n, decir, onCancelar, onRegistrar }: PropsPrueba) {
 const ENSAYOS = 5;
 
 function PruebaReaccion({ n, decir, onCancelar, onRegistrar }: PropsPrueba) {
+  const t = useT();
   type Fase = 'listo' | 'espera' | 'ya' | 'adelanto' | 'fin';
   const [fase, setFase] = useState<Fase>('listo');
   const [tiempos, setTiempos] = useState<number[]>([]);
@@ -436,28 +443,28 @@ function PruebaReaccion({ n, decir, onCancelar, onRegistrar }: PropsPrueba) {
   }, [tocar, fase]);
 
   const media = tiempos.length ? Math.round(tiempos.reduce((a, b) => a + b, 0) / tiempos.length) : 0;
-  const texto = fase === 'listo' ? <>Toca para empezar<small>Intento 1 de {ENSAYOS}</small></>
-    : fase === 'espera' ? <>Espera…<small>Intento {tiempos.length + 1} de {ENSAYOS}</small></>
-    : fase === 'ya' ? <>¡Ahora!</>
-    : fase === 'adelanto' ? <>Te adelantaste<small>Toca para repetir el intento</small></>
-    : <>Listo: {media} ms<small>promedio de {ENSAYOS} intentos</small></>;
+  const texto = fase === 'listo' ? <>{t('Toca para empezar')}<small>{t('Intento {n} de {total}', { n: 1, total: ENSAYOS })}</small></>
+    : fase === 'espera' ? <>{t('Espera…')}<small>{t('Intento {n} de {total}', { n: tiempos.length + 1, total: ENSAYOS })}</small></>
+    : fase === 'ya' ? <>{t('¡Ahora!')}</>
+    : fase === 'adelanto' ? <>{t('Te adelantaste')}<small>{t('Toca para repetir el intento')}</small></>
+    : <>{t('Listo: {ms} ms', { ms: media })}<small>{t('promedio de {n} intentos', { n: ENSAYOS })}</small></>;
 
   return (
-    <section className="tarjeta panel-prueba" aria-label="Prueba de tiempo de reacción">
+    <section className="tarjeta panel-prueba" aria-label={t('Prueba de tiempo de reacción')}>
       <div className="tarjeta-cab">
-        <h2 className="titulo-tarjeta"><Icono nombre="rayo" /> Tiempo de reacción (PVT breve)</h2>
-        <button className="boton-icono" onClick={onCancelar} aria-label="Cancelar la prueba"><Icono nombre="cerrar" /></button>
+        <h2 className="titulo-tarjeta"><Icono nombre="rayo" /> {t('Tiempo de reacción (PVT breve)')}</h2>
+        <button className="boton-icono" onClick={onCancelar} aria-label={t('Cancelar la prueba')}><Icono nombre="cerrar" /></button>
       </div>
       {sueno && sueno.valor < 6 && (
-        <p className="nota" style={{ marginBottom: 10 }}>Anoche dormiste {sueno.valor} h: es posible que reacciones más lento. Justamente eso es lo que mide esta prueba.</p>
+        <p className="nota" style={{ marginBottom: 10 }}>{t('Anoche dormiste {h} h: es posible que reacciones más lento. Justamente eso es lo que mide esta prueba.', { h: sueno.valor })}</p>
       )}
       <div className="pvt">
         <button type="button" className={`pvt-blanco ${fase}`} onPointerDown={fase === 'fin' ? undefined : tocar} aria-live="assertive">{texto}</button>
-        <div className="pvt-tiempos" aria-label="Tiempos de cada intento">
+        <div className="pvt-tiempos" aria-label={t('Tiempos de cada intento')}>
           {tiempos.map((t, i) => <span key={i}>{t} ms</span>)}
-          {adelantos > 0 && <span>{adelantos} adelanto{adelantos > 1 ? 's' : ''}</span>}
+          {adelantos > 0 && <span>{t('{n} adelanto(s)', { n: adelantos })}</span>}
         </div>
-        {fase === 'fin' && <p className="texto-suave">Tu habitual es {base} ms ({media > base ? '+' : '−'}{Math.abs(Math.round(((media - base) / base) * 100))} %).</p>}
+        {fase === 'fin' && <p className="texto-suave">{t('Tu habitual es {base} ms ({signo}{p} %).', { base, signo: media > base ? '+' : '−', p: Math.abs(Math.round(((media - base) / base) * 100)) })}</p>}
       </div>
       <div className="acciones-prueba">
         {fase === 'fin' && (
@@ -465,11 +472,11 @@ function PruebaReaccion({ n, decir, onCancelar, onRegistrar }: PropsPrueba) {
             <button className="boton boton-ok" onClick={() => onRegistrar(
               [{ sensor: 'tiempoReaccion', valor: Math.min(1000, Math.max(150, media)), timestamp: Date.now(), fuente: 'sensor' }],
               `Prueba de tiempo de reacción: ${media} milisegundos de promedio, tu habitual es ${base}.`,
-            )}><Icono nombre="check" /> Registrar resultado</button>
-            <button className="boton" onClick={() => { setTiempos([]); setAdelantos(0); setFase('listo'); }}>Repetir</button>
+            )}><Icono nombre="check" /> {t('Registrar resultado')}</button>
+            <button className="boton" onClick={() => { setTiempos([]); setAdelantos(0); setFase('listo'); }}>{t('Repetir')}</button>
           </>
         )}
-        <button className="boton boton-fantasma" onClick={onCancelar}>Cancelar</button>
+        <button className="boton boton-fantasma" onClick={onCancelar}>{t('Cancelar')}</button>
       </div>
     </section>
   );

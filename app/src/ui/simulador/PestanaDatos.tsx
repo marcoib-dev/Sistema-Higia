@@ -11,6 +11,7 @@ import {
 import type { Historial } from '../../core/historial';
 import { Punto } from '../componentes/basicos';
 import { Icono } from '../iconos';
+import { useT } from '../idioma';
 
 const SENSORES = Object.keys(INFO_SENSOR) as TipoSensor[];
 
@@ -38,6 +39,7 @@ interface Props {
 }
 
 export function PestanaDatos({ perfil, historial, hallazgos, onInyectar, onDiaNormal, onLimpiar }: Props) {
+  const t = useT();
   const enviar = (sensor: TipoSensor, valor: number) => {
     const t = Date.now();
     const l = (s: TipoSensor, v: number): Lectura => ({ sensor: s, valor: v, timestamp: t, fuente: 'manual' });
@@ -50,15 +52,15 @@ export function PestanaDatos({ perfil, historial, hallazgos, onInyectar, onDiaNo
   return (
     <div className="pestana-datos">
       <div className="acciones-datos">
-        <button className="boton" onClick={onDiaNormal}><Icono nombre="check" tamano={16} /> Día normal</button>
-        <button className="boton boton-fantasma" onClick={onLimpiar}><Icono nombre="reiniciar" tamano={16} /> Limpiar todo</button>
+        <button className="boton" onClick={onDiaNormal}><Icono nombre="check" tamano={16} /> {t('Día normal')}</button>
+        <button className="boton boton-fantasma" onClick={onLimpiar}><Icono nombre="reiniciar" tamano={16} /> {t('Limpiar todo')}</button>
       </div>
-      <p className="nota">Mueve un control y suéltalo: el dato llega a Higia como si lo hubiera medido un sensor. La marca vertical es la línea base de {perfil.nombre}.</p>
+      <p className="nota">{t('Mueve un control y suéltalo: el dato llega a Higia como si lo hubiera medido un sensor. La marca vertical es la línea base de {nombre}.', { nombre: perfil.nombre })}</p>
       {CATEGORIAS_SENSOR.map((c, i) => {
         const lista = SENSORES.filter((s) => INFO_SENSOR[s].categoria === c);
         return (
           <details key={c} className="grupo-datos" open={i === 0}>
-            <summary>{NOMBRE_CATEGORIA_SENSOR[c]} <span>{lista.length}</span></summary>
+            <summary>{t(NOMBRE_CATEGORIA_SENSOR[c])} <span>{lista.length}</span></summary>
             <ul>
               {lista.map((s) => (
                 <FilaDato key={s} sensor={s} ultimo={historial.ultima(s)?.valor} base={perfil.lineaBase[s as keyof Perfil['lineaBase']]}
@@ -75,6 +77,7 @@ export function PestanaDatos({ perfil, historial, hallazgos, onInyectar, onDiaNo
 function FilaDato({ sensor, ultimo, base, nivel, onEnviar }: {
   sensor: TipoSensor; ultimo?: number; base?: number; nivel: Nivel | 'sinDatos'; onEnviar: (v: number) => void;
 }) {
+  const t = useT();
   const info = INFO_SENSOR[sensor];
   const inicial = ultimo ?? base ?? info.min;
   const [valor, setValor] = useState(inicial);
@@ -93,8 +96,8 @@ function FilaDato({ sensor, ultimo, base, nivel, onEnviar }: {
     <li className="fila-dato">
       <div className="fila-dato-cab">
         <Punto nivel={nivel} />
-        <label htmlFor={id}>{info.nombre}</label>
-        <span className="fila-dato-ultimo">{ultimo !== undefined ? `${mostrar(ultimo, info.paso)} ${info.unidad}` : 'sin datos'}</span>
+        <label htmlFor={id}>{t(info.nombre)}</label>
+        <span className="fila-dato-ultimo">{ultimo !== undefined ? `${mostrar(ultimo, info.paso)} ${info.unidad}` : t('sin datos')}</span>
       </div>
       <div className="fila-dato-control">
         <div className="deslizador" style={posBase !== null ? { '--base': `${posBase}%` } as React.CSSProperties : undefined}>
@@ -105,11 +108,11 @@ function FilaDato({ sensor, ultimo, base, nivel, onEnviar }: {
             onPointerUp={(e) => confirmar(Number((e.target as HTMLInputElement).value))}
             onKeyUp={(e) => { if (e.key.startsWith('Arrow') || e.key === 'Home' || e.key === 'End' || e.key.startsWith('Page')) confirmar(Number((e.target as HTMLInputElement).value)); }}
           />
-          {posBase !== null && <span className="deslizador-base" aria-hidden title={`Línea base: ${base} ${info.unidad}`} />}
+          {posBase !== null && <span className="deslizador-base" aria-hidden title={t('Línea base: {v} {u}', { v: base ?? 0, u: info.unidad })} />}
         </div>
         <input
           type="number" className="campo-numero" min={info.min} max={info.max} step={info.paso} value={mostrar(v, info.paso)}
-          aria-label={`${info.nombre} (${info.unidad})`}
+          aria-label={`${t(info.nombre)} (${info.unidad})`}
           onChange={(e) => { setValor(Number(e.target.value)); setTocado(true); }}
           onKeyDown={(e) => { if (e.key === 'Enter') confirmar(Number((e.target as HTMLInputElement).value)); }}
           onBlur={(e) => { if (tocado) confirmar(Number(e.target.value)); }}

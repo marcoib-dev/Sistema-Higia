@@ -1,6 +1,7 @@
 /** Piezas básicas reutilizables de la interfaz. */
 import type { ReactNode } from 'react';
 import type { Canal, Nivel } from '../../core/tipos';
+import { useT } from '../idioma';
 import { Icono, type NombreIcono } from '../iconos';
 
 export type EstadoVisual = Nivel | 'sinDatos';
@@ -23,7 +24,8 @@ export function sinTitulo(texto: string, titulo: string): string {
 
 /** Insignia de nivel: color + texto (nunca solo color). */
 export function InsigniaNivel({ nivel }: { nivel: EstadoVisual }) {
-  return <span className={`insignia nivel-${nivel}`}>{NOMBRE_NIVEL[nivel]}</span>;
+  const t = useT();
+  return <span className={`insignia nivel-${nivel}`}>{t(NOMBRE_NIVEL[nivel])}</span>;
 }
 
 export function Etiqueta({ icono, children, tono }: { icono?: NombreIcono; children: ReactNode; tono?: 'alerta' | 'ia' | 'nasa' }) {

@@ -5,9 +5,11 @@
 import { useEffect, useState } from 'react';
 import { TEXTO_ACTIVIDAD, TEXTO_ESCUCHA, type Asistente } from '../asistente';
 import { Icono } from '../iconos';
+import { useT } from '../idioma';
 import { OrbeHigia } from './AuraHigia';
 
 export function AccesoHigia({ asistente: a, onAbrir }: { asistente: Asistente; onAbrir: () => void }) {
+  const t = useT();
   const [texto, setTexto] = useState('');
   const [abierto, setAbierto] = useState(false);
   const ultimo = a.historial[0];
@@ -22,10 +24,10 @@ export function AccesoHigia({ asistente: a, onAbrir }: { asistente: Asistente; o
   }, [ultimo?.id]);
 
   const estado = a.actividad === 'escuchando' && a.parcial ? `«${a.parcial}»`
-    : a.actividad === 'inactiva' || a.actividad === 'esperando' ? TEXTO_ESCUCHA[a.estadoEscucha] : TEXTO_ACTIVIDAD[a.actividad];
+    : a.actividad === 'inactiva' || a.actividad === 'esperando' ? t(TEXTO_ESCUCHA[a.estadoEscucha]) : t(TEXTO_ACTIVIDAD[a.actividad]);
 
   return (
-    <div className={`acceso-higia actividad-${a.actividad}`} aria-label="Asistente Higia">
+    <div className={`acceso-higia actividad-${a.actividad}`} aria-label={t('Asistente Higia')}>
       {verUltimo && ultimo && !abierto && (
         <div className="acceso-burbuja" role="status">
           {ultimo.pregunta && <p className="acceso-pregunta">«{ultimo.pregunta}»</p>}
@@ -35,20 +37,20 @@ export function AccesoHigia({ asistente: a, onAbrir }: { asistente: Asistente; o
       )}
       {abierto && (
         <form className="acceso-redactor" onSubmit={(e) => { e.preventDefault(); void a.enviar(texto); setTexto(''); }}>
-          <input autoFocus value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Pídele algo a Higia" aria-label="Mensaje para Higia" />
-          <button type="submit" className="boton-icono" disabled={!texto.trim() || a.pensando} aria-label="Enviar"><Icono nombre="enviar" /></button>
+          <input autoFocus value={texto} onChange={(e) => setTexto(e.target.value)} placeholder={t('Pídele algo a Higia')} aria-label={t('Mensaje para Higia')} />
+          <button type="submit" className="boton-icono" disabled={!texto.trim() || a.pensando} aria-label={t('Enviar')}><Icono nombre="enviar" /></button>
         </form>
       )}
       <div className="acceso-barra">
-        <button className="acceso-estado" onClick={onAbrir} title="Abrir el asistente">
+        <button className="acceso-estado" onClick={onAbrir} title={t('Abrir el asistente')}>
           <OrbeHigia actividad={a.actividad === 'inactiva' ? 'esperando' : a.actividad} tamano={30} />
           <span>{estado}</span>
         </button>
-        <button className="boton-icono" onClick={() => setAbierto((v) => !v)} aria-expanded={abierto} aria-label="Escribirle a Higia" title="Escribirle a Higia">
+        <button className="boton-icono" onClick={() => setAbierto((v) => !v)} aria-expanded={abierto} aria-label={t('Escribirle a Higia')} title={t('Escribirle a Higia')}>
           <Icono nombre={abierto ? 'cerrar' : 'asistente'} />
         </button>
         {a.micDisponible && (
-          <button className={`boton-mic pequeno ${a.dictando ? 'escuchando' : ''}`} onClick={a.dictar} disabled={a.dictando} aria-label="Hablarle a Higia" title="Hablarle a Higia (sin decir su nombre)">
+          <button className={`boton-mic pequeno ${a.dictando ? 'escuchando' : ''}`} onClick={a.dictar} disabled={a.dictando} aria-label={t('Hablarle a Higia')} title={t('Hablarle a Higia (sin decir su nombre)')}> 
             <Icono nombre="microfono" tamano={18} />
           </button>
         )}

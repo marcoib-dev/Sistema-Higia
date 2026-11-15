@@ -8,6 +8,7 @@
  * Un tono corto acompaña el «te escucho» (ver `sonarLlamado`).
  */
 import { TEXTO_ACTIVIDAD, type ActividadHigia, type Asistente } from '../asistente';
+import { useT } from '../idioma';
 import { Icono } from '../iconos';
 
 /** Orbe animado: el "rostro" de Higia. Cambia de color y movimiento según lo que hace. */
@@ -28,6 +29,7 @@ export function OrbeHigia({ actividad, tamano = 56 }: { actividad: ActividadHigi
 const VISIBLE: ActividadHigia[] = ['escuchando', 'pensando', 'hablando'];
 
 export function AuraHigia({ asistente: a }: { asistente: Asistente }) {
+  const t = useT();
   const visible = VISIBLE.includes(a.actividad);
   // Mientras habla basta el borde: la pastilla taparía lo que está explicando (p. ej. los pasos de una prueba).
   const conPastilla = visible && a.actividad !== 'hablando';
@@ -39,9 +41,9 @@ export function AuraHigia({ asistente: a }: { asistente: Asistente }) {
           <>
             <OrbeHigia actividad={a.actividad} tamano={34} />
             <span className="pastilla-texto">
-              <strong>{a.actividad === 'escuchando' ? 'Higia te escucha' : TEXTO_ACTIVIDAD[a.actividad]}</strong>
+              <strong>{a.actividad === 'escuchando' ? t('Higia te escucha') : t(TEXTO_ACTIVIDAD[a.actividad])}</strong>
               {a.actividad === 'escuchando' && (
-                <span className="pastilla-parcial">{a.parcial ? `«${a.parcial}»` : 'Habla ahora…'}</span>
+                <span className="pastilla-parcial">{a.parcial ? `«${a.parcial}»` : t('Habla ahora…')}</span>
               )}
             </span>
           </>

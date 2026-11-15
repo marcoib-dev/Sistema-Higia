@@ -68,6 +68,8 @@ export interface PeticionConversacion {
   frase: string;
   historial: TurnoConversacion[];
   estado: EstadoParaIA;
+  /** Idioma en el que debe responder la IA. */
+  idioma?: 'es' | 'en';
 }
 
 export interface RespuestaConversacion {
@@ -81,6 +83,7 @@ export interface PeticionEntorno {
   /** JPEG en base64, sin el prefijo data: */
   imagen: string;
   contexto: Record<string, unknown>;
+  idioma?: 'es' | 'en';
 }
 
 export interface AnalisisEntorno {
@@ -119,6 +122,7 @@ export interface PeticionEvaluacion {
   /** Lo que Higia ya le dijo al astronauta (texto del motor local). */
   mensaje: string;
   estado: EstadoParaIA;
+  idioma?: 'es' | 'en';
 }
 
 export interface EvaluacionIA {

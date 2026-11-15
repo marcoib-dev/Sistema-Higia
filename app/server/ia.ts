@@ -240,6 +240,12 @@ const EsquemaConversacion = z.object({
 });
 
 export async function conversar(p: PeticionConversacion): Promise<RespuestaConversacion> {
+  const enIngles = p.idioma === 'en';
+  const sistema = (enIngles
+    ? SISTEMA_CONVERSACION.replace('Conversas por voz, en español,', 'Conversas por voz, en inglés,')
+    : SISTEMA_CONVERSACION) + (enIngles
+    ? '\n\nIDIOMA DE SALIDA (obligatorio): el astronauta usa la interfaz en inglés. Responde SIEMPRE en inglés natural, aunque el estado, los hallazgos o los datos lleguen en español. Traduce mentalmente lo que necesites; no respondas en español ni mezcles idiomas.'
+    : '');
   const historial: Mensaje[] = p.historial.slice(-12).map((t) => ({
     role: t.rol === 'astronauta' ? 'user' : 'assistant',
     content: t.texto,
@@ -247,12 +253,15 @@ export async function conversar(p: PeticionConversacion): Promise<RespuestaConve
   while (historial.length && historial[0].role !== 'user') historial.shift(); // la conversación debe empezar por el usuario
 
   const r = await pedirJSON([
-    { role: 'system', content: SISTEMA_CONVERSACION },
+    { role: 'system', content: sistema },
     ...historial,
     {
       role: 'user',
       content: `<estado>\n${JSON.stringify(p.estado)}\n</estado>\n\n` +
-        `(Ahora: ${p.estado.momento.horaHabitat} del hábitat, ${p.estado.momento.fecha}, día ${p.estado.momento.diaMision} de la misión.)\n\n${p.frase}`,
+        (enIngles
+          ? `(Now: ${p.estado.momento.horaHabitat} habitat time, ${p.estado.momento.fecha}, mission day ${p.estado.momento.diaMision}.)`
+          : `(Ahora: ${p.estado.momento.horaHabitat} del hábitat, ${p.estado.momento.fecha}, día ${p.estado.momento.diaMision} de la misión.)`) +
+        `\n\n${p.frase}`,
     },
   ], EsquemaConversacion, 'responder');
   // La app solo ejecuta acciones válidas: lo que el modelo invente o escriba mal se descarta.
@@ -290,8 +299,14 @@ const EsquemaEvaluacion = z.object({
 });
 
 export async function evaluarHallazgo(p: PeticionEvaluacion): Promise<EvaluacionIA> {
+  const enIngles = p.idioma === 'en';
+  const sistema = (enIngles
+    ? SISTEMA_EVALUACION.replace('una evaluación personalizada, en español,', 'a personalised assessment, in English,')
+    : SISTEMA_EVALUACION) + (enIngles
+    ? '\n\nIDIOMA DE SALIDA (obligatorio): escribe "evaluacion", "recomendacion", "datosUsados" y "limitaciones" SIEMPRE en inglés natural, aunque el hallazgo y el estado lleguen en español.'
+    : '');
   return pedirJSON([
-    { role: 'system', content: SISTEMA_EVALUACION },
+    { role: 'system', content: sistema },
     {
       role: 'user',
       content: `<estado>\n${JSON.stringify(p.estado)}\n</estado>\n\n<hallazgo>\n${JSON.stringify(p.hallazgo)}\n</hallazgo>\n\n<mensaje_enviado>\n${p.mensaje}\n</mensaje_enviado>`,
@@ -323,8 +338,14 @@ const EsquemaEntorno = z.object({
 });
 
 export async function analizarEntorno(p: PeticionEntorno): Promise<AnalisisEntorno> {
+  const enIngles = p.idioma === 'en';
+  const sistema = (enIngles
+    ? SISTEMA_ENTORNO.replace('Escribe en español.', 'Write in English.')
+    : SISTEMA_ENTORNO) + (enIngles
+    ? '\n\nIDIOMA DE SALIDA (obligatorio): escribe "descripcion", "peligros" y "recomendacion" SIEMPRE en inglés natural, aunque el contexto llegue en español. Los valores de ubicacion, destino y actividad se mantienen en los códigos permitidos.'
+    : '');
   return pedirJSON([
-    { role: 'system', content: SISTEMA_ENTORNO },
+    { role: 'system', content: sistema },
     {
       role: 'user',
       content: [

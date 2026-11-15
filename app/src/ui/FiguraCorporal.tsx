@@ -13,6 +13,7 @@ import {
   NOMBRE_SISTEMA, ORDEN_NIVEL, type EstadoCorporal, type Nivel, type RegionCuerpo, type SistemaCorporal,
 } from '../core/tipos';
 import { NOMBRE_NIVEL } from './componentes/basicos';
+import { useT } from './idioma';
 
 type EstadoVisual = Nivel | 'sinDatos';
 
@@ -561,6 +562,7 @@ const leerPreferencia = (): { vista: Vista; categoria: Categoria } => {
 };
 
 export function FiguraCorporal({ estado, regiones = {}, seleccion, onSeleccionar }: Props) {
+  const t = useT();
   const [{ vista, categoria }, setPreferencia] = useState(leerPreferencia);
   const [zonaActiva, setZonaActiva] = useState<string | null>(null);
   const id = useId().replace(/:/g, '');
@@ -587,7 +589,7 @@ export function FiguraCorporal({ estado, regiones = {}, seleccion, onSeleccionar
   }, [seleccion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const nivelZona = (zona: ZonaFigura): EstadoVisual => peor(peorEstado(estado, [zona.sistema]), zona.region ? regiones[zona.region] : undefined);
-  const etiqueta = (zona: ZonaFigura) => `${zona.nombre} · ${NOMBRE_SISTEMA[zona.sistema]}: ${NOMBRE_NIVEL[nivelZona(zona)]}`;
+  const etiqueta = (zona: ZonaFigura) => `${t(zona.nombre)} · ${t(NOMBRE_SISTEMA[zona.sistema])}: ${t(NOMBRE_NIVEL[nivelZona(zona)])}`;
   // Si se tocó una zona, se resalta solo esa; si el sistema se eligió desde la lista, todas sus zonas.
   const activa = zonas.find((x) => x.id === zonaActiva && seleccion?.includes(x.sistema));
   const elegida = (zona: ZonaFigura) => (activa ? zona.id === activa.id : !!seleccion?.includes(zona.sistema));
@@ -603,15 +605,15 @@ export function FiguraCorporal({ estado, regiones = {}, seleccion, onSeleccionar
   return (
     <div className="figura">
       <div className="figura-controles">
-        <div className="figura-selector" role="group" aria-label="Qué mostrar">
-          {CATEGORIAS.map(([c, n]) => <button key={c} aria-pressed={categoria === c} onClick={() => cambiar({ categoria: c })}>{n}</button>)}
+        <div className="figura-selector" role="group" aria-label={t('Qué mostrar')}>
+          {CATEGORIAS.map(([c, n]) => <button key={c} aria-pressed={categoria === c} onClick={() => cambiar({ categoria: c })}>{t(n)}</button>)}
         </div>
-        <div className="figura-selector" role="group" aria-label="Vista">
-          {VISTAS.map(([v, n]) => <button key={v} aria-pressed={vista === v} onClick={() => cambiar({ vista: v })}>{n}</button>)}
+        <div className="figura-selector" role="group" aria-label={t('Vista')}>
+          {VISTAS.map(([v, n]) => <button key={v} aria-pressed={vista === v} onClick={() => cambiar({ vista: v })}>{t(n)}</button>)}
         </div>
       </div>
 
-      <svg viewBox={`0 0 ${ANCHO} ${ALTO}`} className="figura-svg" aria-label={`Figura anatómica: ${CATEGORIAS.find(([c]) => c === categoria)![1].toLowerCase()}, vista de ${vista}`}>
+      <svg viewBox={`0 0 ${ANCHO} ${ALTO}`} className="figura-svg" aria-label={`${t('Figura anatómica')}: ${t(CATEGORIAS.find(([c]) => c === categoria)![1]).toLowerCase()}, ${t('vista de {vista}', { vista: t(vista) })}`}>
         <defs>
           {/* Luminancia → transparencia: quita el fondo oscuro y deja la figura en un blanco azulado del tema. */}
           <filter id={`${id}-figura`} colorInterpolationFilters="sRGB">
@@ -627,11 +629,11 @@ export function FiguraCorporal({ estado, regiones = {}, seleccion, onSeleccionar
         {/* Todo el cuerpo (radiación): el halo de la figura toma su color. */}
         <g
           className={`sistema-svg nivel-${nivelCuerpo} aura-cuerpo ${seleccion?.includes('cuerpo') ? 'seleccionado' : ''}`}
-          role="button" tabIndex={0} aria-label={`Todo el cuerpo (radiación): ${NOMBRE_NIVEL[nivelCuerpo]}`}
+          role="button" tabIndex={0} aria-label={`${t('Todo el cuerpo (radiación)')}: ${t(NOMBRE_NIVEL[nivelCuerpo])}`}
           aria-pressed={!!seleccion?.includes('cuerpo')} onClick={() => { setZonaActiva(null); onSeleccionar(['cuerpo']); }}
           onKeyDown={alTeclear(() => { setZonaActiva(null); onSeleccionar(['cuerpo']); })}
         >
-          <title>{`Todo el cuerpo (radiación): ${NOMBRE_NIVEL[nivelCuerpo]}`}</title>
+          <title>{`${t('Todo el cuerpo (radiación)')}: ${t(NOMBRE_NIVEL[nivelCuerpo])}`}</title>
           {imagen(`${id}-figura`)}
         </g>
 
@@ -658,11 +660,11 @@ export function FiguraCorporal({ estado, regiones = {}, seleccion, onSeleccionar
       </svg>
 
       <p className="figura-zona" aria-live="polite">
-        {activa ? <><strong>{activa.nombre}</strong> · {NOMBRE_SISTEMA[activa.sistema]}: {NOMBRE_NIVEL[nivelZona(activa)]}</> : 'Pasa el mouse o usa Tab para ver cada zona · clic o Enter para ver su detalle'}
+        {activa ? <><strong>{t(activa.nombre)}</strong> · {t(NOMBRE_SISTEMA[activa.sistema])}: {t(NOMBRE_NIVEL[nivelZona(activa)])}</> : t('Pasa el mouse o usa Tab para ver cada zona · clic o Enter para ver su detalle')}
       </p>
       <ul className="leyenda">
         {(['normal', 'info', 'aviso', 'alerta', 'sinDatos'] as EstadoVisual[]).map((n) => (
-          <li key={n}><span className={`punto nivel-${n}`} />{NOMBRE_NIVEL[n]}</li>
+          <li key={n}><span className={`punto nivel-${n}`} />{t(NOMBRE_NIVEL[n])}</li>
         ))}
       </ul>
     </div>

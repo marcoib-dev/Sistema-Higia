@@ -8,6 +8,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { INFO_SENSOR, NOMBRE_SISTEMA, SISTEMAS, resumenClinico, type Antecedente, type HistoriaClinica, type Perfil, type SistemaCorporal, type TipoSensor } from '../../core/tipos';
 import { Etiqueta } from '../componentes/basicos';
 import { Icono, type NombreIcono } from '../iconos';
+import { useIdioma, useT } from '../idioma';
 
 interface Props {
   perfil: Perfil;
@@ -26,7 +27,12 @@ type CampoLista = 'alergias' | 'medicacion' | 'cirugias' | 'antecedentesFamiliar
 const hora = (h: number) => `${String(h).padStart(2, '0')}:00`;
 
 export function VistaPerfil({ perfil: p, onHistoria, onRestablecer }: Props) {
+  const t = useT();
+  const { idioma } = useIdioma();
   const h = p.historiaClinica;
+  const resumen = idioma === 'en'
+    ? `${h.edad} years · blood type ${h.grupoSanguineo} · allergies: ${h.alergias.length ? h.alergias.map((x) => t(x)).join(', ') : t('ninguna conocida')}${h.antecedentes.length ? ` · conditions: ${h.antecedentes.map((a) => t(a.nombre)).join(', ')}` : ''}${h.medicacion.length ? ` · medication: ${h.medicacion.map((x) => t(x)).join(', ')}` : ''}`
+    : resumenClinico(h);
   const [confirmar, setConfirmar] = useState(false);
   const cambiarLista = (campo: CampoLista, items: string[]) => onHistoria({ ...h, [campo]: items });
   const iniciales = p.nombre.split(' ').map((x) => x[0]).slice(0, 2).join('');
@@ -43,19 +49,19 @@ export function VistaPerfil({ perfil: p, onHistoria, onRestablecer }: Props) {
     <div className="perfil-vista">
       <header className="encabezado-seccion">
         <div>
-          <h1>Perfil</h1>
-          <p>Tu historia clínica previa a la misión. Higia la usa para responderte y la envía con cada aviso de emergencia.</p>
+          <h1>{t('Perfil')}</h1>
+          <p>{t('Tu historia clínica previa a la misión. Higia la usa para responderte y la envía con cada aviso de emergencia.')}</p>
         </div>
         <div className="encabezado-acciones">
           {confirmar ? (
-            <div className="confirmar" role="group" aria-label="Confirmar restablecer">
-              <span>¿Descartar tus cambios?</span>
-              <button className="boton boton-fantasma" onClick={() => setConfirmar(false)}>Cancelar</button>
-              <button className="boton boton-peligro" onClick={() => { onRestablecer(); setConfirmar(false); }}>Restablecer</button>
+            <div className="confirmar" role="group" aria-label={t('Confirmar restablecer')}>
+              <span>{t('¿Descartar tus cambios?')}</span>
+              <button className="boton boton-fantasma" onClick={() => setConfirmar(false)}>{t('Cancelar')}</button>
+              <button className="boton boton-peligro" onClick={() => { onRestablecer(); setConfirmar(false); }}>{t('Restablecer')}</button>
             </div>
           ) : (
-            <button className="boton" onClick={() => setConfirmar(true)} title="Volver a la historia original del perfil">
-              <Icono nombre="reiniciar" /> Restablecer
+            <button className="boton" onClick={() => setConfirmar(true)} title={t('Volver a la historia original del perfil')}>
+              <Icono nombre="reiniciar" /> {t('Restablecer')}
             </button>
           )}
         </div>
@@ -68,24 +74,24 @@ export function VistaPerfil({ perfil: p, onHistoria, onRestablecer }: Props) {
               <span className="ficha-avatar" aria-hidden>{iniciales}</span>
               <div className="ficha-nombre">
                 <h2 id="titulo-ficha">{p.nombre}</h2>
-                <p className="texto-suave">{p.rol}</p>
+                <p className="texto-suave">{t(p.rol)}</p>
                 <span className="ficha-id">{p.id}</span>
               </div>
             </div>
 
             <div className="datos-clave">
               <label className="dato-clave">
-                <span>Edad</span>
+                <span>{t('Edad')}</span>
                 <CampoEdad valor={h.edad} onCambio={(edad) => onHistoria({ ...h, edad })} />
               </label>
               <label className="dato-clave">
-                <span>Sexo</span>
+                <span>{t('Sexo')}</span>
                 <select value={h.sexo} onChange={(e) => onHistoria({ ...h, sexo: e.target.value as HistoriaClinica['sexo'] })}>
-                  {Object.entries(SEXO).map(([v, n]) => <option key={v} value={v}>{n}</option>)}
+                  {Object.entries(SEXO).map(([v, n]) => <option key={v} value={v}>{t(n)}</option>)}
                 </select>
               </label>
               <label className="dato-clave dato-sangre">
-                <span>Grupo sanguíneo</span>
+                <span>{t('Grupo sanguíneo')}</span>
                 <select value={h.grupoSanguineo} onChange={(e) => onHistoria({ ...h, grupoSanguineo: e.target.value })}>
                   {grupos.map((g) => <option key={g} value={g}>{g}</option>)}
                 </select>
@@ -94,30 +100,30 @@ export function VistaPerfil({ perfil: p, onHistoria, onRestablecer }: Props) {
           </section>
 
           <section className="tarjeta tarjeta-emergencia" aria-labelledby="titulo-emergencia">
-            <h2 id="titulo-emergencia" className="titulo-tarjeta"><Icono nombre="escudo" tamano={16} /> Lo que recibe el equipo médico</h2>
-            <p>{resumenClinico(h)}</p>
-            <small>Se adjunta automáticamente a cada aviso de emergencia.</small>
+            <h2 id="titulo-emergencia" className="titulo-tarjeta"><Icono nombre="escudo" tamano={16} /> {t('Lo que recibe el equipo médico')}</h2>
+            <p>{resumen}</p>
+            <small>{t('Se adjunta automáticamente a cada aviso de emergencia.')}</small>
           </section>
 
           <section className="tarjeta tarjeta-mision" aria-labelledby="titulo-mision">
-            <h2 id="titulo-mision" className="titulo-tarjeta">Perfil de misión</h2>
+            <h2 id="titulo-mision" className="titulo-tarjeta">{t('Perfil de misión')}</h2>
             <ul className="lista-mision">
-              <ItemMision icono="info" nombre="Formación médica" valor={FORMACION[p.formacionMedica]} />
-              <ItemMision icono="usuario" nombre="Experiencia" valor={EXPERIENCIA[p.experiencia]} />
-              <ItemMision icono="cerebro" nombre="Tolerancia al estrés" valor={`${TOLERANCIA[p.toleranciaEstres]}${p.propensoPanico ? ' · propenso al pánico' : ''}`} />
-              <ItemMision icono="reloj" nombre="Horario de sueño" valor={`${hora(p.horarioSueno.inicio)} a ${hora(p.horarioSueno.fin)}`} />
+              <ItemMision icono="info" nombre={t('Formación médica')} valor={t(FORMACION[p.formacionMedica])} />
+              <ItemMision icono="usuario" nombre={t('Experiencia')} valor={t(EXPERIENCIA[p.experiencia])} />
+              <ItemMision icono="cerebro" nombre={t('Tolerancia al estrés')} valor={`${t(TOLERANCIA[p.toleranciaEstres])}${p.propensoPanico ? ` · ${t('propenso al pánico')}` : ''}`} />
+              <ItemMision icono="reloj" nombre={t('Horario de sueño')} valor={t('{a} a {b}', { a: hora(p.horarioSueno.inicio), b: hora(p.horarioSueno.fin) })} />
             </ul>
             <details className="linea-base">
-              <summary>Valores habituales <span className="texto-suave">({Object.keys(p.lineaBase).length})</span></summary>
+              <summary>{t('Valores habituales')} <span className="texto-suave">({Object.keys(p.lineaBase).length})</span></summary>
               <dl>
                 {Object.entries(p.lineaBase).map(([s, v]) => (
                   <div key={s}>
-                    <dt>{INFO_SENSOR[s as TipoSensor].nombre}</dt>
+                    <dt>{t(INFO_SENSOR[s as TipoSensor].nombre)}</dt>
                     <dd>{v} <small>{INFO_SENSOR[s as TipoSensor].unidad}</small></dd>
                   </div>
                 ))}
               </dl>
-              <p className="nota">Higia compara tus datos contra estos valores, no contra un promedio general.</p>
+              <p className="nota">{t('Higia compara tus datos contra estos valores, no contra un promedio general.')}</p>
             </details>
           </section>
         </aside>
@@ -125,35 +131,35 @@ export function VistaPerfil({ perfil: p, onHistoria, onRestablecer }: Props) {
         <div className="perfil-principal">
           <p className="consejo-voz">
             <Icono nombre="microfono" tamano={16} />
-            <span>También puedes dictarlo: <em>«Higia, soy alérgico al látex»</em> o <em>«Higia, tomo ibuprofeno»</em>.</span>
+            <span>{t('También puedes dictarlo:')} <em>{t('«Higia, soy alérgico al látex»')}</em> {t('o')} <em>{t('«Higia, tomo ibuprofeno»')}</em>.</span>
           </p>
 
-          <Bloque id="alergias" titulo="Alergias" icono="alerta" cantidad={h.alergias.length} tono="alerta"
-            descripcion="Se destacan en rojo en cada aviso de emergencia.">
-            <ListaEditable items={h.alergias} onCambio={(v) => cambiarLista('alergias', v)} vacio="Ninguna conocida" placeholder="Ej.: penicilina, látex" nombre="alergia" alerta />
+          <Bloque id="alergias" titulo={t('Alergias')} icono="alerta" cantidad={h.alergias.length} tono="alerta"
+            descripcion={t('Se destacan en rojo en cada aviso de emergencia.')}>
+            <ListaEditable items={h.alergias} onCambio={(v) => cambiarLista('alergias', v)} vacio={t('Ninguna conocida')} placeholder={t('Ej.: penicilina, látex')} nombre={t('alergia')} alerta />
           </Bloque>
 
-          <Bloque id="antecedentes" titulo="Antecedentes y condiciones" icono="corazon" cantidad={h.antecedentes.length}
-            descripcion="Asócialos a un sistema del cuerpo para que se destaquen en sus mensajes.">
+          <Bloque id="antecedentes" titulo={t('Antecedentes y condiciones')} icono="corazon" cantidad={h.antecedentes.length}
+            descripcion={t('Asócialos a un sistema del cuerpo para que se destaquen en sus mensajes.')}>
             <Antecedentes items={h.antecedentes} onCambio={(antecedentes) => onHistoria({ ...h, antecedentes })} />
           </Bloque>
 
           <div className="perfil-pares">
-            <Bloque id="medicacion" titulo="Medicación" icono="documento" cantidad={h.medicacion.length}>
-              <ListaEditable items={h.medicacion} onCambio={(v) => cambiarLista('medicacion', v)} vacio="Sin medicación" placeholder="Ej.: ibuprofeno 400 mg" nombre="medicación" />
+            <Bloque id="medicacion" titulo={t('Medicación')} icono="documento" cantidad={h.medicacion.length}>
+              <ListaEditable items={h.medicacion} onCambio={(v) => cambiarLista('medicacion', v)} vacio={t('Sin medicación')} placeholder={t('Ej.: ibuprofeno 400 mg')} nombre={t('medicación')} />
             </Bloque>
-            <Bloque id="cirugias" titulo="Cirugías" icono="mano" cantidad={h.cirugias.length}>
-              <ListaEditable items={h.cirugias} onCambio={(v) => cambiarLista('cirugias', v)} vacio="Sin cirugías" placeholder="Ej.: apendicectomía (2015)" nombre="cirugía" />
+            <Bloque id="cirugias" titulo={t('Cirugías')} icono="mano" cantidad={h.cirugias.length}>
+              <ListaEditable items={h.cirugias} onCambio={(v) => cambiarLista('cirugias', v)} vacio={t('Sin cirugías')} placeholder={t('Ej.: apendicectomía (2015)')} nombre={t('cirugía')} />
             </Bloque>
-            <Bloque id="familiares" titulo="Antecedentes familiares" icono="personas" cantidad={h.antecedentesFamiliares.length}>
-              <ListaEditable items={h.antecedentesFamiliares} onCambio={(v) => cambiarLista('antecedentesFamiliares', v)} vacio="Sin datos" placeholder="Ej.: diabetes (madre)" nombre="antecedente familiar" />
+            <Bloque id="familiares" titulo={t('Antecedentes familiares')} icono="personas" cantidad={h.antecedentesFamiliares.length}>
+              <ListaEditable items={h.antecedentesFamiliares} onCambio={(v) => cambiarLista('antecedentesFamiliares', v)} vacio={t('Sin datos')} placeholder={t('Ej.: diabetes (madre)')} nombre={t('antecedente familiar')} />
             </Bloque>
-            <Bloque id="notas" titulo="Notas" icono="documento" cantidad={h.notas.length}>
-              <ListaEditable items={h.notas} onCambio={(v) => cambiarLista('notas', v)} vacio="Sin notas" placeholder="Ej.: vacuna antigripal al día" nombre="nota" />
+            <Bloque id="notas" titulo={t('Notas')} icono="documento" cantidad={h.notas.length}>
+              <ListaEditable items={h.notas} onCambio={(v) => cambiarLista('notas', v)} vacio={t('Sin notas')} placeholder={t('Ej.: vacuna antigripal al día')} nombre={t('nota')} />
             </Bloque>
           </div>
 
-          <p className="nota perfil-nota"><Icono nombre="candado" tamano={14} /> Los cambios se guardan solo en este dispositivo. A la IA se le envía la historia sin tu nombre.</p>
+          <p className="nota perfil-nota"><Icono nombre="candado" tamano={14} /> {t('Los cambios se guardan solo en este dispositivo. A la IA se le envía la historia sin tu nombre.')}</p>
         </div>
       </div>
     </div>
@@ -189,6 +195,7 @@ function Bloque({ id, titulo, icono, cantidad, descripcion, tono, children }: {
 
 /** Edad editable sin saltos: deja borrar y escribir, y guarda al ser válida. */
 function CampoEdad({ valor, onCambio }: { valor: number; onCambio: (v: number) => void }) {
+  const t = useT();
   const [borrador, setBorrador] = useState(String(valor));
   useEffect(() => setBorrador(String(valor)), [valor]);
   const confirmar = () => {
@@ -207,7 +214,7 @@ function CampoEdad({ valor, onCambio }: { valor: number; onCambio: (v: number) =
         }}
         onBlur={confirmar}
       />
-      <small>años</small>
+      <small>{t('años')}</small>
     </span>
   );
 }
@@ -215,6 +222,7 @@ function CampoEdad({ valor, onCambio }: { valor: number; onCambio: (v: number) =
 function ListaEditable({ items, onCambio, vacio, placeholder, nombre, alerta }: {
   items: string[]; onCambio: (v: string[]) => void; vacio: string; placeholder: string; nombre: string; alerta?: boolean;
 }) {
+  const t = useT();
   const [nuevo, setNuevo] = useState('');
   const repetido = items.some((x) => x.toLowerCase() === nuevo.trim().toLowerCase());
   const agregar = () => {
@@ -229,8 +237,8 @@ function ListaEditable({ items, onCambio, vacio, placeholder, nombre, alerta }: 
         <ul className="lista-editable">
           {items.map((i) => (
             <li key={i} className={alerta ? 'alerta' : ''}>
-              <span>{i}</span>
-              <button className="boton-icono" onClick={() => onCambio(items.filter((x) => x !== i))} aria-label={`Quitar ${i}`} title="Quitar">
+              <span>{t(i)}</span>
+              <button className="boton-icono" onClick={() => onCambio(items.filter((x) => x !== i))} aria-label={t('Quitar {x}', { x: i })} title={t('Quitar')}>
                 <Icono nombre="cerrar" tamano={14} />
               </button>
             </li>
@@ -238,17 +246,18 @@ function ListaEditable({ items, onCambio, vacio, placeholder, nombre, alerta }: 
         </ul>
       ) : <p className="lista-vacia">{vacio}</p>}
       <form className="agregar" onSubmit={(e) => { e.preventDefault(); agregar(); }}>
-        <input value={nuevo} onChange={(e) => setNuevo(e.target.value)} placeholder={placeholder} aria-label={`Agregar ${nombre}`} enterKeyHint="done" />
-        <button type="submit" className="boton" disabled={!nuevo.trim() || repetido} aria-label={`Agregar ${nombre}`}>
-          <Icono nombre="mas" tamano={16} /> <span>Agregar</span>
+        <input value={nuevo} onChange={(e) => setNuevo(e.target.value)} placeholder={placeholder} aria-label={t('Agregar {nombre}', { nombre })} enterKeyHint="done" />
+        <button type="submit" className="boton" disabled={!nuevo.trim() || repetido} aria-label={t('Agregar {nombre}', { nombre })}>
+          <Icono nombre="mas" tamano={16} /> <span>{t('Agregar')}</span>
         </button>
       </form>
-      {repetido && nuevo.trim() && <p className="nota agregar-aviso" role="status">Ya está en la lista.</p>}
+      {repetido && nuevo.trim() && <p className="nota agregar-aviso" role="status">{t('Ya está en la lista.')}</p>}
     </>
   );
 }
 
 function Antecedentes({ items, onCambio }: { items: Antecedente[]; onCambio: (v: Antecedente[]) => void }) {
+  const t = useT();
   const [nombre, setNombre] = useState('');
   const [sistema, setSistema] = useState<SistemaCorporal | ''>('');
   const agregar = () => {
@@ -264,25 +273,25 @@ function Antecedentes({ items, onCambio }: { items: Antecedente[]; onCambio: (v:
           {items.map((a, i) => (
             <li key={`${a.nombre}-${i}`}>
               <div>
-                <strong>{a.nombre}</strong>
-                {a.detalle && <p className="texto-suave">{a.detalle}</p>}
+                <strong>{t(a.nombre)}</strong>
+                {a.detalle && <p className="texto-suave">{t(a.detalle)}</p>}
               </div>
-              {a.sistema && <Etiqueta>{NOMBRE_SISTEMA[a.sistema]}</Etiqueta>}
-              <button className="boton-icono" onClick={() => onCambio(items.filter((_, k) => k !== i))} aria-label={`Quitar ${a.nombre}`} title="Quitar">
+              {a.sistema && <Etiqueta>{t(NOMBRE_SISTEMA[a.sistema])}</Etiqueta>}
+              <button className="boton-icono" onClick={() => onCambio(items.filter((_, k) => k !== i))} aria-label={t('Quitar {x}', { x: a.nombre })} title={t('Quitar')}>
                 <Icono nombre="cerrar" tamano={14} />
               </button>
             </li>
           ))}
         </ul>
-      ) : <p className="lista-vacia">Sin antecedentes</p>}
+      ) : <p className="lista-vacia">{t('Sin antecedentes')}</p>}
       <form className="agregar agregar-antecedente" onSubmit={(e) => { e.preventDefault(); agregar(); }}>
-        <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej.: asma leve" aria-label="Agregar antecedente" />
-        <select value={sistema} onChange={(e) => setSistema(e.target.value as SistemaCorporal | '')} aria-label="Sistema del cuerpo">
-          <option value="">Sistema (opcional)</option>
-          {SISTEMAS.map((s) => <option key={s} value={s}>{NOMBRE_SISTEMA[s]}</option>)}
+        <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder={t('Ej.: asma leve')} aria-label={t('Agregar antecedente')} />
+        <select value={sistema} onChange={(e) => setSistema(e.target.value as SistemaCorporal | '')} aria-label={t('Sistema del cuerpo')}>
+          <option value="">{t('Sistema (opcional)')}</option>
+          {SISTEMAS.map((s) => <option key={s} value={s}>{t(NOMBRE_SISTEMA[s])}</option>)}
         </select>
-        <button type="submit" className="boton" disabled={!nombre.trim()} aria-label="Agregar antecedente">
-          <Icono nombre="mas" tamano={16} /> <span>Agregar</span>
+        <button type="submit" className="boton" disabled={!nombre.trim()} aria-label={t('Agregar antecedente')}>
+          <Icono nombre="mas" tamano={16} /> <span>{t('Agregar')}</span>
         </button>
       </form>
     </>

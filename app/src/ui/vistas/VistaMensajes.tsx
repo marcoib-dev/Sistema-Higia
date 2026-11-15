@@ -7,6 +7,7 @@ import { antecedentesDe, INFO_SENSOR, type Contexto, type DatoClinico, type Hist
 import { CANAL, EncabezadoSeccion, Etiqueta, InsigniaNivel, sinTitulo, Vacio } from '../componentes/basicos';
 import { DATOS_CON_TENDENCIA, MiniTendencia } from '../componentes/MiniTendencia';
 import { Icono } from '../iconos';
+import { useIdioma, useT, type Idioma } from '../idioma';
 
 type Filtro = 'todos' | 'alertas' | 'retenidos' | 'escalados';
 
@@ -36,26 +37,27 @@ interface Props {
 }
 
 export function VistaMensajes({ mensajes, evaluaciones, pendientes, ahora, contexto, historia, historial, onConfirmar, onAbrirDemo }: Props) {
+  const t = useT();
   const [filtro, setFiltro] = useState<Filtro>('todos');
   const visibles = mensajes.filter(FILTROS.find((f) => f.id === filtro)!.aplica);
 
   return (
     <>
-      <EncabezadoSeccion titulo="Mensajes" descripcion="Lo que Higia le comunicó al astronauta, por qué canal y por qué." />
-      <div className="filtros" role="tablist" aria-label="Filtrar mensajes">
+      <EncabezadoSeccion titulo={t('Mensajes')} descripcion={t('Lo que Higia le comunicó al astronauta, por qué canal y por qué.')} />
+      <div className="filtros" role="tablist" aria-label={t('Filtrar mensajes')}>
         {FILTROS.map((f) => {
           const n = mensajes.filter(f.aplica).length;
           return (
             <button key={f.id} role="tab" aria-selected={filtro === f.id} onClick={() => setFiltro(f.id)}>
-              {f.nombre} <span className="filtro-n">{n}</span>
+              {t(f.nombre)} <span className="filtro-n">{n}</span>
             </button>
           );
         })}
       </div>
 
       {visibles.length === 0 ? (
-        <Vacio icono="mensajes" titulo={mensajes.length ? 'Nada en este filtro' : 'Sin mensajes todavía'}>
-          {!mensajes.length && <>Higia solo habla cuando algo cambia. <button className="boton-enlace" onClick={onAbrirDemo}>Ejecuta un escenario en el simulador</button> para ver cómo responde.</>}
+        <Vacio icono="mensajes" titulo={mensajes.length ? t('Nada en este filtro') : t('Sin mensajes todavía')}>
+          {!mensajes.length && <>{t('Higia solo habla cuando algo cambia.')} <button className="boton-enlace" onClick={onAbrirDemo}>{t('Ejecuta un escenario en el simulador')}</button> {t('para ver cómo responde.')}</>}
         </Vacio>
       ) : (
         <ol className="lista-mensajes">
@@ -71,66 +73,68 @@ export function VistaMensajes({ mensajes, evaluaciones, pendientes, ahora, conte
 function TarjetaMensaje({ mensaje: m, historia, historial, evaluacion, vence, ahora, contexto, onConfirmar }: {
   mensaje: Mensaje; historia: HistoriaClinica; historial: Historial; evaluacion?: EvaluacionMensaje; vence?: number; ahora: number; contexto: Contexto; onConfirmar: (id: string) => void;
 }) {
+  const t = useT();
+  const { idioma } = useIdioma();
   const canal = CANAL[m.canal];
   const segundos = vence ? Math.max(0, Math.ceil((vence - ahora) / 1000)) : 0;
 
   return (
     <li className={`mensaje nivel-borde-${m.escalamiento ? 'alerta' : m.hallazgo.nivel} ${m.diferido ? 'mensaje-retenido' : ''}`}>
       <div className="mensaje-cab">
-        {m.escalamiento ? <Etiqueta icono="escalado" tono="alerta">Escalado</Etiqueta> : <InsigniaNivel nivel={m.hallazgo.nivel} />}
+        {m.escalamiento ? <Etiqueta icono="escalado" tono="alerta">{t('Escalado')}</Etiqueta> : <InsigniaNivel nivel={m.hallazgo.nivel} />}
         <h3>{m.hallazgo.titulo}</h3>
-        <time dateTime={new Date(m.timestamp).toISOString()}>{new Date(m.timestamp).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</time>
+        <time dateTime={new Date(m.timestamp).toISOString()}>{new Date(m.timestamp).toLocaleTimeString(idioma === 'en' ? 'en-GB' : 'es', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</time>
       </div>
 
       <p className="mensaje-texto">{sinTitulo(m.texto, m.hallazgo.titulo)}</p>
 
       {antecedentesDe(historia, m.hallazgo.sistema).length > 0 && !m.escalamiento && (
         <p className="mensaje-antecedente">
-          <Icono nombre="documento" tamano={16} /> Antecedente relevante: {antecedentesDe(historia, m.hallazgo.sistema).map((a) => a.nombre).join(', ')}
+          <Icono nombre="documento" tamano={16} /> {t('Antecedente relevante:')} {antecedentesDe(historia, m.hallazgo.sistema).map((a) => t(a.nombre)).join(', ')}
         </p>
       )}
 
       <div className="mensaje-etiquetas">
-        <Etiqueta icono={canal.icono}>{canal.nombre}</Etiqueta>
-        {m.diferido && <Etiqueta icono="retenido">Retenido</Etiqueta>}
-        {m.hallazgo.sensible && <Etiqueta icono="candado">Privado</Etiqueta>}
-        {m.esRecordatorio && <Etiqueta icono="recordatorio">Recordatorio</Etiqueta>}
-        {m.hallazgo.hrp?.slice(0, 2).map((id) => <Etiqueta key={id} icono="escudo" tono="nasa">Riesgo NASA: {RIESGO_HRP[id].nombre}</Etiqueta>)}
+        <Etiqueta icono={canal.icono}>{t(canal.nombre)}</Etiqueta>
+        {m.diferido && <Etiqueta icono="retenido">{t('Retenido')}</Etiqueta>}
+        {m.hallazgo.sensible && <Etiqueta icono="candado">{t('Privado')}</Etiqueta>}
+        {m.esRecordatorio && <Etiqueta icono="recordatorio">{t('Recordatorio')}</Etiqueta>}
+        {m.hallazgo.hrp?.slice(0, 2).map((id) => <Etiqueta key={id} icono="escudo" tono="nasa">{t('Riesgo NASA: {nombre}', { nombre: t(RIESGO_HRP[id].nombre) })}</Etiqueta>)}
       </div>
 
       {vence !== undefined && (
         <div className="confirmacion">
-          <span>Esperando respuesta: se avisará a otros en <b>{segundos} s</b>.</span>
-          <button className="boton boton-ok" onClick={() => onConfirmar(m.id)}><Icono nombre="check" /> Estoy bien</button>
+          <span>{t('Esperando respuesta: se avisará a otros en')} <b>{segundos} s</b>.</span>
+          <button className="boton boton-ok" onClick={() => onConfirmar(m.id)}><Icono nombre="check" /> {t('Estoy bien')}</button>
         </div>
       )}
 
       {m.escalamiento && (
-        <p className="mensaje-destino"><Icono nombre="escalado" tamano={16} /> Avisados: {m.escalamiento.destinos.join(', ')}</p>
+        <p className="mensaje-destino"><Icono nombre="escalado" tamano={16} /> {t('Avisados:')} {m.escalamiento.destinos.join(', ')}</p>
       )}
       {m.reporte && <p className="mensaje-destino"><Icono nombre="reportes" tamano={16} /> {m.reporte}</p>}
 
       {evaluacion && (
         <div className={`evaluacion-ia ${evaluacion.estado}`} aria-live="polite">
-          <p className="evaluacion-ia-titulo"><Icono nombre="ia" tamano={16} /> Evaluación de Higia · IA</p>
-          {evaluacion.estado === 'cargando' && <p className="texto-suave">La IA está evaluando este hallazgo…</p>}
+          <p className="evaluacion-ia-titulo"><Icono nombre="ia" tamano={16} /> {t('Evaluación de Higia · IA')}</p>
+          {evaluacion.estado === 'cargando' && <p className="texto-suave">{t('La IA está evaluando este hallazgo…')}</p>}
           {evaluacion.estado === 'lista' && (
             <>
               <p>{evaluacion.evaluacion}</p>
-              {evaluacion.recomendacion && <p className="evaluacion-ia-accion"><b>Siguiente paso:</b> {evaluacion.recomendacion}</p>}
+              {evaluacion.recomendacion && <p className="evaluacion-ia-accion"><b>{t('Siguiente paso:')}</b> {evaluacion.recomendacion}</p>}
               {evaluacion.datosUsados.length > 0
-                ? <p className="evaluacion-ia-datos"><b>Datos que usó:</b> {evaluacion.datosUsados.join(' · ')}</p>
-                : <p className="evaluacion-ia-datos aviso">La IA no citó datos: tómala con cautela y guíate por el mensaje del motor.</p>}
-              {evaluacion.limitaciones && <p className="evaluacion-ia-datos"><b>Limitaciones:</b> {evaluacion.limitaciones}</p>}
+                ? <p className="evaluacion-ia-datos"><b>{t('Datos que usó:')}</b> {evaluacion.datosUsados.join(' · ')}</p>
+                : <p className="evaluacion-ia-datos aviso">{t('La IA no citó datos: tómala con cautela y guíate por el mensaje del motor.')}</p>}
+              {evaluacion.limitaciones && <p className="evaluacion-ia-datos"><b>{t('Limitaciones:')}</b> {evaluacion.limitaciones}</p>}
             </>
           )}
-          {evaluacion.estado === 'error' && <p className="nota">IA no disponible ({evaluacion.error}). Vale el mensaje del motor local.</p>}
+          {evaluacion.estado === 'error' && <p className="nota">{t('IA no disponible ({error}). Vale el mensaje del motor local.', { error: evaluacion.error })}</p>}
         </div>
       )}
 
       {m.pasos && (
         <div className="pasos">
-          <p>Qué hacer, paso a paso (no hay médico a bordo)</p>
+          <p>{t('Qué hacer, paso a paso (no hay médico a bordo)')}</p>
           <ol>{m.pasos.map((p) => <li key={p}>{p}</li>)}</ol>
         </div>
       )}
@@ -140,19 +144,19 @@ function TarjetaMensaje({ mensaje: m, historia, historial, evaluacion, vence, ah
       {!!m.hallazgo.datos?.length && <DatosUsados datos={m.hallazgo.datos} />}
 
       <details className="mensaje-detalles">
-        <summary>Por qué este mensaje</summary>
+        <summary>{t('Por qué este mensaje')}</summary>
         <dl>
-          <dt>Canal elegido</dt><dd>{m.motivo}</dd>
-          <dt>Base científica</dt><dd>{m.hallazgo.fuente}</dd>
-          <dt>Dato técnico</dt><dd>{m.hallazgo.detalleTecnico}</dd>
+          <dt>{t('Canal elegido')}</dt><dd>{m.motivo}</dd>
+          <dt>{t('Base científica')}</dt><dd>{m.hallazgo.fuente}</dd>
+          <dt>{t('Dato técnico')}</dt><dd>{m.hallazgo.detalleTecnico}</dd>
         </dl>
         {!m.escalamiento && m.hallazgo.nivel !== 'normal' && (
           <>
-            <p className="detalles-sub">Cómo lo recibiría cada astronauta</p>
+            <p className="detalles-sub">{t('Cómo lo recibiría cada astronauta')}</p>
             <ul className="comparacion">
               {PERFILES.map((p) => (
                 <li key={p.id}>
-                  <strong>{p.nombre}</strong> <span className="texto-suave">· {p.rol}</span>
+                  <strong>{p.nombre}</strong> <span className="texto-suave">· {t(p.rol)}</span>
                   <p>{redactar(m.hallazgo, p, contexto, { breve: m.canal === 'auricular' })}</p>
                 </li>
               ))}
@@ -179,23 +183,25 @@ function Tendencias({ mensaje: m, historial }: { mensaje: Mensaje; historial: Hi
   return <div className="tendencias">{sensores.map((s) => <MiniTendencia key={s} sensor={s} historial={historial} base={base(s)} />)}</div>;
 }
 
-const horaDato = (ts: number) => new Date(ts).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+const horaDato = (ts: number, idioma: Idioma) => new Date(ts).toLocaleTimeString(idioma === 'en' ? 'en-GB' : 'es', { hour: '2-digit', minute: '2-digit' });
 const FUENTE: Record<DatoClinico['fuente'], string> = { sensor: 'sensor', voz: 'conversación', manual: 'manual', simulador: 'simulador' };
 
 /** Datos exactos en que se basó el análisis: valor, cuándo, de dónde y la línea base de la persona. */
 function DatosUsados({ datos }: { datos: DatoClinico[] }) {
+  const t = useT();
+  const { idioma } = useIdioma();
   return (
     <div className="datos-usados">
-      <p className="datos-usados-titulo"><Icono nombre="actividad" tamano={14} /> Datos usados en este análisis</p>
+      <p className="datos-usados-titulo"><Icono nombre="actividad" tamano={14} /> {t('Datos usados en este análisis')}</p>
       <ul>
         {datos.map((d, i) => {
           const info = INFO_SENSOR[d.sensor];
           return (
             <li key={`${d.sensor}-${d.timestamp}-${i}`}>
-              <span className="dato-nombre">{info.nombre}</span>
+              <span className="dato-nombre">{t(info.nombre)}</span>
               <span className="dato-valor">{d.valor} {info.unidad}</span>
-              {d.lineaBase !== undefined && <span className="texto-suave">habitual {d.lineaBase} {info.unidad}</span>}
-              <span className="texto-suave">{horaDato(d.timestamp)} · {FUENTE[d.fuente]}</span>
+              {d.lineaBase !== undefined && <span className="texto-suave">{t('habitual {v} {u}', { v: d.lineaBase, u: info.unidad })}</span>}
+              <span className="texto-suave">{horaDato(d.timestamp, idioma)} · {t(FUENTE[d.fuente])}</span>
             </li>
           );
         })}

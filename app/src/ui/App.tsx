@@ -17,10 +17,10 @@ import { ChequeoOrientacion } from '../core/orientacion';
 import { elegirPreguntaProactiva, esAfirmativo, esNegativo, preguntaProactiva, type PreguntaProactiva } from '../core/proactivo';
 import { enRango, esSensor, INFO_SENSOR, NOMBRE_SISTEMA, type Comunicacion, type Contexto, type HistoriaClinica, type Lectura, type Mensaje, type Perfil, type SistemaCorporal } from '../core/tipos';
 import { useAsistente, type ResultadoConversacion } from './asistente';
-import { AccesoHigia } from './componentes/AccesoHigia';
-import { AuraHigia } from './componentes/AuraHigia';
+import { AccesoHigia } from './componentes/AccesoHigia';import { AuraHigia } from './componentes/AuraHigia';
 import { BannerAlerta, BannerComunicacion, BarraSuperior, Navegacion } from './componentes/Estructura';
 import { SECCIONES, useSeccion } from './navegacion';
+import { useIdioma, useT } from './idioma';
 import { BarraReproduccion } from './simulador/BarraReproduccion';
 import { CoberturaPantallaCompleta } from './simulador/CoberturaHRP';
 import { PanelSimulador } from './simulador/PanelSimulador';
@@ -78,6 +78,8 @@ const esUrgente = (a: Accion) => a.tipo === 'pedir_ayuda' || a.tipo === 'confirm
 const esInmediata = (a: Accion) => esUrgente(a) || a.tipo === 'evaluacion_cognitiva' || a.tipo === 'prueba_guiada' || a.tipo === 'chequeo_orientacion';
 
 export function App() {
+  const t = useT();
+  const { idioma } = useIdioma();
   // El núcleo se puede reemplazar: el simulador reinicia con uno limpio entre escenarios.
   const [nucleo, setNucleo] = useState<NucleoSalud>(() => nuevoNucleo(conHistoriaGuardada(PERFILES[0]), CONTEXTO_INICIAL));
   /** Cambia en cada reinicio: los temporizadores de un núcleo anterior no deben actuar sobre el nuevo. */
@@ -138,9 +140,9 @@ export function App() {
 
   // Título de la pestaña según la sección.
   useEffect(() => {
-    document.title = seccion === 'asistente' ? 'Higia · Asistente' : `${SECCIONES.find((s) => s.id === seccion)!.nombre} · Higia`;
+    document.title = seccion === 'asistente' ? `Higia · ${t('Asistente')}` : `${t(SECCIONES.find((s) => s.id === seccion)!.nombre)} · Higia`;
     if (seccion === 'mensajes') setVistoHasta(Date.now());
-  }, [seccion, mensajes.length]);
+  }, [seccion, mensajes.length, t]);
 
   const alternarDemo = useCallback((v?: boolean) => {
     setDemoAbierta((actual) => {
@@ -187,12 +189,12 @@ export function App() {
     for (const m of nuevos) {
       if (m.escalamiento || m.esRecordatorio || m.hallazgo.nivel === 'normal') continue;
       setEvaluaciones((prev) => ({ ...prev, [m.id]: { estado: 'cargando' } }));
-      evaluarIA(peticionEvaluacion(m, nucleo)).then(
+      evaluarIA({ ...peticionEvaluacion(m, nucleo), idioma }).then(
         (r) => setEvaluaciones((prev) => ({ ...prev, [m.id]: { estado: 'lista', ...r } })),
         (e: unknown) => setEvaluaciones((prev) => ({ ...prev, [m.id]: { estado: 'error', error: e instanceof Error ? e.message : 'Error desconocido.' } })),
       );
     }
-  }, [nucleo]);
+  }, [nucleo, idioma]);
 
   /** Simula la respuesta de cada destinatario (en la realidad llega por radio o por la red del hábitat). */
   const programarRespuestas = useCallback((coms: Comunicacion[]) => {
@@ -573,7 +575,7 @@ export function App() {
     const soloPrueba = local.acciones.length > 0 && local.acciones.every((a) => a.tipo === 'evaluacion_cognitiva' || a.tipo === 'prueba_guiada');
     try {
       if (!iaActiva || soloPrueba) throw new Error('');
-      const r = await conversarIA({ frase, historial: turnos.current, estado: estadoParaIA(nucleo, estadoApp()) });
+      const r = await conversarIA({ frase, historial: turnos.current, estado: estadoParaIA(nucleo, estadoApp()), idioma });
       lecturas = lecturasDesdeIA(r);
       // Lo que el intérprete local detecta de forma determinista (señales de percepción) se registra siempre.
       lecturas.push(...local.lecturas.filter((l) => l.sensor === 'marcadoresPsicoticos' && !lecturas.some((x) => x.sensor === l.sensor)));
@@ -629,10 +631,10 @@ export function App() {
   const cambiarProactivo = (min: number) => { setProactivo(min); guardarProactivo(min); ultimaProactiva.current = Date.now(); };
 
   const enCurso: EnCurso | null = evaluacion.current
-    ? { titulo: 'Evaluación cognitiva', paso: evaluacion.current.respondidas + 1, total: evaluacion.current.total }
-    : chequeo.current ? { titulo: 'Chequeo de orientación', paso: chequeo.current.respuestas.length + 1, total: chequeo.current.total }
+    ? { titulo: t('Evaluación cognitiva'), paso: evaluacion.current.respondidas + 1, total: evaluacion.current.total }
+    : chequeo.current ? { titulo: t('Chequeo de orientación'), paso: chequeo.current.respuestas.length + 1, total: chequeo.current.total }
     : pendiente.current ? {
-      titulo: 'Higia te hizo una pregunta',
+      titulo: t('Higia te hizo una pregunta'),
       rapidas: pendiente.current.pregunta.tipo === 'cognitiva' ? ['Sí, empecemos', 'Ahora no']
         : pendiente.current.pregunta.tipo === 'abierta' ? ['No, estoy bien', 'Me duele la cabeza']
         : pendiente.current.pregunta.sensor === 'horasSueno' ? ['5 horas', '7 horas', '8 horas']
@@ -686,7 +688,7 @@ export function App() {
       'app', demoAbierta && !grabando && 'con-demo', demoAbierta && simAmplio && 'sim-amplio', sim.activo && !grabando && 'con-reproductor',
       grabando && 'modo-grabacion', cursorQuieto && 'cursor-oculto',
     ].filter(Boolean).join(' ')}>
-      <a href="#contenido" className="saltar">Saltar al contenido</a>
+      <a href="#contenido" className="saltar">{t('Saltar al contenido')}</a>
       <BarraSuperior
         contexto={c} nombreAstronauta={nucleo.perfil.nombre} iaActiva={iaActiva} iaConfigurada={ia.configurada}
         escucha={asistente.estadoEscucha} actividad={asistente.actividad} ahora={ahora} vozActiva={vozActiva} onVozActiva={setVozActiva} demoAbierta={demoAbierta} onDemo={() => alternarDemo()}
@@ -713,8 +715,8 @@ export function App() {
           {seccion === 'pruebas' && (
             <VistaPruebas
               nucleo={nucleo} vozActiva={vozActiva} pedida={pruebaPedida} onPedidaAtendida={limpiarPedida} onRegistrar={registrarPrueba}
-              onEvaluacionCognitiva={() => { ir('asistente'); void asistente.enviar('Hazme una evaluación cognitiva'); }}
-              onChequeoOrientacion={() => { ir('asistente'); void asistente.enviar('Hazme un chequeo de orientación'); }}
+              onEvaluacionCognitiva={() => { ir('asistente'); void asistente.enviar(t('Hazme una evaluación cognitiva')); }}
+              onChequeoOrientacion={() => { ir('asistente'); void asistente.enviar(t('Hazme un chequeo de orientación')); }}
             />
           )}
           {seccion === 'resumen' && (
@@ -739,7 +741,7 @@ export function App() {
           {seccion === 'entorno' && (
             <VistaEntorno
               contexto={c} iaActiva={iaActiva} onAplicar={cambiarContexto} onAbrirDemo={() => alternarDemo(true)}
-              onAnalizar={(imagen) => analizarEntornoIA({ imagen, contexto: { ...c } })}
+              onAnalizar={(imagen) => analizarEntornoIA({ imagen, contexto: { ...c }, idioma })}
             />
           )}
           {seccion === 'reportes' && (
@@ -763,7 +765,7 @@ export function App() {
       {coberturaCompleta && (
         <CoberturaPantallaCompleta estado={nucleo.estadoRiesgosHRP()} enEscenario={sim.reproductor.escenario?.hrp ?? []} onCerrar={() => setCoberturaCompleta(false)} />
       )}
-      {grabando && <span className="indicador-grabacion" role="status" aria-label="Modo grabación activo (G para salir)" />}
+      {grabando && <span className="indicador-grabacion" role="status" aria-label={t('Modo grabación activo (G para salir)')} />}
     </div>
   );
 }
