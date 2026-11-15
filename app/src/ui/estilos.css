@@ -380,23 +380,18 @@ select, input[type='text'], input[type='number'], input:not([type]) {
 
 /* Tintes por sistema, recortados con la figura (máscara) */
 .tintes { pointer-events: none; }
-.tinte ellipse { fill: var(--c); opacity: .5; transition: opacity .15s; }
-.tinte polygon { fill: var(--c); opacity: .3; transition: opacity .15s; }
-.zona-brazos path { fill: none; stroke-width: 30; stroke-linecap: round; stroke-linejoin: round; }
-.tinte .zona-brazos path { stroke: var(--c); opacity: .3; }
-.tinte.nivel-sinDatos ellipse, .tinte.nivel-sinDatos polygon, .tinte.nivel-sinDatos .zona-brazos path { opacity: 0; }
-.tinte.seleccionado ellipse { opacity: .72; }
-.tinte.seleccionado polygon, .tinte.seleccionado .zona-brazos path { opacity: .5; }
-.tinte.nivel-sinDatos.seleccionado ellipse, .tinte.nivel-sinDatos.seleccionado polygon, .tinte.nivel-sinDatos.seleccionado .zona-brazos path { opacity: .35; }
+.tinte path { fill: var(--c); opacity: .45; transition: opacity .15s; }
+.tinte.nivel-sinDatos path { opacity: 0; }
+.tinte.seleccionado path { opacity: .72; }
+.tinte.nivel-sinDatos.seleccionado path { opacity: .35; }
 .tinte.nivel-alerta { animation: pulso-alerta 1.6s ease-in-out infinite; }
 @keyframes pulso-alerta { 50% { opacity: .55; } }
 
 /* Zonas interactivas: invisibles; contorno al pasar o seleccionar */
-.zona-sistema ellipse, .zona-sistema polygon { fill: transparent; stroke: transparent; stroke-width: 1.6; transition: stroke .15s; }
-.zona-sistema .zona-brazos path { stroke: transparent; pointer-events: stroke; }
-.zona-sistema:hover ellipse, .zona-sistema:hover polygon { stroke: color-mix(in srgb, var(--c) 70%, #fff); stroke-dasharray: 4 3; }
-.zona-sistema.seleccionado ellipse, .zona-sistema.seleccionado polygon,
-.zona-sistema:focus-visible ellipse, .zona-sistema:focus-visible polygon { stroke: color-mix(in srgb, var(--c) 80%, #fff); stroke-dasharray: none; filter: drop-shadow(0 0 4px var(--c)); }
+.zona-sistema path { fill: transparent; stroke: transparent; stroke-width: 1.6; transition: stroke .15s; }
+.zona-sistema:hover path { stroke: color-mix(in srgb, var(--c) 70%, #fff); stroke-dasharray: 4 3; }
+.zona-sistema.seleccionado path,
+.zona-sistema:focus-visible path { stroke: color-mix(in srgb, var(--c) 80%, #fff); stroke-dasharray: none; filter: drop-shadow(0 0 4px var(--c)); }
 
 /* ── Botón de peligro (pedir ayuda) ──────────────────────────────────── */
 .boton-peligro { background: var(--alerta); border-color: var(--alerta); color: #fff; font-weight: 600; }
