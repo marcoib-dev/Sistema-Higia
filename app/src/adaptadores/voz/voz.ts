@@ -152,7 +152,12 @@ const ESPERA_PEDIDO_MS = 8000;
 /** Hasta cuándo se acepta una respuesta sin nombrar a Higia (cuando ella acaba de hacer una pregunta). */
 let respuestaHasta = 0;
 
-/** Higia hizo una pregunta: la próxima frase se toma como respuesta aunque no la nombren. */
+/** La ventana de escucha sin nombre está activa en este instante. */
+export function respuestaSinNombreActiva(now: number = Date.now()): boolean {
+  return now < respuestaHasta;
+}
+
+/** Higia hizo una pregunta o acaba de responder: se acepta otra frase sin nombrarla durante unos segundos. */
 export function aceptarRespuestaSinNombre(ms: number): void {
   respuestaHasta = Date.now() + ms;
 }
@@ -232,7 +237,7 @@ function crearDetector({ onComando, onEstado }: Pick<OpcionesEscucha, 'onComando
         } else {
           esperar();
         }
-      } else if (Date.now() < esperaHasta || Date.now() < respuestaHasta) {
+      } else if (Date.now() < esperaHasta || respuestaSinNombreActiva()) {
         limpiar();
         respuestaHasta = 0;
         onEstado('esperando');
@@ -240,7 +245,7 @@ function crearDetector({ onComando, onEstado }: Pick<OpcionesEscucha, 'onComando
         if (texto) onComando(texto);
       }
     },
-    alIniciar() { onEstado(Date.now() < esperaHasta ? 'llamado' : 'esperando'); },
+    alIniciar() { onEstado(Date.now() < esperaHasta || respuestaSinNombreActiva() ? 'llamado' : 'esperando'); },
     parar: limpiar,
   };
 }

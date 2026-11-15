@@ -4,6 +4,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  aceptarRespuestaSinNombre,
   detectarLlamado, detener, escucharFrase, escucharPalabraClave, estadoVoz, hablar,
   motivoSinReconocimiento, motorVozPreferido, type EstadoEscucha, type MotorVoz,
 } from '../adaptadores/voz/voz';
@@ -81,7 +82,10 @@ export function useAsistente(onFrase: (frase: string) => Promise<ResultadoConver
     try {
       const r = await onFraseRef.current(f);
       setHistorial((prev) => [{ id: Date.now(), pregunta: f, respuesta: r.texto, fuente: r.fuente, hechos: r.hechos, origen, nota: r.nota }, ...prev].slice(0, 40));
-      if (origen === 'voz') setProblemaVoz(undefined); // el reconocimiento funcionó
+      if (origen === 'voz') {
+        setProblemaVoz(undefined); // el reconocimiento funcionó
+        aceptarRespuestaSinNombre(8000); // deja una ventana corta para seguir hablando sin repetir «Higia»
+      }
       if (vozRef.current) hablar(r.texto);
     } finally {
       pensandoRef.current = false;

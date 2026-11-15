@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectarLlamado, diagnosticoReconocimiento, mensajeErrorReconocimiento } from './voz';
+import { aceptarRespuestaSinNombre, detectarLlamado, diagnosticoReconocimiento, mensajeErrorReconocimiento, respuestaSinNombreActiva } from './voz';
 
 describe('palabra clave «Higia»', () => {
   it('separa el pedido del nombre', () => {
@@ -18,6 +18,12 @@ describe('palabra clave «Higia»', () => {
 
   it('solo el nombre: llamado sin pedido (se espera la frase siguiente)', () => {
     expect(detectarLlamado('Higia')).toEqual({ llamado: true, resto: '' });
+  });
+
+  it('mantiene la escucha abierta durante unos segundos tras responder', () => {
+    aceptarRespuestaSinNombre(5000);
+    expect(respuestaSinNombreActiva(Date.now() + 1000)).toBe(true);
+    expect(respuestaSinNombreActiva(Date.now() + 6000)).toBe(false);
   });
 
   it('no se activa si no la nombran al principio, ni con palabras parecidas', () => {
