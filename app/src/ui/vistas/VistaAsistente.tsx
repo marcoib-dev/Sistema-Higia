@@ -150,8 +150,8 @@ export function VistaAsistente({
             </li>
           </ol>
           <div className="guia-acciones">
-            <button className="boton boton-fantasma" onClick={onTutorial}><Icono nombre="brujula" /> {t('Ver recorrido guiado')}</button>
-            <button className="boton guia-entendido" onClick={cerrarGuia}><Icono nombre="check" /> {t('Entendido')}</button>
+            <button className="boton boton-fantasma guia-entendido" onClick={cerrarGuia}><Icono nombre="check" /> {t('Entendido')}</button>
+            <button className="boton boton-primario" onClick={onTutorial}><Icono nombre="brujula" /> {t('Ver recorrido guiado')}</button>
           </div>
         </section>
       )}
