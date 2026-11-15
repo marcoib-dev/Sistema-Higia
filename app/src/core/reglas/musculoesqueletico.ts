@@ -256,3 +256,50 @@ export const reglaCargaDinamica = definirRegla(
     return d;
   },
 );
+
+// ── Fuerza isométrica (dinamómetro de prensión) ─────────────────────────
+
+/** Valor de referencia si la persona no tiene línea base previa al vuelo (kg). */
+export const ISOMETRICA_REFERENCIA = 40;
+
+export const reglaFuerzaIsometrica = definirRegla(
+  {
+    id: 'musculo.isometrica', nombre: 'Fuerza isométrica', sistema: 'musculos',
+    sensores: ['fuerzaIsometrica'],
+    fuente: '§7.1.9: pérdida de fuerza en vuelo (10–12 % en promedio) · Standard Measures: fuerza isométrica de prensión con dinamómetro',
+    hrp: ['aptitud'],
+  },
+  (h, p, ahora) => {
+    const ult = ultimaReciente(h, 'fuerzaIsometrica', ahora, 45 * 24);
+    if (!ult) return null;
+    const base = p.lineaBase.fuerzaIsometrica ?? ISOMETRICA_REFERENCIA;
+    const caida = caidaRelativa(ult.valor, base);
+    const previas = h.ultimas('fuerzaIsometrica', 3);
+    const tendencia = previas.length >= 2 ? ` (antes ${previas.slice(0, -1).map((l) => r1(l.valor)).join(' → ')} kg)` : '';
+    const detalle = `Prensión isométrica máxima ${r1(ult.valor)} kg (línea base ${base} kg, ${caida > 0 ? '−' : '+'}${pct(Math.abs(caida))})${tendencia}`;
+    const datos = previas.map((l) => dato(l, p));
+    const nivel: Nivel = caida >= 0.3 ? 'alerta' : caida >= 0.2 ? 'aviso' : caida >= 0.1 ? 'info' : 'normal';
+    if (nivel === 'normal') return { ...normal('Fuerza isométrica', detalle), datos, region: 'brazos' };
+    const d: DatosHallazgo = {
+      nivel, detalleTecnico: detalle, datos, region: 'brazos',
+      titulo: nivel === 'info' ? 'Fuerza isométrica algo más baja' : 'Pérdida de fuerza isométrica mayor a la esperable',
+      resumenSimple: nivel === 'info'
+        ? 'Tu fuerza de agarre bajó un poco: es lo habitual en vuelo.'
+        : 'Tu fuerza de agarre bajó más de lo habitual: afecta el manejo de herramientas y del traje.',
+      accion: 'Suma ejercicio de resistencia de brazos y manos y repite la prueba en una semana.',
+      accionPorUbicacion: { eva: 'Si notas que te cuesta sujetar herramientas o los pasamanos, avisa y acorta la EVA.' },
+      ruta: nivel === 'info' ? 'autogestion' : 'reporte', sensible: false,
+      bloquea: nivel === 'alerta' ? ['eva'] : undefined,
+    };
+    if (nivel === 'alerta') {
+      d.pasos = [
+        'Pospón las EVA largas: los guantes del traje exigen mucha fuerza de agarre.',
+        'Haz ejercicio de resistencia de antebrazos y manos todos los días.',
+        'Revisa que estés comiendo suficiente proteína y calorías.',
+        'Repite la prueba isométrica en una semana, con la misma mano y la misma postura.',
+        'Higia envía el reporte para que Tierra ajuste tu plan de entrenamiento.',
+      ];
+    }
+    return d;
+  },
+);

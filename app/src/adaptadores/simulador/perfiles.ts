@@ -8,6 +8,7 @@ export const PERFILES: Perfil[] = [
     lineaBase: {
       frecuenciaCardiaca: 58, animo: 7, estres: 25, cognicion: 90, tiempoReaccion: 255,
       fuerza: 92, aptitudAerobica: 38, equilibrio: 88, agudezaVisual: 95, pesoCorporal: 62, cohesionEquipo: 8, presionIntraocular: 15,
+      fuerzaIsometrica: 30, valsalva: 1.55,
     },
     requerimientoCalorico: 2200,
     horarioSueno: { inicio: 23, fin: 7 },
@@ -30,6 +31,7 @@ export const PERFILES: Perfil[] = [
     lineaBase: {
       frecuenciaCardiaca: 70, animo: 7, estres: 35, cognicion: 84, tiempoReaccion: 285,
       fuerza: 100, aptitudAerobica: 45, equilibrio: 90, agudezaVisual: 98, pesoCorporal: 78, cohesionEquipo: 8, presionIntraocular: 14,
+      fuerzaIsometrica: 46, valsalva: 1.62,
     },
     requerimientoCalorico: 2800,
     horarioSueno: { inicio: 22, fin: 6 },
@@ -52,6 +54,7 @@ export const PERFILES: Perfil[] = [
     lineaBase: {
       frecuenciaCardiaca: 62, animo: 8, estres: 30, cognicion: 88, tiempoReaccion: 240,
       fuerza: 105, aptitudAerobica: 48, equilibrio: 94, agudezaVisual: 99, pesoCorporal: 74, cohesionEquipo: 9, presionIntraocular: 16,
+      fuerzaIsometrica: 48, valsalva: 1.58,
     },
     requerimientoCalorico: 2700,
     horarioSueno: { inicio: 23, fin: 7 },
@@ -74,6 +77,7 @@ export const PERFILES: Perfil[] = [
     lineaBase: {
       frecuenciaCardiaca: 60, animo: 7, estres: 28, cognicion: 87, tiempoReaccion: 265,
       fuerza: 85, aptitudAerobica: 34, equilibrio: 85, agudezaVisual: 90, pesoCorporal: 66, cohesionEquipo: 8, presionIntraocular: 21,
+      fuerzaIsometrica: 29, valsalva: 1.5,
     },
     requerimientoCalorico: 2100,
     horarioSueno: { inicio: 22, fin: 6 },

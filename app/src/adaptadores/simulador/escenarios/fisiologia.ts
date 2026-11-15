@@ -320,4 +320,30 @@ export const ESCENARIOS_FISIOLOGIA: Escenario[] = [
       { enMs: 8_000, titulo: 'Dolor de espalda', narracion: 'Al intentar levantarse, le duele la espalda.', frase: 'me duele la espalda', esperado: [{ riesgoId: 'lesion.cargaDinamica', nivel: 'alerta' }] },
     ],
   },
+  {
+    id: 'fuerza-isometrica', nombre: 'Prueba de fuerza isométrica', categoria: 'fisiologia',
+    descripcion: 'Día 120: el dinamómetro de mano marca un 25 % menos que antes del vuelo. Pérdida mayor a la esperable.',
+    hrp: ['aptitud'], peligros: ['gravedad'], nivelMaximo: 'aviso',
+    queObservar: ['Se compara con la línea base personal, no con un valor genérico.', 'Se ve la tendencia de las pruebas anteriores.', 'La prueba se puede guiar paso a paso desde la sección Pruebas.'],
+    perfil: 'AST-02',
+    contextoInicial: { diaMision: 120 },
+    precarga: (t, p) => serie('fuerzaIsometrica', [p.lineaBase.fuerzaIsometrica ?? 46, (p.lineaBase.fuerzaIsometrica ?? 46) * 0.9], t - DIA, 30 * DIA),
+    pasos: [{
+      enMs: 0, titulo: 'Prensión de 34,5 kg', narracion: 'La contracción máxima sostenida da 34,5 kg (línea base 46 kg).',
+      lecturas: (t, _h, p) => [L('fuerzaIsometrica', Math.round((p.lineaBase.fuerzaIsometrica ?? 46) * 0.75 * 2) / 2, t)],
+      esperado: [{ riesgoId: 'musculo.isometrica', nivel: 'aviso' }],
+    }],
+  },
+  {
+    id: 'valsalva-aterrizaje', nombre: 'Valsalva antes de aterrizar', categoria: 'fisiologia',
+    descripcion: 'Llegada a la superficie: la maniobra de Valsalva muestra un reflejo autonómico reducido. Riesgo de desmayo al incorporarse.',
+    hrp: ['cardiovascular'], peligros: ['gravedad'], nivelMaximo: 'alerta',
+    queObservar: ['El mismo cociente pesa más durante una transición de gravedad.', 'Contraindica el pilotaje y trae guía paso a paso.'],
+    contextoInicial: { transicionGravedad: true, destino: 'marte' },
+    pasos: [{
+      enMs: 0, titulo: 'Cociente de 1,05', narracion: 'Al soltar el pujo, el pulso casi no baja: el reflejo barorreceptor responde poco.',
+      lecturas: (t) => [L('valsalva', 1.05, t), L('frecuenciaCardiaca', 84, t)],
+      esperado: [{ riesgoId: 'cardio.valsalva', nivel: 'alerta' }],
+    }],
+  },
 ];

@@ -9,20 +9,24 @@ import { RegistroSimulacion } from '../adaptadores/simulador/registro';
 import { respuestaSimulada } from '../adaptadores/simulador/tripulacion';
 import { prepararPiper } from '../adaptadores/voz/piper';
 import { aceptarRespuestaSinNombre, detener, hablar } from '../adaptadores/voz/voz';
-import type { Accion } from '../core/acciones';
+import type { Accion, PruebaGuiada } from '../core/acciones';
+import { EvaluacionCognitiva } from '../core/cognicion';
 import { interpretar } from '../core/conversacion';
 import type { NucleoSalud } from '../core/nucleo';
 import { ChequeoOrientacion } from '../core/orientacion';
-import { enRango, esSensor, NOMBRE_SISTEMA, type Comunicacion, type Contexto, type HistoriaClinica, type Lectura, type Mensaje, type Perfil, type SistemaCorporal } from '../core/tipos';
+import { elegirPreguntaProactiva, esAfirmativo, esNegativo, preguntaProactiva, type PreguntaProactiva } from '../core/proactivo';
+import { enRango, esSensor, INFO_SENSOR, NOMBRE_SISTEMA, type Comunicacion, type Contexto, type HistoriaClinica, type Lectura, type Mensaje, type Perfil, type SistemaCorporal } from '../core/tipos';
 import { useAsistente, type ResultadoConversacion } from './asistente';
 import { AccesoHigia } from './componentes/AccesoHigia';
+import { AuraHigia } from './componentes/AuraHigia';
 import { BannerAlerta, BannerComunicacion, BarraSuperior, Navegacion } from './componentes/Estructura';
 import { SECCIONES, useSeccion } from './navegacion';
 import { BarraReproduccion } from './simulador/BarraReproduccion';
 import { CoberturaPantallaCompleta } from './simulador/CoberturaHRP';
 import { PanelSimulador } from './simulador/PanelSimulador';
 import { useSimulador } from './simulador/useSimulador';
-import { VistaAsistente } from './vistas/VistaAsistente';
+import { VistaAsistente, type EnCurso } from './vistas/VistaAsistente';
+import { VistaPruebas } from './vistas/VistaPruebas';
 import { VistaComunicaciones } from './vistas/VistaComunicaciones';
 import { VistaEntorno } from './vistas/VistaEntorno';
 import { VistaMensajes, type EvaluacionMensaje } from './vistas/VistaMensajes';
@@ -38,6 +42,11 @@ const PREAVISO_ESCALADA_MS = 10_000;
 const CLAVE_DEMO = 'higia.panelDemo';
 const leerDemo = () => { try { return localStorage.getItem(CLAVE_DEMO) === 'abierto'; } catch { return false; } };
 const guardarDemo = (v: boolean) => { try { localStorage.setItem(CLAVE_DEMO, v ? 'abierto' : 'cerrado'); } catch { /* sin almacenamiento */ } };
+const CLAVE_PROACTIVO = 'higia.proactivo.min';
+const leerProactivo = () => { try { const v = localStorage.getItem(CLAVE_PROACTIVO); return v === null ? 5 : Number(v) || 0; } catch { return 5; } };
+const guardarProactivo = (v: number) => { try { localStorage.setItem(CLAVE_PROACTIVO, String(v)); } catch { /* sin almacenamiento */ } };
+/** Una pregunta proactiva sin respuesta deja de esperar respuesta después de esto. */
+const VIGENCIA_PREGUNTA_MS = 2 * 60_000;
 const CLAVE_AMPLIO = 'higia.simulador.amplio';
 const leerAmplio = () => { try { return localStorage.getItem(CLAVE_AMPLIO) === 'si'; } catch { return false; } };
 const guardarAmplio = (v: boolean) => { try { localStorage.setItem(CLAVE_AMPLIO, v ? 'si' : 'no'); } catch { /* sin almacenamiento */ } };
@@ -62,6 +71,11 @@ const ORDEN = { normal: 0, info: 1, aviso: 2, alerta: 3 } as const;
 
 /** Acciones que no esperan a la IA: la seguridad no depende de la red. */
 const esUrgente = (a: Accion) => a.tipo === 'pedir_ayuda' || a.tipo === 'confirmar_bien' || (a.tipo === 'emitir_alerta' && a.nivel === 'alerta');
+/**
+ * Pedidos explícitos que el intérprete local reconoce sin ambigüedad (una evaluación, una prueba guiada):
+ * se ejecutan siempre, aunque la IA no los devuelva como acción.
+ */
+const esInmediata = (a: Accion) => esUrgente(a) || a.tipo === 'evaluacion_cognitiva' || a.tipo === 'prueba_guiada' || a.tipo === 'chequeo_orientacion';
 
 export function App() {
   // El núcleo se puede reemplazar: el simulador reinicia con uno limpio entre escenarios.
@@ -96,6 +110,15 @@ export function App() {
   const preavisados = useRef(new Set<string>());
   /** Chequeo de orientación en curso (preguntas que Higia hace y evalúa en el dispositivo). */
   const chequeo = useRef<ChequeoOrientacion | null>(null);
+  /** Evaluación cognitiva en curso (seis preguntas, se evalúan en el dispositivo). */
+  const evaluacion = useRef<EvaluacionCognitiva | null>(null);
+  /** Pregunta que Higia hizo por iniciativa propia y espera respuesta. */
+  const pendiente = useRef<{ pregunta: PreguntaProactiva; desde: number } | null>(null);
+  /** Cuándo se hizo cada pregunta proactiva (no repetirlas seguido). */
+  const hechas = useRef<Record<string, number>>({});
+  const ultimaProactiva = useRef(Date.now());
+  const [proactivo, setProactivo] = useState(leerProactivo);
+  const [pruebaPedida, setPruebaPedida] = useState<PruebaGuiada | null>(null);
   /** Impactos en la cabeza para los que ya se pidió el chequeo (no repetirlo al reevaluar). */
   const impactosChequeados = useRef(new Set<number>());
   const decirRef = useRef<(texto: string, hechos?: string[]) => void>(() => {});
@@ -194,6 +217,14 @@ export function App() {
     return `Te haré ${chequeo.current.total} preguntas rápidas; responde sin apuro. ${chequeo.current.pregunta()}`;
   }, [nucleo]);
 
+  /** Empieza la evaluación cognitiva y devuelve la presentación con la primera pregunta. */
+  const iniciarEvaluacion = useCallback((): string => {
+    pendiente.current = null;
+    evaluacion.current = new EvaluacionCognitiva();
+    aceptarRespuestaSinNombre(45_000);
+    return `Son ${evaluacion.current.total} preguntas cortas; responde con calma, sin decir «Higia». ${evaluacion.current.pregunta()}`;
+  }, []);
+
   const procesar = useCallback(async (nuevos: Mensaje[]) => {
     const enSimulador = !!simRef.current?.activo;
     // En el simulador varios hallazgos de un mismo paso no se leen seguidos: se lee el de mayor nivel.
@@ -276,6 +307,8 @@ export function App() {
     turnos.current = [];
     preavisados.current.clear();
     chequeo.current = null;
+    evaluacion.current = null;
+    pendiente.current = null;
     impactosChequeados.current.clear();
     return n;
   };
@@ -368,7 +401,15 @@ export function App() {
           break;
         }
         case 'chequeo_orientacion':
-          if (!chequeo.current) { chequeoPendiente = iniciarChequeo(); hechos.push('Inicié un chequeo de orientación'); }
+          if (!chequeo.current) { evaluacion.current = null; chequeoPendiente = iniciarChequeo(); hechos.push('Inicié un chequeo de orientación'); }
+          break;
+        case 'evaluacion_cognitiva':
+          if (!evaluacion.current && !chequeo.current) { chequeoPendiente = iniciarEvaluacion(); hechos.push('Inicié la evaluación cognitiva'); }
+          break;
+        case 'prueba_guiada':
+          setPruebaPedida(a.prueba);
+          ir('pruebas');
+          hechos.push(`Abrí la prueba guiada: ${a.prueba === 'isometrica' ? 'fuerza isométrica' : a.prueba === 'valsalva' ? 'maniobra de Valsalva' : 'tiempo de reacción'}`);
           break;
         case 'ejecutar_escenario': {
           const e = buscarEscenario(a.escenario);
@@ -393,6 +434,9 @@ export function App() {
     const vencimientos = nucleo.confirmacionesPendientes();
     return {
       seccion,
+      enCurso: evaluacion.current ? `Evaluación cognitiva, pregunta ${evaluacion.current.respondidas + 1} de ${evaluacion.current.total}`
+        : chequeo.current ? 'Chequeo de orientación'
+        : pendiente.current ? `Higia le preguntó: «${pendiente.current.pregunta.texto}»` : undefined,
       alertasEsperandoRespuesta: mensajes.filter((m) => vencimientos.has(m.id)).map((m) => m.hallazgo.titulo),
       comunicacionesRecientes: nucleo.comunicaciones().slice(0, 5).map((x) => ({ destinatario: x.destinatario, asunto: x.asunto, estado: x.estado })),
       destinosDisponibles: nucleo.destinosEscalamiento(),
@@ -423,7 +467,7 @@ export function App() {
     c.responder(frase);
     if (!c.terminado) {
       aceptarRespuestaSinNombre(30_000);
-      return { texto: c.pregunta()!, fuente: 'local', hechos: [] };
+      return { texto: c.pregunta()!, fuente: 'local', hechos: [], etiqueta: 'Chequeo de orientación' };
     }
     chequeo.current = null;
     void procesar(nucleo.registrar({ sensor: 'orientacion', valor: c.valor, timestamp: Date.now(), fuente: 'voz' }));
@@ -433,24 +477,102 @@ export function App() {
     return { texto, fuente: 'local', hechos: [`Chequeo de orientación: ${c.aciertos} de ${c.total} (${c.valor}/10)`] };
   };
 
+  /** Respuesta a una pregunta de la evaluación cognitiva en curso. */
+  const responderEvaluacion = (frase: string): ResultadoConversacion => {
+    const e = evaluacion.current!;
+    if (/\b(cancela|cancelar|basta|deten|para la (prueba|evaluacion)|no quiero seguir)\b/.test(normal(frase))) {
+      evaluacion.current = null;
+      return { texto: 'De acuerdo, dejamos la evaluación para otro momento.', fuente: 'local', hechos: ['Evaluación cognitiva cancelada'] };
+    }
+    e.responder(frase);
+    if (!e.terminado) {
+      aceptarRespuestaSinNombre(45_000);
+      return { texto: e.pregunta()!, fuente: 'local', hechos: [], etiqueta: `Evaluación cognitiva · ${e.respondidas + 1} de ${e.total}` };
+    }
+    evaluacion.current = null;
+    void procesar(nucleo.registrar({ sensor: 'cognicion', valor: e.valor, timestamp: Date.now(), fuente: 'voz' }));
+    const base = nucleo.perfil.lineaBase.cognicion ?? 85;
+    const fallas = e.dominiosConFallas();
+    const habitual = e.valor >= base * 0.85;
+    const texto = habitual
+      ? `Listo, gracias. Obtuviste ${e.valor} de 100: dentro de lo habitual para ti.${fallas.length ? ` Fallaste un poco en ${fallas.join(' y ')}, nada fuera de lo común.` : ''}`
+      : `Gracias. Obtuviste ${e.valor} de 100, por debajo de lo habitual para ti. Costaron ${fallas.join(', ')}. Puede ser cansancio o falta de sueño: lo registro y lo tengo en cuenta.`;
+    return { texto, fuente: 'local', hechos: [`Evaluación cognitiva: ${e.valor}/100 (habitual ${base}) · tiempo medio de respuesta ${e.latenciaMedia} s`] };
+  };
+
+  /** Higia hace una pregunta por iniciativa propia (o a pedido, con `forzar`). */
+  const lanzarProactiva = (forzar = false) => {
+    const t = Date.now();
+    ultimaProactiva.current = t;
+    const reciente = hechas.current.cognitiva && t - hechas.current.cognitiva < 600_000;
+    const p = elegirPreguntaProactiva(nucleo, t, hechas.current) ?? (forzar ? preguntaProactiva(reciente ? 'molestias' : 'cognitiva')! : null);
+    if (!p) return;
+    hechas.current[p.id] = t;
+    pendiente.current = { pregunta: p, desde: t };
+    aceptarRespuestaSinNombre(30_000);
+    turnos.current = [...turnos.current, { rol: 'higia' as const, texto: p.texto }].slice(-12);
+    registro.agregar({ tipo: 'mensaje', texto: `Pregunta proactiva: ${p.texto}`, nivel: 'info', detalle: p.id });
+    asistente.decir(p.texto, [], p.tipo === 'cognitiva' ? 'Higia propone' : 'Pregunta de Higia');
+    refrescar();
+  };
+
+  /** Respuesta a una pregunta proactiva. Devuelve null si la frase es otra cosa (sigue la conversación normal). */
+  const responderProactiva = (frase: string): ResultadoConversacion | null => {
+    const { pregunta: p } = pendiente.current!;
+    pendiente.current = null;
+    if (p.tipo === 'cognitiva') {
+      if (esAfirmativo(frase)) return { texto: `Perfecto. ${iniciarEvaluacion()}`, fuente: 'local', hechos: ['Inicié la evaluación cognitiva'], etiqueta: 'Evaluación cognitiva · 1 de 6' };
+      if (esNegativo(frase)) return { texto: 'De acuerdo, te lo propongo más tarde.', fuente: 'local', hechos: [] };
+      return null;
+    }
+    if (p.tipo === 'dato' && p.sensor && p.leer) {
+      const v = p.leer(frase);
+      if (v !== null) {
+        void procesar(nucleo.registrar({ sensor: p.sensor, valor: v, timestamp: Date.now(), fuente: 'voz' }));
+        return { texto: p.confirmar?.(v) ?? 'Anotado.', fuente: 'local', hechos: [`Registré ${INFO_SENSOR[p.sensor].nombre.toLowerCase()}: ${v}${INFO_SENSOR[p.sensor].unidad.startsWith('/') ? '' : ' '}${INFO_SENSOR[p.sensor].unidad}`] };
+      }
+      if (esNegativo(frase)) return { texto: 'Está bien, no pasa nada.', fuente: 'local', hechos: [] };
+      return null;
+    }
+    if (p.tipo === 'abierta' && esNegativo(frase)) return { texto: 'Me alegra. Sigo atenta; avísame si algo cambia.', fuente: 'local', hechos: [] };
+    return null;
+  };
+
   const conversar = async (frase: string): Promise<ResultadoConversacion> => {
     // Seguridad primero: lo urgente que entiende el intérprete local (pedir ayuda, "estoy bien",
     // un síntoma grave) se ejecuta ya, sin esperar a la IA ni depender de la red.
     const local = interpretar(frase, nucleo);
-    // Durante el chequeo de orientación, la frase es una respuesta; un pedido de ayuda lo interrumpe.
+    const pideAyuda = local.acciones.some((a) => a.tipo === 'pedir_ayuda');
+    // Durante el chequeo de orientación o la evaluación, la frase es una respuesta; un pedido de ayuda los interrumpe.
     if (chequeo.current) {
-      if (local.acciones.some((a) => a.tipo === 'pedir_ayuda')) chequeo.current = null;
+      if (pideAyuda) chequeo.current = null;
       else return responderChequeo(frase);
     }
+    if (evaluacion.current) {
+      if (pideAyuda) evaluacion.current = null;
+      else return responderEvaluacion(frase);
+    }
+    if (pendiente.current) {
+      if (pideAyuda || Date.now() - pendiente.current.desde > VIGENCIA_PREGUNTA_MS) pendiente.current = null;
+      else {
+        const r = responderProactiva(frase);
+        if (r) {
+          turnos.current = [...turnos.current, { rol: 'astronauta' as const, texto: frase }, { rol: 'higia' as const, texto: r.texto }].slice(-12);
+          return r;
+        }
+      }
+    }
     chequeoPendiente = null;
-    const urgentes = local.acciones.filter(esUrgente);
+    const urgentes = local.acciones.filter(esInmediata);
     const hechos = ejecutarAcciones(urgentes);
     const yaHecha = (a: Accion) => urgentes.some((u) => u.tipo === a.tipo && (a.tipo !== 'emitir_alerta' || (u.tipo === 'emitir_alerta' && u.sistema === a.sistema)));
 
     let resultado: ResultadoConversacion;
     let lecturas: Lectura[];
+    // Pedido explícito de una evaluación o prueba: responde el intérprete local, sin esperar a la IA.
+    const soloPrueba = local.acciones.length > 0 && local.acciones.every((a) => a.tipo === 'evaluacion_cognitiva' || a.tipo === 'prueba_guiada');
     try {
-      if (!iaActiva) throw new Error('');
+      if (!iaActiva || soloPrueba) throw new Error('');
       const r = await conversarIA({ frase, historial: turnos.current, estado: estadoParaIA(nucleo, estadoApp()) });
       lecturas = lecturasDesdeIA(r);
       // Lo que el intérprete local detecta de forma determinista (señales de percepción) se registra siempre.
@@ -460,11 +582,16 @@ export function App() {
     } catch (e) {
       // Autonomía primero: sin IA, responde el intérprete local.
       lecturas = local.lecturas;
-      hechos.push(...ejecutarAcciones(local.acciones.filter((a) => !esUrgente(a))));
+      hechos.push(...ejecutarAcciones(local.acciones.filter((a) => !esInmediata(a))));
       const motivo = e instanceof Error && e.message ? `IA no disponible (${e.message}). ` : '';
       resultado = { texto: local.texto, fuente: 'local', hechos, nota: motivo ? `${motivo}Respondió el intérprete local.` : undefined };
     }
-    if (chequeoPendiente) resultado = { ...resultado, texto: `${resultado.texto} ${chequeoPendiente}` };
+    if (chequeoPendiente) {
+      // (La acción pudo empezar la evaluación durante esta misma frase.)
+      const ev = evaluacion.current as EvaluacionCognitiva | null;
+      const etiqueta = ev ? `Evaluación cognitiva · 1 de ${ev.total}` : 'Chequeo de orientación';
+      resultado = { ...resultado, texto: `${resultado.texto} ${chequeoPendiente}`, etiqueta };
+    }
     turnos.current = [...turnos.current, { rol: 'astronauta' as const, texto: frase }, { rol: 'higia' as const, texto: resultado.texto }].slice(-12);
     if (lecturas.length) void procesar(nucleo.registrar(lecturas));
     return resultado;
@@ -478,6 +605,50 @@ export function App() {
     decirFrase: (f) => void asistente.enviar(f, 'texto'),
   });
   simRef.current = sim;
+
+  // ── Preguntas proactivas: de vez en cuando Higia pregunta lo que le falta saber ──
+  const lanzarRef = useRef(lanzarProactiva);
+  lanzarRef.current = lanzarProactiva;
+  const ocupadoRef = useRef(false);
+  ocupadoRef.current = !!evaluacion.current || !!chequeo.current || asistente.pensando || asistente.hablando
+    || asistente.actividad === 'escuchando' || nucleo.confirmacionesPendientes().size > 0 || sim.activo || grabando;
+  const interaccionRef = useRef(asistente.ultimaInteraccion);
+  interaccionRef.current = asistente.ultimaInteraccion;
+  useEffect(() => {
+    if (!proactivo) return;
+    const id = setInterval(() => {
+      const t = Date.now();
+      if (pendiente.current && t - pendiente.current.desde > VIGENCIA_PREGUNTA_MS) pendiente.current = null;
+      if (ocupadoRef.current || pendiente.current) return;
+      // Cuenta desde la última pregunta o desde que el astronauta habló por última vez: no interrumpe una conversación.
+      if (t - Math.max(ultimaProactiva.current, interaccionRef.current) < proactivo * 60_000) return;
+      lanzarRef.current();
+    }, 5000);
+    return () => clearInterval(id);
+  }, [proactivo]);
+  const cambiarProactivo = (min: number) => { setProactivo(min); guardarProactivo(min); ultimaProactiva.current = Date.now(); };
+
+  const enCurso: EnCurso | null = evaluacion.current
+    ? { titulo: 'Evaluación cognitiva', paso: evaluacion.current.respondidas + 1, total: evaluacion.current.total }
+    : chequeo.current ? { titulo: 'Chequeo de orientación', paso: chequeo.current.respuestas.length + 1, total: chequeo.current.total }
+    : pendiente.current ? {
+      titulo: 'Higia te hizo una pregunta',
+      rapidas: pendiente.current.pregunta.tipo === 'cognitiva' ? ['Sí, empecemos', 'Ahora no']
+        : pendiente.current.pregunta.tipo === 'abierta' ? ['No, estoy bien', 'Me duele la cabeza']
+        : pendiente.current.pregunta.sensor === 'horasSueno' ? ['5 horas', '7 horas', '8 horas']
+        : pendiente.current.pregunta.sensor === 'hidratacion' ? ['4 vasos', '8 vasos']
+        : ['3', '5', '7', '9'],
+    } : null;
+
+  /** Resultado de una prueba guiada (sección Pruebas): entra como dato y Higia lo comenta. */
+  const registrarPrueba = (lecturas: Lectura[], resumen: string) => {
+    registro.agregar({ tipo: 'lecturas', texto: `Prueba guiada: ${lecturas.map((l) => `${l.sensor} ${l.valor}`).join(', ')}` });
+    const ms = nucleo.registrar(lecturas);
+    void procesar(ms.map((m) => ({ ...m, voz: false })));
+    const h = ms.find((m) => lecturas.some((l) => m.hallazgo.datos?.some((d) => d.sensor === l.sensor)))?.hallazgo;
+    const conclusion = !h || h.nivel === 'normal' ? 'Está dentro de lo habitual.' : `${h.titulo}. ${h.accionPorUbicacion?.[nucleo.contexto.ubicacion] ?? h.accion}`;
+    asistente.decir(`${resumen} ${conclusion}`, [`Registré el resultado de la prueba`], 'Resultado de la prueba');
+  };
 
   // ── Acciones del simulador ──
   const inyectar = (ls: Lectura[]) => {
@@ -501,6 +672,7 @@ export function App() {
     setEvaDesde(null);
     cambiarContexto({ ubicacion: 'habitat' });
   };
+  const limpiarPedida = useCallback(() => setPruebaPedida(null), []);
   const cambiarAmplio = (v: boolean) => { setSimAmplio(v); guardarAmplio(v); };
 
   const vencimientos = nucleo.confirmacionesPendientes();
@@ -517,7 +689,7 @@ export function App() {
       <a href="#contenido" className="saltar">Saltar al contenido</a>
       <BarraSuperior
         contexto={c} nombreAstronauta={nucleo.perfil.nombre} iaActiva={iaActiva} iaConfigurada={ia.configurada}
-        escucha={asistente.estadoEscucha} vozActiva={vozActiva} onVozActiva={setVozActiva} demoAbierta={demoAbierta} onDemo={() => alternarDemo()}
+        escucha={asistente.estadoEscucha} actividad={asistente.actividad} ahora={ahora} vozActiva={vozActiva} onVozActiva={setVozActiva} demoAbierta={demoAbierta} onDemo={() => alternarDemo()}
       />
       <BannerAlerta pendientes={pendientes} ahora={ahora} onConfirmar={confirmar} onVer={() => ir('mensajes')} />
       {avisoComunicacion && (
@@ -534,7 +706,15 @@ export function App() {
           {seccion === 'asistente' && (
             <VistaAsistente
               asistente={asistente} iaActiva={iaActiva} perfil={nucleo.perfil} hallazgos={nucleo.hallazgosActuales()}
-              alertasPendientes={pendientes.length} comunicaciones={comunicaciones} onIr={ir} onPedirAyuda={() => pedirAyuda()}
+              alertasPendientes={pendientes.length} enCurso={enCurso} proactivo={proactivo} onProactivo={cambiarProactivo}
+              onPreguntarAhora={() => lanzarProactiva(true)} onAbrirSimulador={() => alternarDemo(true)} onIr={ir} onPedirAyuda={() => pedirAyuda()}
+            />
+          )}
+          {seccion === 'pruebas' && (
+            <VistaPruebas
+              nucleo={nucleo} vozActiva={vozActiva} pedida={pruebaPedida} onPedidaAtendida={limpiarPedida} onRegistrar={registrarPrueba}
+              onEvaluacionCognitiva={() => { ir('asistente'); void asistente.enviar('Hazme una evaluación cognitiva'); }}
+              onChequeoOrientacion={() => { ir('asistente'); void asistente.enviar('Hazme un chequeo de orientación'); }}
             />
           )}
           {seccion === 'resumen' && (
@@ -569,6 +749,7 @@ export function App() {
       </div>
 
       {seccion !== 'asistente' && <AccesoHigia asistente={asistente} onAbrir={() => ir('asistente')} />}
+      <AuraHigia asistente={asistente} />
 
       {!grabando && (
         <PanelSimulador

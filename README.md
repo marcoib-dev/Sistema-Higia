@@ -31,7 +31,7 @@ Higia vigila la salud de astronautas que viven en hábitats permanentes (base lu
 
 | Capacidad | En una frase |
 |---|---|
-| **Detectar riesgos** | 36 reglas que cubren los **18 riesgos de salud del HRP de la NASA** (radiación, huesos, sueño, salud mental, SANS, descompresión, hipoxia, coágulos…), comparadas con la línea base de cada astronauta |
+| **Detectar riesgos** | 38 reglas que cubren los **18 riesgos de salud del HRP de la NASA** (radiación, huesos, sueño, salud mental, SANS, descompresión, hipoxia, coágulos…), comparadas con la línea base de cada astronauta |
 | **Sumar señales leves** | Muchas señales leves en sistemas distintos (sueño, ánimo, radiación, hueso) se suman en un aviso que desaconseja la EVA, aunque ninguna sea grave sola |
 | **Usar los datos** | Cada análisis registra los datos exactos en que se basó (valor, hora, fuente y línea base) y los muestra; la evaluación de la IA debe citar los datos que usó y declarar lo que falta |
 | **Entender el contexto** | Interpreta distinto según ubicación, actividad, destino, clima espacial y hora; por ejemplo, no alarma por pulso alto durante el ejercicio |
@@ -39,6 +39,10 @@ Higia vigila la salud de astronautas que viven en hábitats permanentes (base lu
 | **Personalizar el mensaje** | Cifras para quien es médico, indicaciones claras para quien no, tono calmado para quien es propenso al pánico |
 | **Elegir el canal** | Lo privado nunca va a la pantalla compartida; fuera del hábitat, mensajes breves por auricular |
 | **Escalar emergencias** | Si una alerta no recibe "Estoy bien", primero lo advierte por voz y luego **se comunica con otros** (compañero, médico, base o Tierra) enviando qué pasó, dónde está el astronauta y su historia clínica; si no hay nadie, activa una baliza. Las respuestas se ven en vivo |
+| **Presencia visible** | Al oír «Higia» el borde de toda la pantalla se ilumina en violeta, suena un tono corto y aparece arriba lo que se va oyendo **mientras se habla** (resultados parciales, sin esperar al final de la frase). Pensando: azul. Hablando: turquesa |
+| **Pregunta por iniciativa propia** | De vez en cuando (cada 2, 5, 15 o 60 min, configurable) Higia pregunta lo que le falta saber: ánimo, sueño, agua, molestias, cohesión del equipo, o propone una **evaluación cognitiva**. Elige según qué dato falta o está viejo; no pregunta durante el sueño, una EVA, una alerta o un escenario |
+| **Evaluar la cognición** | Evaluación cognitiva breve conversando (memoria inmediata, atención con dígitos al revés, cálculo, orientación en el tiempo, razonamiento y recuerdo diferido), puntuada en el dispositivo de 0 a 100 y comparada con la línea base |
+| **Pruebas a bordo** | Sección **Pruebas**: tiempo de reacción (PVT), **fuerza isométrica** con dinamómetro y **maniobra de Valsalva** guiadas paso a paso con voz y cuenta regresiva; avisa si una prueba está contraindicada (p. ej. Valsalva con signos de SANS) |
 | **Asistente al centro** | Higia es la base de la app: se activa al oír su nombre ("Higia, …") y desde la conversación consulta el estado, **pide ayuda**, **envía mensajes** a otros astronautas o a Tierra, **emite alertas** por síntomas que cuenta el astronauta y maneja toda la app |
 | **Historia clínica previa** | Cada astronauta tiene su historia (alergias, antecedentes, medicación, cirugías). La usan la IA, los mensajes y las comunicaciones de emergencia |
 | **Funcionar sin médico** | Si no hay médico a bordo, da guías paso a paso y dirige los reportes a la base o a Tierra |
@@ -108,8 +112,11 @@ Recorrido sugerido, paso a paso:
 11. En **Higia**, di (o escribe) "Higia, anoche dormí como cinco horas y me siento cansado": registra el dato. Con clave, mira la **Evaluación de Higia · IA** en cada mensaje.
 12. "Higia, dile a Tierra que terminé la reparación": el mensaje aparece en **Comunicaciones** (en cola si no hay enlace con Tierra).
 13. "Higia, me duele mucho el pecho, pide ayuda": avisa a todos los que están al alcance al instante, deja una alerta en el corazón (se ve en la figura) y muestra el aviso de comunicación. Luego "Higia, estoy bien" cancela la alerta.
-14. Termina en **Cobertura**: "18 / 18 riesgos de salud de la NASA con detección". **Pantalla completa** la deja sola para proyectar.
-15. Para presentar o grabar, cierra el simulador (Esc o D) o usa el **modo grabación** (G): queda solo la interfaz del astronauta.
+14. **Presencia y contexto:** di «Higia, ¿qué hora es?». Al decir «Higia» el borde de la pantalla se pone violeta, suena un tono y arriba aparece lo que vas diciendo; responde con la hora del hábitat, la fecha y el día de misión.
+15. **Evaluación cognitiva:** «Higia, hazme una evaluación cognitiva» (o espera a que Higia lo proponga; con «Pregúntame algo» se fuerza una pregunta). Seis preguntas con barra de progreso y respuestas rápidas; el resultado (0–100) se compara con la línea base.
+16. **Pruebas a bordo:** en **Pruebas**, haz la maniobra de **Valsalva** (cuenta regresiva y manómetro) y la de **fuerza isométrica**. Para ver el riesgo, reproduce los escenarios **Valsalva antes de aterrizar** (alerta: contraindica el pilotaje) y **Prueba de fuerza isométrica** (pérdida mayor a la esperable).
+17. Termina en **Cobertura**: "18 / 18 riesgos de salud de la NASA con detección". **Pantalla completa** la deja sola para proyectar.
+18. Para presentar o grabar, cierra el simulador (Esc o D) o usa el **modo grabación** (G): queda solo la interfaz del astronauta.
 
 ---
 
@@ -121,7 +128,8 @@ La interfaz separa **lo que ve el astronauta** del **Simulador**, que hace de se
 
 | Zona | Qué contiene |
 |---|---|
-| **Barra superior** | Indicadores de estado (conexión, IA, escucha de «Higia», astronauta, ubicación y destino, hora y, si la hay, tormenta solar), control de voz y botón **Simulador** |
+| **Barra superior** | Indicadores de estado (conexión, IA, qué hace Higia: escucha, piensa o habla, astronauta, ubicación y destino, **hora del hábitat con minutos y día de misión** y, si la hay, tormenta solar), control de voz y botón **Simulador** |
+| **Presencia de Higia** | Borde luminoso de la pantalla y pastilla arriba al centro cuando Higia escucha (violeta, con la transcripción en vivo) o piensa (azul); borde turquesa mientras habla |
 | **Aviso de comunicación** | Aparece cuando Higia se comunicó con otros (alerta sin respuesta o pedido de ayuda): a quién avisó y, en vivo, en qué etapa está cada envío (enviando, entregado, respondió) y a qué hora |
 | **Acceso a Higia** | Botón flotante en todas las secciones: estado de la escucha, última respuesta, escribir o dictar |
 | **Franja de alerta** | Aparece cuando una alerta espera "Estoy bien": título, cuenta regresiva, botón **Estoy bien** y **Ver detalle**, con una barra que se vacía hasta el plazo. Se ve en cualquier sección y nada la tapa |
@@ -132,7 +140,8 @@ La interfaz separa **lo que ve el astronauta** del **Simulador**, que hace de se
 
 | Sección | Para qué sirve |
 |---|---|
-| **Higia** (inicio) | El asistente: estado rápido (salud, alertas, última comunicación), botón **Pedir ayuda**, conversación con lo que Higia hizo en cada respuesta, micrófono y el interruptor **Escuchar «Higia»** |
+| **Higia** (inicio) | El asistente: guía de tres pasos para quien la ve por primera vez, estado rápido (salud, alertas, pruebas), botón **Pedir ayuda**, **orbe** que cambia de color según escuche, piense o hable (tocarlo abre el micrófono), conversación con lo que Higia hizo en cada respuesta, barra de progreso y **respuestas rápidas** durante una evaluación o pregunta, el interruptor **Escuchar «Higia»** y la frecuencia de las **preguntas de Higia** (con el botón «Pregúntame algo») |
+| **Pruebas** | Pruebas a bordo con su último resultado frente al habitual: evaluación cognitiva, tiempo de reacción (PVT), fuerza isométrica, maniobra de Valsalva y chequeo de orientación |
 | **Resumen** | **Día de misión**, figura anatómica del cuerpo, **Señales que se suman** (cuando varias señales leves desaconsejan la EVA), lo que **requiere atención** (avisos y alertas activos, de más grave a menos), **Aptitud para tareas** (solo si alguna está desaconsejada) y **sistemas del cuerpo**, que se despliega para ver el detalle. La lista y la figura están sincronizadas |
 | **Mensajes** | Todo lo que Higia comunicó. Filtros: Todos, Alertas, Retenidos, Escalados. Cada mensaje muestra nivel, canal, si es privado, retenido o recordatorio, el **riesgo de la NASA** al que responde, a quién se reportó, la guía paso a paso si corresponde y, en los riesgos de semanas, un **minigráfico de tendencia** con la línea base (la radiación, como dosis acumulada frente al límite). **"Por qué este mensaje"** abre el canal elegido, la base científica, el dato técnico y la comparación entre los tres astronautas |
 | **Comunicaciones** | Quién está al alcance ahora y todo lo que Higia envió a otros: emergencias y mensajes, automáticos o pedidos al asistente, estado (enviado, en cola, respondió), retardo con Tierra, el texto enviado y la respuesta |
@@ -144,8 +153,8 @@ La interfaz separa **lo que ve el astronauta** del **Simulador**, que hace de se
 
 Hace lo que en la realidad harían los sensores, el hábitat y la tripulación. Panel lateral con dos tamaños (compacto y **amplio**, con dos columnas) y seis pestañas:
 
-- **Escenarios:** tarjeta **Guion de la demo** ("Reproducir guion"), buscador y filtros por peligro de la NASA, categoría y nivel máximo. Los 40 escenarios van agrupados por categoría, con nivel, riesgos NASA, pasos, duración y la marca "Reproducido". Al abrir uno: qué observar, astronauta sugerido, sus pasos y los botones **Reproducir** y **Paso a paso** (arranca en pausa).
-- **Datos:** un control por cada dato del catálogo (50), agrupado por familia y generado desde `INFO_SENSOR`. Cada fila muestra el último valor, la línea base del astronauta (marca en el deslizador) y el nivel actual; el dato se envía al soltar el control. Botones **Día normal** y **Limpiar todo**.
+- **Escenarios:** tarjeta **Guion de la demo** ("Reproducir guion"), buscador y filtros por peligro de la NASA, categoría y nivel máximo. Los 42 escenarios van agrupados por categoría, con nivel, riesgos NASA, pasos, duración y la marca "Reproducido". Al abrir uno: qué observar, astronauta sugerido, sus pasos y los botones **Reproducir** y **Paso a paso** (arranca en pausa).
+- **Datos:** un control por cada dato del catálogo (52), agrupado por familia y generado desde `INFO_SENSOR`. Cada fila muestra el último valor, la línea base del astronauta (marca en el deslizador) y el nivel actual; el dato se envía al soltar el control. Botones **Día normal** y **Limpiar todo**.
 - **Contexto:** semáforo de **aptitud para tareas** (EVA, pilotaje, ejercicio intenso, con los motivos); situación (ubicación, actividad, destino, hora, **día de misión** con atajos 30/180/500, **transición de gravedad**, tormenta solar); **Iniciar EVA** (pide la prerrespiración y emite la duración cada minuto) y **Terminar EVA**; personas, enlaces y dispositivos de salida.
 - **Tripulación:** los cuatro astronautas de ejemplo con antecedentes y líneas base; cómo responde el resto (compañero y base, médico, Tierra, demora) y el interruptor de **IA durante los escenarios** (apagado por defecto: cada mensaje sería una consulta).
 - **Cobertura:** los **18 riesgos del HRP** en una cuadrícula de cinco columnas (los peligros de la NASA), con su estado en vivo y el contador "18 / 18". Los mosaicos laten al cambiar de estado y se resaltan si el escenario en curso los toca; al tocar uno se ven sus reglas, los escenarios que lo demuestran y la página de la NASA. También hay vista de tabla y **Pantalla completa** para proyectar.
@@ -157,7 +166,7 @@ El navegador recuerda si el panel quedó abierto, su tamaño y la última pesta�
 
 ### Navegación y atajos
 
-- Cada sección tiene su dirección (`#/asistente`, `#/resumen`, `#/mensajes`, `#/comunicaciones`, `#/perfil`, `#/entorno`, `#/reportes`); sin dirección se abre el asistente: funciona el botón "atrás" y se puede compartir un enlace directo. El título de la pestaña cambia con la sección.
+- Cada sección tiene su dirección (`#/asistente`, `#/resumen`, `#/pruebas`, `#/mensajes`, `#/comunicaciones`, `#/perfil`, `#/entorno`, `#/reportes`); sin dirección se abre el asistente: funciona el botón "atrás" y se puede compartir un enlace directo. El título de la pestaña cambia con la sección.
 
 | Tecla | Acción |
 |---|---|
@@ -202,7 +211,7 @@ La elección se recuerda en el dispositivo. Si se pide un sistema que no está e
 
 ### 2. Motor de detección
 
-**36 reglas** (`app/src/core/reglas/`) que cubren los **17 riesgos del HRP** de la NASA más el **tromboembolismo venoso** (catálogo en `app/src/core/riesgosHRP.ts`). Cada regla declara su `fuente` y los riesgos HRP a los que responde (`hrp`). Cada una lee el historial, lo compara con la **línea base personal** cuando aplica y **tiene en cuenta el contexto**. Devuelve un *hallazgo* con: nivel, explicación simple, detalle técnico, acción (que puede variar según la ubicación), guía paso a paso (en alertas), ruta, si es privado, si puede dejar al astronauta incapacitado y de qué anexo sale.
+**38 reglas** (`app/src/core/reglas/`) que cubren los **17 riesgos del HRP** de la NASA más el **tromboembolismo venoso** (catálogo en `app/src/core/riesgosHRP.ts`). Cada regla declara su `fuente` y los riesgos HRP a los que responde (`hrp`). Cada una lee el historial, lo compara con la **línea base personal** cuando aplica y **tiene en cuenta el contexto**. Devuelve un *hallazgo* con: nivel, explicación simple, detalle técnico, acción (que puede variar según la ubicación), guía paso a paso (en alertas), ruta, si es privado, si puede dejar al astronauta incapacitado y de qué anexo sale.
 
 | Riesgo | Sensor | Cómo evalúa (umbrales provisionales) |
 |---|---|---|
@@ -402,7 +411,7 @@ En la barra superior: **silenciar o activar** la voz, **pausar y reanudar**, **d
 
 ### Escenarios
 
-**40 escenarios** en `app/src/adaptadores/simulador/escenarios/` (uno por archivo de categoría). Cada uno es una **línea de tiempo** de pasos con narración, contexto, lecturas o una frase del astronauta, y el resultado **esperado** de cada paso. El mismo catálogo es la suite `escenarios.test.ts`. Los 15 originales conservan su `id`:
+**42 escenarios** en `app/src/adaptadores/simulador/escenarios/` (uno por archivo de categoría). Cada uno es una **línea de tiempo** de pasos con narración, contexto, lecturas o una frase del astronauta, y el resultado **esperado** de cada paso. El mismo catálogo es la suite `escenarios.test.ts`. Los 15 originales conservan su `id`:
 
 | Escenario | Qué demuestra |
 |---|---|
@@ -439,9 +448,9 @@ Nuevos (25): `fiebre`, `herpes`, `cinetosis-llegada`, `rover-mareo`, `arritmia`,
 - **Señales que se suman:** el umbral (4 señales en 3 sistemas), que desaconseja la EVA, que hereda la privacidad y que se borra al normalizarse.
 - **Conversación:** el intérprete local registra datos (también números en palabras), síntomas con intensidad y responde consultas.
 - **Voz:** variantes con que el reconocedor escribe «Higia» (incluida «guía», típica de Vosk), diagnóstico por navegador y mensajes de error.
-- **Reglas** (`core/reglas/*.test.ts`): cada umbral, agravante, `bloquea`, `sensible` y `posibleIncapacidad` de las 36 reglas.
+- **Reglas** (`core/reglas/*.test.ts`): cada umbral, agravante, `bloquea`, `sensible` y `posibleIncapacidad` de las 38 reglas.
 - **Cobertura** (`core/cobertura.test.ts`): los 18 riesgos tienen regla y escenario; todo dato del catálogo lo usa alguna regla.
-- **Escenarios** (`adaptadores/simulador/escenarios.test.ts`): los 40 escenarios corren sobre un núcleo real y cumplen su `esperado`; toda alerta trae pasos.
+- **Escenarios** (`adaptadores/simulador/escenarios.test.ts`): los 42 escenarios corren sobre un núcleo real y cumplen su `esperado`; toda alerta trae pasos.
 - **Reproductor** (`reproductor.test.ts`): orden, pausa, siguiente, velocidad, espera de escalada y guion, con tiempo falso.
 
 ---
@@ -482,7 +491,7 @@ app/
 │   │   ├── sensores.ts        Catálogo de los 50 datos (rango, unidad, categoría)
 │   │   ├── riesgosHRP.ts      Los 18 riesgos del HRP (peligros, sistemas, enlaces)
 │   │   ├── numeros.ts         Números en palabras → cifras (intérprete local)
-│   │   ├── reglas/            36 reglas, agrupadas por área
+│   │   ├── reglas/            38 reglas, agrupadas por área
 │   │   ├── nucleo.ts          Orquestación, confirmación y escalada
 │   │   ├── personalizador.ts  Texto según el perfil
 │   │   ├── canales.ts         Elección de canal
@@ -509,7 +518,7 @@ app/
 | Línea | Carpeta | Qué hay | Pendiente |
 |---|---|---|---|
 | — | `app/src/core/tipos.ts` | **Contratos de datos.** Avisen antes de cambiarlos. | |
-| **A. Detección** | `app/src/core/reglas/` | 36 reglas que cubren los 18 riesgos HRP, con contexto, agravantes y guías paso a paso | Validar umbrales con los anexos y kinesiología |
+| **A. Detección** | `app/src/core/reglas/` | 38 reglas que cubren los 18 riesgos HRP, con contexto, agravantes y guías paso a paso | Validar umbrales con los anexos y kinesiología |
 | **B. Perfil, canales y escalada** | `app/src/core/personalizador.ts`, `canales.ts`, `nucleo.ts` | Texto por perfil, canal, sueño, privacidad, recordatorios, confirmación y escalada | Perfil que aprende del uso |
 | **C. Interfaz** | `app/src/ui/` | Navegación por secciones, figura anatómica, simulador, cobertura NASA, minigráficos de tendencia, franjas de alerta, íconos SVG | Vistas dedicadas "pantalla del hábitat" y "auricular" |
 | **D. Voz, IA e integración** | `app/src/adaptadores/`, `app/server/` | Web Speech API, **Vosk local (WASM, sin conexión)**, IA híbrida (conversación y visión), FHIR de ejemplo | Detección de «Higia» sin transcribir toda la frase y modelo más preciso |

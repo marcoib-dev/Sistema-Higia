@@ -12,6 +12,7 @@ export type Seccion = SeccionApp;
 export const SECCIONES: { id: Seccion; nombre: string; icono: NombreIcono; descripcion: string }[] = [
   { id: 'asistente', nombre: 'Higia', icono: 'asistente', descripcion: 'El asistente: habla con Higia y controla la app' },
   { id: 'resumen', nombre: 'Resumen', icono: 'resumen', descripcion: 'Estado del cuerpo y lo que requiere atención' },
+  { id: 'pruebas', nombre: 'Pruebas', icono: 'pruebas', descripcion: 'Pruebas a bordo: cognitiva, reacción, fuerza isométrica y Valsalva' },
   { id: 'mensajes', nombre: 'Mensajes', icono: 'mensajes', descripcion: 'Avisos y alertas enviados al astronauta' },
   { id: 'comunicaciones', nombre: 'Comunicaciones', icono: 'escalado', descripcion: 'Lo que Higia envió a otros y sus respuestas' },
   { id: 'perfil', nombre: 'Perfil', icono: 'documento', descripcion: 'Perfil e historia clínica previa' },

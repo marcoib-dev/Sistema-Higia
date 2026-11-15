@@ -285,6 +285,11 @@ interface OpcionesEscucha {
   /** Pedido completo después de «Higia» (o la frase siguiente, si solo dijo «Higia»). */
   onComando: (texto: string) => void;
   onEstado: (e: EstadoEscucha, detalle?: string) => void;
+  /**
+   * Lo que se va oyendo mientras habla (antes de que termine la frase), sin el nombre de Higia.
+   * Cadena vacía cuando la frase terminó o se descartó.
+   */
+  onParcial?: (texto: string) => void;
   /** Mientras devuelva true, lo que se oye se ignora (p. ej. mientras Higia habla, para no escucharse a sí misma). */
   ignorar: () => boolean;
   /** Motor de reconocimiento; por defecto, el nativo del navegador. */
@@ -351,14 +356,21 @@ export function motorVozPreferido(): MotorVoz {
 interface Detector {
   /** Procesa una frase final (con sus alternativas, si el motor las ofrece). */
   alTexto(alternativas: string[]): void;
+  /**
+   * Resultado parcial (la frase todavía no terminó): si ya se oyó «Higia», se avisa al instante
+   * para que la interfaz lo muestre sin esperar al final de la frase.
+   */
+  alParcial(texto: string): void;
   /** El motor arrancó: publica «esperando» o «llamado» según la ventana actual. */
   alIniciar(): void;
   parar(): void;
 }
 
 /** Máquina de estados de «Higia»: llamado, espera de 8 s y respuestas sin nombrarla. */
-function crearDetector({ onComando, onEstado }: Pick<OpcionesEscucha, 'onComando' | 'onEstado'>): Detector {
+function crearDetector({ onComando, onEstado, onParcial }: Pick<OpcionesEscucha, 'onComando' | 'onEstado' | 'onParcial'>): Detector {
   let esperaHasta = 0;
+  /** Ya se avisó «llamado» por un resultado parcial de esta frase. */
+  let llamadoParcial = false;
   let esperaPedido: ReturnType<typeof setTimeout> | undefined;
   const limpiar = () => {
     clearTimeout(esperaPedido);
@@ -372,7 +384,22 @@ function crearDetector({ onComando, onEstado }: Pick<OpcionesEscucha, 'onComando
     onEstado('llamado');
   };
   return {
+    alParcial(texto) {
+      const t = texto.trim();
+      if (!t) return;
+      const d = detectarLlamado(t);
+      const atento = Date.now() < esperaHasta || respuestaSinNombreActiva();
+      if (d.llamado) {
+        if (!llamadoParcial) { llamadoParcial = true; onEstado('llamado'); }
+        onParcial?.(d.resto);
+      } else if (atento) {
+        onParcial?.(t);
+      }
+    },
     alTexto(alternativas) {
+      const habiaParcial = llamadoParcial;
+      llamadoParcial = false;
+      onParcial?.('');
       const conLlamado = alternativas.map(detectarLlamado).find((d) => d.llamado);
       if (conLlamado) {
         if (conLlamado.resto) {
@@ -388,6 +415,9 @@ function crearDetector({ onComando, onEstado }: Pick<OpcionesEscucha, 'onComando
         onEstado('esperando');
         const texto = alternativas[0]?.trim();
         if (texto) onComando(texto);
+      } else if (habiaParcial) {
+        // El parcial sonaba a «Higia» pero la frase final no: se vuelve a esperar.
+        onEstado('esperando');
       }
     },
     alIniciar() { onEstado(Date.now() < esperaHasta || respuestaSinNombreActiva() ? 'llamado' : 'esperando'); },
@@ -423,12 +453,16 @@ function escucharConNavegador(detector: Detector, onEstado: OpcionesEscucha['onE
     r = new Ctor();
     r.lang = 'es-ES';
     r.continuous = true;
-    r.interimResults = false;
+    // Resultados parciales: «Higia» se reconoce mientras se habla, no al terminar la frase.
+    r.interimResults = true;
     r.maxAlternatives = 3;
     r.onresult = (e: { resultIndex: number; results: { isFinal: boolean; length: number; [i: number]: { transcript: string } }[] }) => {
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const res = e.results[i];
-        if (!res.isFinal) continue;
+        if (!res.isFinal) {
+          if (!ignorar()) detector.alParcial(res[0].transcript);
+          continue;
+        }
         fallosRed = 0; // el servicio responde: no es un fallo de conexión
         if (ignorar()) continue;
         // Entre las alternativas, la que contenga el llamado (el reconocedor a veces lo escribe distinto).
@@ -486,6 +520,7 @@ function escucharConLocal(detector: Detector, onEstado: OpcionesEscucha['onEstad
     detener = crearEscuchaLocal({
       onListo: () => { if (!cancelado) detector.alIniciar(); },
       onTexto: (t) => { if (!cancelado && !ignorar()) detector.alTexto([t]); },
+      onParcial: (t) => { if (!cancelado && !ignorar()) detector.alParcial(t); },
       onAviso: (m) => { if (!cancelado) onEstado('cargando', m); },
       onError: (m) => {
         if (cancelado) return;
@@ -508,12 +543,12 @@ function escucharConLocal(detector: Detector, onEstado: OpcionesEscucha['onEstad
  * Escucha continua: Higia solo se activa cuando la nombran. "Higia, pide ayuda" se procesa directo;
  * si solo dice "Higia", se espera la frase siguiente. Devuelve una función para apagarla.
  */
-export function escucharPalabraClave({ motor = 'navegador', onComando, onEstado, ignorar }: OpcionesEscucha): () => void {
+export function escucharPalabraClave({ motor = 'navegador', onComando, onEstado, onParcial, ignorar }: OpcionesEscucha): () => void {
   if (motor === 'ninguno') {
     onEstado('error', motivoSinReconocimiento() ?? 'Este navegador no tiene reconocimiento de voz.');
     return () => {};
   }
-  const detector = crearDetector({ onComando, onEstado });
+  const detector = crearDetector({ onComando, onEstado, onParcial });
   return motor === 'local'
     ? escucharConLocal(detector, onEstado, ignorar)
     : escucharConNavegador(detector, onEstado, ignorar);
@@ -579,4 +614,34 @@ export function escuchar(onTexto: (t: string) => void, onFin: () => void, onErro
     onFin();
   }
   return () => { try { r.abort(); } catch { /* ya detenido */ } };
+}
+
+// ── Señal sonora al oír «Higia» ─────────────────────────────────────────
+
+let contextoSonido: AudioContext | undefined;
+
+/**
+ * Dos notas cortas y suaves que confirman «te escucho» (como el tono de un asistente).
+ * No suena si el volumen está en cero. Si el navegador no permite audio todavía, no pasa nada.
+ */
+export function sonarLlamado(): void {
+  if (volumen === 0 || typeof AudioContext === 'undefined') return;
+  try {
+    contextoSonido ??= new AudioContext();
+    const ctx = contextoSonido;
+    if (ctx.state === 'suspended') void ctx.resume().catch(() => undefined);
+    const t = ctx.currentTime;
+    [[660, 0], [990, 0.09]].forEach(([f, d]) => {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = f;
+      g.gain.setValueAtTime(0, t + d);
+      g.gain.linearRampToValueAtTime(0.12 * volumen, t + d + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.22);
+      osc.connect(g).connect(ctx.destination);
+      osc.start(t + d);
+      osc.stop(t + d + 0.25);
+    });
+  } catch { /* sin audio */ }
 }

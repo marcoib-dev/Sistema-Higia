@@ -2,7 +2,8 @@
 import { useEffect, useRef } from 'react';
 import type { EstadoEscucha } from '../../adaptadores/voz/voz';
 import type { Comunicacion, Contexto, Mensaje } from '../../core/tipos';
-import { TEXTO_ESCUCHA } from '../asistente';
+import { horaHabitat } from '../../core/momento';
+import { TEXTO_ACTIVIDAD, TEXTO_ESCUCHA, type ActividadHigia } from '../asistente';
 import { NOMBRE_DESTINO } from '../../core/tipos';
 import { Icono } from '../iconos';
 import { SECCIONES, type Seccion } from '../navegacion';
@@ -16,13 +17,16 @@ interface PropsBarra {
   iaActiva: boolean;
   iaConfigurada: boolean;
   escucha: EstadoEscucha;
+  actividad: ActividadHigia;
+  ahora: number;
   vozActiva: boolean;
   onVozActiva: (v: boolean) => void;
   demoAbierta: boolean;
   onDemo: () => void;
 }
 
-export function BarraSuperior({ contexto: c, nombreAstronauta, iaActiva, iaConfigurada, escucha, vozActiva, onVozActiva, demoAbierta, onDemo }: PropsBarra) {
+export function BarraSuperior({ contexto: c, nombreAstronauta, iaActiva, iaConfigurada, escucha, actividad, ahora, vozActiva, onVozActiva, demoAbierta, onDemo }: PropsBarra) {
+  const atenta = actividad === 'escuchando' || actividad === 'pensando' || actividad === 'hablando';
   return (
     <header className="barra-superior">
       <div className="marca">
@@ -39,9 +43,11 @@ export function BarraSuperior({ contexto: c, nombreAstronauta, iaActiva, iaConfi
           <Icono nombre="ia" tamano={16} />
           <span className="indicador-texto">{iaActiva ? 'IA activa' : 'IA inactiva'}</span>
         </li>
-        <li className={`escucha-${escucha}`} title={TEXTO_ESCUCHA[escucha]}>
-          <Icono nombre="microfono" tamano={16} />
-          <span className="indicador-texto">{escucha === 'llamado' ? 'Te escucho' : escucha === 'esperando' ? '«Higia»' : escucha === 'cargando' ? 'Voz local…' : escucha === 'error' ? 'Sin micrófono' : 'Escucha apagada'}</span>
+        <li className={atenta ? `actividad-${actividad}` : `escucha-${escucha}`} title={atenta ? TEXTO_ACTIVIDAD[actividad] : TEXTO_ESCUCHA[escucha]}>
+          <Icono nombre={actividad === 'pensando' ? 'ia' : actividad === 'hablando' ? 'volumen' : 'microfono'} tamano={16} />
+          <span className="indicador-texto">{atenta
+            ? (actividad === 'escuchando' ? 'Te escucho' : actividad === 'pensando' ? 'Pensando' : 'Hablando')
+            : escucha === 'esperando' ? '«Higia»' : escucha === 'cargando' ? 'Voz local…' : escucha === 'error' ? 'Sin micrófono' : 'Escucha apagada'}</span>
         </li>
         <li title="Astronauta">
           <Icono nombre="usuario" tamano={16} />{nombreAstronauta}
@@ -49,8 +55,8 @@ export function BarraSuperior({ contexto: c, nombreAstronauta, iaActiva, iaConfi
         <li title="Ubicación y destino">
           <Icono nombre="ubicacion" tamano={16} />{UBICACION[c.ubicacion]} · {NOMBRE_DESTINO[c.destino]}
         </li>
-        <li title="Hora del hábitat">
-          <Icono nombre="reloj" tamano={16} />{String(c.hora).padStart(2, '0')}:00
+        <li title={`Hora del hábitat · día ${c.diaMision} de misión`}>
+          <Icono nombre="reloj" tamano={16} />{horaHabitat(c, ahora)}<span className="indicador-texto"> · día {c.diaMision}</span>
         </li>
         {c.climaEspacial === 'tormentaSolar' && (
           <li className="alerta" title="Tormenta solar activa"><Icono nombre="sol" tamano={16} />Tormenta solar</li>

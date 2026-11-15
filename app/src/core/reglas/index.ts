@@ -1,11 +1,11 @@
 import type { Regla } from '../tipos';
-import { reglaArritmia, reglaFrecuenciaCardiaca, reglaPresionArterial, reglaTrombosis } from './cardiovascular';
+import { reglaArritmia, reglaFrecuenciaCardiaca, reglaPresionArterial, reglaTrombosis, reglaValsalva } from './cardiovascular';
 import { reglaCargaEva, reglaDescompresion } from './eva';
 import { reglaRuido } from './entorno';
 import { reglaFiebre, reglaMicrobioma, reglaReactivacion } from './inmune';
 import { reglaFatigaMenu, reglaGlucemia, reglaHidratacion, reglaIngesta, reglaPeso } from './metabolismo';
 import { reglaAnimo, reglaAnimoSostenido, reglaCircadiano, reglaCohesion, reglaEstres, reglaSobrecarga, reglaSueno } from './mental';
-import { reglaAdherencia, reglaAptitud, reglaCargaDinamica, reglaEjercicio, reglaHueso } from './musculoesqueletico';
+import { reglaAdherencia, reglaAptitud, reglaCargaDinamica, reglaEjercicio, reglaFuerzaIsometrica, reglaHueso } from './musculoesqueletico';
 import { reglaOrientacion, reglaPsicosis, reglaTraumaCraneal } from './neuro';
 import { reglaSANS } from './ojos';
 import { reglaRadiacion } from './radiacion';
@@ -50,4 +50,6 @@ export const REGLAS: Regla[] = [
   reglaCohesion,
   reglaCircadiano,
   reglaSobrecarga,
+  reglaFuerzaIsometrica,
+  reglaValsalva,
 ];

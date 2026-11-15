@@ -3,8 +3,9 @@
  * Muestra si está escuchando su nombre, la última respuesta y permite escribirle o dictarle.
  */
 import { useEffect, useState } from 'react';
-import { TEXTO_ESCUCHA, type Asistente } from '../asistente';
+import { TEXTO_ACTIVIDAD, TEXTO_ESCUCHA, type Asistente } from '../asistente';
 import { Icono } from '../iconos';
+import { OrbeHigia } from './AuraHigia';
 
 export function AccesoHigia({ asistente: a, onAbrir }: { asistente: Asistente; onAbrir: () => void }) {
   const [texto, setTexto] = useState('');
@@ -20,10 +21,11 @@ export function AccesoHigia({ asistente: a, onAbrir }: { asistente: Asistente; o
     return () => clearTimeout(id);
   }, [ultimo?.id]);
 
-  const estado = a.pensando ? 'Pensando…' : a.dictando ? 'Escuchando…' : TEXTO_ESCUCHA[a.estadoEscucha];
+  const estado = a.actividad === 'escuchando' && a.parcial ? `«${a.parcial}»`
+    : a.actividad === 'inactiva' || a.actividad === 'esperando' ? TEXTO_ESCUCHA[a.estadoEscucha] : TEXTO_ACTIVIDAD[a.actividad];
 
   return (
-    <div className={`acceso-higia ${a.estadoEscucha === 'llamado' || a.dictando ? 'atento' : ''}`} aria-label="Asistente Higia">
+    <div className={`acceso-higia actividad-${a.actividad}`} aria-label="Asistente Higia">
       {verUltimo && ultimo && !abierto && (
         <div className="acceso-burbuja" role="status">
           {ultimo.pregunta && <p className="acceso-pregunta">«{ultimo.pregunta}»</p>}
@@ -39,7 +41,7 @@ export function AccesoHigia({ asistente: a, onAbrir }: { asistente: Asistente; o
       )}
       <div className="acceso-barra">
         <button className="acceso-estado" onClick={onAbrir} title="Abrir el asistente">
-          <span className="acceso-logo" aria-hidden><Icono nombre="ia" tamano={16} /></span>
+          <OrbeHigia actividad={a.actividad === 'inactiva' ? 'esperando' : a.actividad} tamano={30} />
           <span>{estado}</span>
         </button>
         <button className="boton-icono" onClick={() => setAbierto((v) => !v)} aria-expanded={abierto} aria-label="Escribirle a Higia" title="Escribirle a Higia">

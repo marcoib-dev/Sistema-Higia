@@ -75,6 +75,8 @@ function cargarCliente(): Promise<VoskClient> {
 export interface OpcionesEscuchaLocal {
   /** Frase final reconocida. Vosk entrega el texto cuando detecta una pausa. */
   onTexto: (texto: string) => void;
+  /** Lo que se va oyendo antes del final de la frase (resultado parcial de Vosk). */
+  onParcial?: (texto: string) => void;
   /** El micrófono y el modelo ya están funcionando. */
   onListo?: () => void;
   /** Aviso no fatal (por ejemplo, el audio está a la espera de un gesto del usuario). */
@@ -104,7 +106,7 @@ function mensajeDeError(e: unknown): string {
  * Abre el micrófono y transcribe en continuo con Vosk. Devuelve una función para detener.
  * La inicialización es asíncrona: si se detiene antes de terminar, no queda nada abierto.
  */
-export function crearEscuchaLocal({ onTexto, onListo, onAviso, onError }: OpcionesEscuchaLocal): () => void {
+export function crearEscuchaLocal({ onTexto, onParcial, onListo, onAviso, onError }: OpcionesEscuchaLocal): () => void {
   let parado = false;
   let detener: (() => void) | undefined;
 
@@ -174,6 +176,12 @@ export function crearEscuchaLocal({ onTexto, onListo, onAviso, onError }: Opcion
         if (parado) return;
         const texto = ((m as { result?: { text?: string } }).result?.text ?? '').trim();
         if (texto) onTexto(texto);
+      });
+      let ultimoParcial = '';
+      reconocedor.on('partialresult', (m) => {
+        if (parado || !onParcial) return;
+        const texto = ((m as { result?: { partial?: string } }).result?.partial ?? '').trim();
+        if (texto && texto !== ultimoParcial) { ultimoParcial = texto; onParcial(texto); }
       });
       reconocedor.on('error', (m) => {
         if (!parado) onError((m as { error?: string }).error || 'El reconocimiento local falló.');

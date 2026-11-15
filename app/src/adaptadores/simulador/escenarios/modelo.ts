@@ -97,6 +97,7 @@ export function diaNormal(t: number, p: Perfil, h?: Historial): Lectura[] {
     L('agudezaVisual', b.agudezaVisual ?? 95, t), L('presionIntraocular', Math.min(b.presionIntraocular ?? 15, 20), t),
     L('grosorRetina', 3, t), L('flujoYugular', 1, t), L('asimetriaPantorrilla', 0.5, t),
     L('orientacion', 10, t), L('cognicion', b.cognicion ?? 85, t), L('tiempoReaccion', b.tiempoReaccion ?? 270, t),
+    L('fuerzaIsometrica', b.fuerzaIsometrica ?? 40, t), L('valsalva', b.valsalva ?? 1.5, t),
     L('ppO2Cabina', 20.8, t), L('ruidoCabina', 45, t), L('cargaMicrobiana', 20, t), L('calcioUrinario', 180, t),
     L('dosisRadiacion', h?.ultima('dosisRadiacion')?.valor ?? 120, t),
   ];

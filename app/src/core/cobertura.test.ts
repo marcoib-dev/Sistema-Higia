@@ -42,8 +42,8 @@ describe('cobertura de los riesgos del HRP', () => {
     for (const e of ESCENARIOS) for (const id of e.hrp) expect(IDS_HRP, e.id).toContain(id);
   });
 
-  it('hay 36 reglas y 40 escenarios', () => {
-    expect(REGLAS).toHaveLength(36);
-    expect(ESCENARIOS).toHaveLength(40);
+  it('hay 38 reglas y 42 escenarios', () => {
+    expect(REGLAS).toHaveLength(38);
+    expect(ESCENARIOS).toHaveLength(42);
   });
 });

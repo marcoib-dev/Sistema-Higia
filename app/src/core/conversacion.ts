@@ -6,9 +6,10 @@
  */
 import type { Accion, DestinoPedido, SeccionApp } from './acciones';
 import type { NucleoSalud } from './nucleo';
+import { fechaLegible, horaHabitat } from './momento';
 import { palabrasANumeros } from './numeros';
 import { redactar } from './personalizador';
-import { enRango, INFO_SENSOR, ORDEN_NIVEL, type Lectura, type TipoSensor } from './tipos';
+import { enRango, INFO_SENSOR, NOMBRE_DESTINO, ORDEN_NIVEL, RETARDO_TIERRA, type Lectura, type TipoSensor } from './tipos';
 
 export interface Respuesta {
   texto: string;
@@ -36,6 +37,9 @@ const CONSULTAS: { claves: RegExp; riesgoId: string; nombre: string }[] = [
   { claves: /glucemia|glucosa|azucar/, riesgoId: 'metabolismo.glucemia', nombre: 'glucemia' },
   { claves: /vision|\bojos?\b|\bvista\b/, riesgoId: 'sans.vision', nombre: 'visión' },
   { claves: /hueso/, riesgoId: 'hueso.perdida', nombre: 'huesos' },
+  { claves: /isometric|prension|agarre|dinamometro/, riesgoId: 'musculo.isometrica', nombre: 'fuerza isométrica' },
+  { claves: /valsalva|autonomic/, riesgoId: 'cardio.valsalva', nombre: 'reflejo autonómico (Valsalva)' },
+  { claves: /cognitiv|memoria|concentracion/, riesgoId: 'mental.orientacion', nombre: 'rendimiento cognitivo' },
   { claves: /fuerza|musculo/, riesgoId: 'musculo.aptitud', nombre: 'fuerza' },
   { claves: /\bpeso\b|nutricion|comida|calorias/, riesgoId: 'nutricion.peso', nombre: 'peso y nutrición' },
   { claves: /equilibrio/, riesgoId: 'vestibular.equilibrio', nombre: 'equilibrio' },
@@ -117,6 +121,43 @@ const SENALES_PERCEPCION: RegExp[] = [
 /** Pide o sugiere un chequeo de orientación. */
 const PIDE_ORIENTACION = /chequeo de orientacion|prueba de orientacion|evalua (mi|la) orientacion|no se donde estoy|donde estoy|estoy (muy )?confundid[oa]|me siento confundid[oa]|no recuerdo (como llegue|que paso|nada)|me perdi/;
 
+const UBICACION_LEGIBLE = { habitat: 'en el hábitat', eva: 'afuera, en una EVA', rover: 'en el rover' } as const;
+const ACTIVIDAD_LEGIBLE = { reposo: 'en reposo', trabajo: 'trabajando', ejercicio: 'haciendo ejercicio' } as const;
+
+/**
+ * Preguntas sobre el momento y el entorno (hora, fecha, día de misión, dónde está, quién está cerca,
+ * clima espacial, conexión). Se responden con lo que Higia ya sabe: nunca "no lo sé" si el dato existe.
+ */
+function respuestaDeContexto(f: string, nucleo: NucleoSalud, ahora: number): string | null {
+  const c = nucleo.contexto;
+  const hora = `Son las ${horaHabitat(c, ahora)}, hora del hábitat`;
+  if (/que hora (es|son|tenemos)|me (dices|das) la hora|hora es|la hora/.test(f)) return `${hora}.`;
+  if (/que (dia|fecha) (es|tenemos)|fecha de hoy|dia de hoy|en que (dia|fecha|mes|ano) (estamos|vivimos)|que mes es/.test(f)) {
+    return `Hoy es ${fechaLegible(ahora)}: día ${c.diaMision} de la misión.`;
+  }
+  if (/dia de (la )?mision|cuantos dias (llevo|llevamos|van)|cuanto llevamos/.test(f)) return `Es el día ${c.diaMision} de la misión.`;
+  if (/(clima|tiempo) espacial|tormenta solar|radiacion (afuera|hoy)/.test(f)) {
+    return c.climaEspacial === 'tormentaSolar'
+      ? 'Hay una tormenta solar activa: quédate en el refugio y evita las EVA.'
+      : 'El clima espacial está calmo: no hay tormentas solares activas.';
+  }
+  if (/(hay|esta) (algun |un )?medico|quien (esta|hay) cerca|hay (alguien|un companero) cerca|estoy solo/.test(f)) {
+    const partes = [
+      c.companeroCercano ? 'tienes un compañero al alcance de la radio' : 'no hay un compañero al alcance de la radio',
+      c.medicoABordo ? 'hay médico a bordo' : 'no hay médico a bordo: si hace falta, te guío paso a paso',
+    ];
+    return `${partes.join(' y ')}.`.replace(/^./, (x) => x.toUpperCase());
+  }
+  if (/conexion|enlace|comunicacion con (la )?tierra|hay senal/.test(f) && !/(dile|avisa|manda|envia)/.test(f)) {
+    return `${c.conexionHabitat ? 'Estoy conectado a la red del hábitat' : 'Sin conexión con el hábitat: funciono de forma autónoma'}. ` +
+      `${c.conexionTierra ? `Hay enlace con Tierra (retardo ${RETARDO_TIERRA[c.destino]}).` : 'No hay enlace con Tierra ahora: los mensajes quedan en cola.'}`;
+  }
+  if (/que (estoy|estamos) haciendo|en que (contexto|situacion) estoy|donde estamos/.test(f)) {
+    return `Estás ${UBICACION_LEGIBLE[c.ubicacion]}, ${ACTIVIDAD_LEGIBLE[c.actividad]}, en la misión a ${NOMBRE_DESTINO[c.destino]}. ${hora}, día ${c.diaMision} de la misión.`;
+  }
+  return null;
+}
+
 const NOMBRE_DESTINO_PEDIDO: Record<DestinoPedido, string> = {
   companero: 'tu compañero', medico: 'el equipo médico', base: 'la base', tierra: 'Tierra', todos: 'todos los que están al alcance',
 };
@@ -181,6 +222,15 @@ export function interpretar(frase: string, nucleo: NucleoSalud, ahora = Date.now
     return r(n ? 'Entendido, me alegra. Cancelo el aviso a otros.' : 'Me alegra. No hay alertas esperando respuesta.', [{ tipo: 'confirmar_bien' }]);
   }
 
+  // ── Evaluaciones y pruebas a bordo ──
+  if (/evaluacion cognitiva|prueba cognitiva|test cognitivo|evalua(r)? (mi )?(memoria|cognicion|atencion)|pon(me)? a prueba (la|mi) memoria/.test(f) && !/(como (salio|me fue|esta)|resultado)/.test(f)) {
+    return r('Empecemos la evaluación cognitiva.', [{ tipo: 'evaluacion_cognitiva' }]);
+  }
+  const pidePrueba = /(hacer|haga|hagamos|empez|inici|guia|quiero|vamos|toca|prueba|test|mide|medir)/.test(f) && !/(como (salio|me fue|esta)|resultado|ultimo)/.test(f);
+  if (pidePrueba && /valsalva/.test(f)) return r('Te guío en la maniobra de Valsalva, paso a paso.', [{ tipo: 'prueba_guiada', prueba: 'valsalva' }]);
+  if (pidePrueba && /isometric|dinamometro|prension|fuerza de agarre/.test(f)) return r('Te guío en la prueba de fuerza isométrica.', [{ tipo: 'prueba_guiada', prueba: 'isometrica' }]);
+  if (pidePrueba && /(tiempo de )?reaccion|reflejos|pvt/.test(f)) return r('Abro la prueba de tiempo de reacción.', [{ tipo: 'prueba_guiada', prueba: 'reaccion' }]);
+
   // ── Mensajes a otros: "dile a Tierra que…", "avísale a mi compañero que…" ──
   const msj = f.match(/(?:dile|digale|dile a|avisa|avisale|envia(?:le)?|manda(?:le)?|mensaje|comunica(?:le)?|llama)\b(.*)/);
   if (msj) {
@@ -216,8 +266,22 @@ export function interpretar(frase: string, nucleo: NucleoSalud, ahora = Date.now
   const alergia = f.match(/soy alergic[oa] a (?:la |el |los |las )?(.+)/);
   if (alergia) return r(`Anoto la alergia a ${alergia[1]} en tu historia clínica.`, [{ tipo: 'actualizar_historia', campo: 'alergias', valor: alergia[1] }]);
 
+  // ── Lo que Higia ya sabe del momento y del entorno ──
+  const delContexto = respuestaDeContexto(f, nucleo, ahora);
+  if (delContexto) return r(delContexto);
+
   // ── Registros ──
-  let m = f.match(new RegExp(`dormi\\s+${NUM}\\s+horas?`));
+  let m = f.match(new RegExp(String.raw`(?:valsalva|cociente)\D{0,25}?${NUM}`));
+  if (m && Number(m[1]) >= 0.8 && Number(m[1]) <= 2.5) {
+    const v = enRango('valsalva', Number(m[1]));
+    return r(`Anotado: cociente de Valsalva ${v}.`, [], [lectura('valsalva', v)]);
+  }
+  m = f.match(new RegExp(String.raw`(?:apret\w*|isometric\w*|dinamometro|prension|agarre)\D{0,25}?${NUM}`));
+  if (m) {
+    const v = enRango('fuerzaIsometrica', Number(m[1]));
+    return r(`Anotado: fuerza isométrica de ${v} kilos.`, [], [lectura('fuerzaIsometrica', v)]);
+  }
+  m = f.match(new RegExp(`dormi\\s+${NUM}\\s+horas?`));
   if (m) {
     const v = Number(m[1]);
     return r(`Anotado: dormiste ${v} horas.`, [], [lectura('horasSueno', v)]);

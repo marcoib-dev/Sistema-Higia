@@ -2,9 +2,11 @@
  * Cliente de la IA de Higia (habla con app/server por HTTP).
  * La app la usa siempre que el servidor tenga clave configurada. Si falla, se vuelve al intérprete local.
  */
+import { fechaLegible, horaHabitat, parteDelDia } from '../../core/momento';
 import type { NucleoSalud } from '../../core/nucleo';
+import { durmiendo } from '../../core/proactivo';
 import { RIESGO_HRP } from '../../core/riesgosHRP';
-import { INFO_SENSOR, type Hallazgo, type Mensaje, type TipoSensor } from '../../core/tipos';
+import { INFO_SENSOR, NOMBRE_DESTINO, NOMBRE_TAREA, RETARDO_TIERRA, TAREAS_CRITICAS, type Hallazgo, type Mensaje, type TipoSensor } from '../../core/tipos';
 import type {
   AnalisisEntorno, EstadoIA, EstadoParaIA, EvaluacionIA, PeticionConversacion, PeticionEntorno, PeticionEvaluacion,
   RespuestaConversacion,
@@ -72,9 +74,30 @@ export function estadoParaIA(n: NucleoSalud, app?: EstadoParaIA['app']): EstadoP
     lecturasRecientes[INFO_SENSOR[s].nombre] = ls.map((l) => ({ valor: l.valor, unidad: INFO_SENSOR[s].unidad, haceMin: minutosDesde(l.timestamp, ahora) }));
   }
   const lineaBase = Object.fromEntries(Object.entries(n.perfil.lineaBase).map(([s, v]) => [INFO_SENSOR[s as TipoSensor].nombre, v as number]));
+  const c = n.contexto;
+  const { inicio, fin } = n.perfil.horarioSueno;
+  const aptitud = n.aptitudTareas();
+  const UBIC = { habitat: 'en el hábitat', eva: 'afuera, en una EVA', rover: 'en el rover' };
+  const ACT = { reposo: 'en reposo', trabajo: 'trabajando', ejercicio: 'haciendo ejercicio' };
+  const entorno = [
+    `Está ${UBIC[c.ubicacion]}, ${ACT[c.actividad]}, en la misión a ${NOMBRE_DESTINO[c.destino]} (día ${c.diaMision})`,
+    `clima espacial ${c.climaEspacial === 'tormentaSolar' ? 'con TORMENTA SOLAR activa' : 'calmo'}`,
+    c.companeroCercano ? 'hay un compañero al alcance de la radio' : 'no hay compañero al alcance',
+    c.medicoABordo ? 'hay médico a bordo' : 'no hay médico a bordo',
+    c.conexionHabitat ? 'conectado a la red del hábitat' : 'sin conexión con el hábitat (modo autónomo)',
+    c.conexionTierra ? `con enlace a Tierra (retardo ${RETARDO_TIERRA[c.destino]})` : 'sin enlace con Tierra',
+    c.transicionGravedad ? 'en transición de gravedad (últimas 72 h)' : '',
+  ].filter(Boolean).join('; ');
   return {
     perfil: { formacionMedica, experiencia, toleranciaEstres, propensoPanico, historiaClinica },
-    contexto: { ...n.contexto },
+    contexto: { ...c },
+    momento: {
+      horaHabitat: horaHabitat(c, ahora), fecha: fechaLegible(ahora), parteDelDia: parteDelDia(c.hora), diaMision: c.diaMision,
+      horarioSueno: `${inicio}:00 a ${fin}:00`, enHorarioDeSueno: durmiendo(n.perfil, c),
+    },
+    entorno,
+    aptitudTareas: TAREAS_CRITICAS.map((t) => ({ tarea: NOMBRE_TAREA[t], apto: aptitud[t].apto, motivos: aptitud[t].motivos.map((h) => h.titulo) })),
+    companeros: n.companeros,
     hallazgos: n.hallazgosActuales().map((h) => ({ titulo: h.titulo, nivel: h.nivel, detalle: h.detalleTecnico, sensible: h.sensible, riesgosNASA: riesgosNASA(h) })),
     ultimasLecturas,
     lecturasRecientes,

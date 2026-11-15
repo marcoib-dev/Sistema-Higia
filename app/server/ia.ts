@@ -169,6 +169,13 @@ Cómo responder:
 - Si hay una alerta activa, prioriza la acción de seguridad por encima de cualquier otra conversación.
 - Los hallazgos marcados como sensibles (ánimo, estrés) se tratan con tacto.
 - Si te habla de algo ajeno a su salud, responde brevemente y con amabilidad.
+- USA TODO LO QUE SABES. En <estado> tienes la hora, la fecha, el día de misión, dónde está, qué hace, quién está cerca, la conexión, el clima espacial, sus datos, su historia clínica y el estado de la app. Si la pregunta se responde con algo de <estado>, respóndela con ese dato: nunca digas que no sabes o que no tienes acceso a algo que está ahí.
+  · Hora: <estado>.momento.horaHabitat es la hora del hábitat (la que ve el astronauta en pantalla). "¿Qué hora es?" → "Son las 10:23."
+  · Fecha y día de misión: <estado>.momento.fecha y <estado>.momento.diaMision.
+  · Dónde está, qué hace, compañeros, médico, conexión y clima espacial: <estado>.entorno (resumen) y <estado>.contexto (detalle).
+  · Si puede salir a EVA, pilotar o hacer ejercicio intenso: <estado>.aptitudTareas.
+  · Últimas pruebas (cognitiva, tiempo de reacción, orientación, fuerza isométrica, Valsalva): <estado>.lecturasRecientes, comparadas con <estado>.lineaBase.
+- Si <estado>.app.enCurso indica una pregunta o prueba en curso, tenlo en cuenta para entender la respuesta.
 - Ten en cuenta su historia clínica previa (alergias, antecedentes, medicación) que llega en <estado>.perfil.historiaClinica. Nunca recomiendes algo a lo que es alérgico.
 - Uso de datos: cuando hables de su salud, apóyate SOLO en los datos de <estado> (hallazgos, lecturasRecientes con su antigüedad en minutos, lineaBase e historia clínica) y menciona el dato concreto en que te basas (por ejemplo "tu pulso de hace 5 minutos fue 132"; sin cifras si el perfil no tiene formación médica, pero sin inventar). Si no hay datos sobre algo, dilo en vez de suponer.
 - Salud mental y neurología, con especial cuidado y sin diagnosticar:
@@ -187,8 +194,10 @@ Acciones: eres el centro de la app y puedes controlarla. Si la frase lo pide, in
 - enviar_mensaje {destino, mensaje}: quiere hablar con otro astronauta o mandar un mensaje que no es emergencia ("dile a Tierra que terminé la reparación", "avísale a Kai que voy para allá"). "mensaje" es lo que hay que transmitir, redactado en tercera persona si hace falta.
 - emitir_alerta {nivel, sistema, titulo, detalle, region?}: cuenta un síntoma o un riesgo nuevo sin dato propio en la tabla, o algo urgente (dolor de pecho, no poder respirar, golpe, desmayo). nivel: "info" | "aviso" | "alerta" ("alerta" solo si es grave o urgente). sistema: "cerebro" | "ojos" | "oidoInterno" | "corazon" | "pulmones" | "inmune" | "intestino" | "huesos" | "musculos" | "piernas" | "metabolismo" | "cuerpo". region (opcional, dónde está el problema): "craneo" | "cara" | "cuello" | "torax" | "abdomen" | "columna" | "pelvis" | "brazos" | "piernas". Si es grave y además pide ayuda, usa también pedir_ayuda.
 - chequeo_orientacion {}: Higia hace cuatro preguntas rápidas (nombre, lugar, mes, una resta) para medir la orientación. Úsalo ante confusión, desorientación o un golpe en la cabeza, o si lo pide. Si lo usas, NO hagas tú las preguntas: Higia agrega la primera al final de tu respuesta.
+- evaluacion_cognitiva {}: evaluación cognitiva breve (memoria, atención, cálculo, orientación en el tiempo, razonamiento y recuerdo; seis preguntas). Úsala si la pide, si se queja de olvidos o de falta de concentración, o si acepta la propuesta de hacerla. Si la usas, NO hagas tú las preguntas ni expliques la prueba: responde solo una frase corta ("Empecemos.") y Higia agrega la primera pregunta.
+- prueba_guiada {prueba}: abre una prueba física guiada paso a paso en la sección Pruebas. prueba: "isometrica" (fuerza isométrica con el dinamómetro de mano) | "valsalva" (maniobra de Valsalva: reflejo autonómico, riesgo de mareo al volver a la gravedad) | "reaccion" (tiempo de reacción, PVT). Úsala si la pide o si conviene medir algo concreto.
 - confirmar_bien {}: dice que está bien en respuesta a una alerta que espera respuesta (ver <estado>.app.alertasEsperandoRespuesta).
-- ir_a {seccion}: quiere ver una parte de la app. seccion: "asistente" | "resumen" | "mensajes" | "comunicaciones" | "perfil" (historia clínica) | "entorno" | "reportes".
+- ir_a {seccion}: quiere ver una parte de la app. seccion: "asistente" | "resumen" | "pruebas" (pruebas a bordo) | "mensajes" | "comunicaciones" | "perfil" (historia clínica) | "entorno" | "reportes".
 - mostrar_sistema {sistema}: quiere ver un sistema del cuerpo en la figura.
 - cambiar_contexto {ubicacion?, actividad?}: cuenta que cambió lo que hace ("salgo a EVA", "empiezo a entrenar"). ubicacion: "habitat" | "eva" | "rover"; actividad: "reposo" | "trabajo" | "ejercicio".
 - voz {estado}: "silenciar" | "activar" | "detener".
@@ -203,7 +212,8 @@ Valores permitidos para "sensor": ${SENSORES_CONVERSACION.map((s) => `"${s}"`).j
 
 /** Acción del asistente. Esquema plano (más fácil para el modelo); la validación estricta la hace validarAcciones. */
 const EsquemaAccion = z.object({
-  tipo: z.string().describe('pedir_ayuda | enviar_mensaje | emitir_alerta | confirmar_bien | ir_a | mostrar_sistema | cambiar_contexto | voz | actualizar_historia | ejecutar_escenario | control_simulador | cambiar_astronauta'),
+  tipo: z.string().describe('pedir_ayuda | enviar_mensaje | emitir_alerta | chequeo_orientacion | evaluacion_cognitiva | prueba_guiada | confirmar_bien | ir_a | mostrar_sistema | cambiar_contexto | voz | actualizar_historia | ejecutar_escenario | control_simulador | cambiar_astronauta'),
+  prueba: z.string().optional().describe('isometrica | valsalva | reaccion'),
   orden: z.string().optional().describe('pausar | continuar | siguiente | reiniciar | detener'),
   destino: z.string().optional().describe('companero | medico | base | tierra | todos'),
   motivo: z.string().optional(),
@@ -239,7 +249,11 @@ export async function conversar(p: PeticionConversacion): Promise<RespuestaConve
   const r = await pedirJSON([
     { role: 'system', content: SISTEMA_CONVERSACION },
     ...historial,
-    { role: 'user', content: `<estado>\n${JSON.stringify(p.estado)}\n</estado>\n\n${p.frase}` },
+    {
+      role: 'user',
+      content: `<estado>\n${JSON.stringify(p.estado)}\n</estado>\n\n` +
+        `(Ahora: ${p.estado.momento.horaHabitat} del hábitat, ${p.estado.momento.fecha}, día ${p.estado.momento.diaMision} de la misión.)\n\n${p.frase}`,
+    },
   ], EsquemaConversacion, 'responder');
   // La app solo ejecuta acciones válidas: lo que el modelo invente o escriba mal se descarta.
   return { ...r, acciones: validarAcciones(r.acciones) };

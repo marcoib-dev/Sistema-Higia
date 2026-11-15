@@ -1,0 +1,208 @@
+/* ══════════════════════════════════════════════════════════════════════
+   PRESENCIA DE HIGIA — cuándo escucha, piensa o habla (visible desde toda la app)
+   y PRUEBAS A BORDO. Se carga después de estilos.css.
+   ══════════════════════════════════════════════════════════════════════ */
+:root {
+  --higia-escucha: #9b7bff;
+  --higia-escucha-2: #4fd1ff;
+  --higia-piensa: #6ea8ff;
+  --higia-habla: #2fd3b5;
+}
+
+/* Borde luminoso de la pantalla */
+.aura {
+  position: fixed; inset: 0; z-index: 80; pointer-events: none; opacity: 0; transition: opacity .25s ease-out;
+  --a: var(--higia-escucha); --b: var(--higia-escucha-2);
+  box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--a) 85%, transparent), inset 0 0 42px 6px color-mix(in srgb, var(--a) 38%, transparent), inset 0 0 120px 10px color-mix(in srgb, var(--b) 14%, transparent);
+}
+.aura.visible { opacity: 1; }
+.aura-escuchando { animation: aura-escucha 1.6s ease-in-out infinite; }
+.aura-pensando { --a: var(--higia-piensa); --b: var(--ia); animation: aura-respira 2.4s ease-in-out infinite; }
+.aura-hablando { --a: var(--higia-habla); --b: var(--higia-piensa); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--a) 70%, transparent), inset 0 0 34px 2px color-mix(in srgb, var(--a) 26%, transparent); }
+@keyframes aura-escucha {
+  0%, 100% { box-shadow: inset 0 0 0 4px var(--a), inset 0 0 60px 12px color-mix(in srgb, var(--a) 55%, transparent), inset 0 0 160px 20px color-mix(in srgb, var(--b) 22%, transparent); }
+  50% { box-shadow: inset 0 0 0 4px var(--b), inset 0 0 80px 16px color-mix(in srgb, var(--b) 50%, transparent), inset 0 0 180px 26px color-mix(in srgb, var(--a) 24%, transparent); }
+}
+/* Franja superior de color: se ve aunque la pantalla esté lejos o proyectada. */
+.aura::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 4px;
+  background: linear-gradient(90deg, var(--a), var(--b), var(--a)); background-size: 200% 100%;
+}
+.aura-escuchando::before { animation: deslizar 1.2s linear infinite; }
+@keyframes deslizar { to { background-position: 200% 0; } }
+@keyframes aura-respira { 50% { opacity: .55; } }
+
+/* Pastilla flotante con el estado y lo que se va oyendo */
+.pastilla-higia {
+  position: fixed; top: calc(var(--alto-barra) + 12px); left: 50%; z-index: 81; transform: translate(-50%, -12px) scale(.96);
+  display: flex; align-items: center; gap: 12px; max-width: min(560px, calc(100vw - 32px)); padding: 8px 10px 8px 8px;
+  border-radius: 999px; background: color-mix(in srgb, var(--superficie-2) 92%, transparent); backdrop-filter: blur(12px);
+  border: 1px solid color-mix(in srgb, var(--higia-escucha) 60%, var(--borde)); box-shadow: 0 12px 40px rgba(0, 0, 0, .45);
+  opacity: 0; pointer-events: none; transition: opacity .2s, transform .25s cubic-bezier(.16, 1, .3, 1);
+}
+.pastilla-higia.visible { opacity: 1; transform: translate(-50%, 0) scale(1); pointer-events: auto; }
+.pastilla-pensando { border-color: color-mix(in srgb, var(--higia-piensa) 55%, var(--borde)); }
+.pastilla-hablando { border-color: color-mix(in srgb, var(--higia-habla) 55%, var(--borde)); }
+.pastilla-texto { display: grid; min-width: 0; padding-right: 8px; }
+.pastilla-texto strong { font-size: 14px; }
+.pastilla-parcial { font-size: 14px; color: var(--texto-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Orbe: el "rostro" de Higia */
+.orbe { position: relative; display: inline-grid; place-items: center; flex-shrink: 0; --o: var(--sin-datos); --o2: var(--superficie-3); }
+.orbe-esperando { --o: var(--acento); --o2: var(--ia); }
+.orbe-escuchando { --o: var(--higia-escucha); --o2: var(--higia-escucha-2); }
+.orbe-pensando { --o: var(--higia-piensa); --o2: var(--ia); }
+.orbe-hablando { --o: var(--higia-habla); --o2: var(--higia-piensa); }
+.orbe-nucleo {
+  position: relative; z-index: 1; display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%;
+  background: radial-gradient(circle at 30% 25%, color-mix(in srgb, #fff 35%, var(--o2)), var(--o) 55%, color-mix(in srgb, var(--o) 55%, #000));
+  color: #fff; box-shadow: 0 0 18px color-mix(in srgb, var(--o) 45%, transparent);
+  transition: background .3s, box-shadow .3s;
+}
+.orbe-inactiva .orbe-nucleo { background: var(--superficie-3); color: var(--texto-3); box-shadow: none; }
+.orbe-onda { position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--o); opacity: 0; }
+.orbe-escuchando .orbe-onda { animation: onda 1.4s cubic-bezier(.2, .6, .4, 1) infinite; }
+.orbe-escuchando .orbe-onda-2 { animation-delay: .7s; }
+.orbe-escuchando .orbe-nucleo { animation: latir 1.4s ease-in-out infinite; }
+.orbe-pensando .orbe-nucleo { animation: girar-brillo 1.8s linear infinite; }
+.orbe-esperando .orbe-onda { animation: onda 3.2s ease-out infinite; }
+.orbe-esperando .orbe-onda-2 { display: none; }
+@keyframes onda { 0% { transform: scale(1); opacity: .7; } 100% { transform: scale(1.75); opacity: 0; } }
+@keyframes latir { 50% { transform: scale(1.08); } }
+@keyframes girar-brillo { to { filter: hue-rotate(40deg); transform: rotate(360deg); } }
+.orbe-barras { display: inline-flex; align-items: center; gap: 2px; height: 40%; }
+.orbe-barras i { width: 3px; height: 100%; border-radius: 2px; background: #fff; animation: barra .9s ease-in-out infinite; }
+.orbe-barras i:nth-child(2) { animation-delay: .15s; }
+.orbe-barras i:nth-child(3) { animation-delay: .3s; }
+.orbe-barras i:nth-child(4) { animation-delay: .45s; }
+@keyframes barra { 0%, 100% { transform: scaleY(.35); } 50% { transform: scaleY(1); } }
+
+/* Cabecera del chat con el orbe grande */
+.boton-orbe { background: none; border: 0; padding: 0; border-radius: 50%; cursor: pointer; }
+.boton-orbe:disabled { cursor: default; }
+.chat-cabecera {
+  display: flex; align-items: center; gap: 16px; padding: 16px 18px; border-bottom: 1px solid var(--borde);
+  background: linear-gradient(120deg, color-mix(in srgb, var(--ia) 8%, var(--superficie-2)), var(--superficie-2) 60%);
+  transition: background .3s;
+}
+.chat-cabecera.escuchando { background: linear-gradient(120deg, color-mix(in srgb, var(--higia-escucha) 22%, var(--superficie-2)), color-mix(in srgb, var(--higia-escucha-2) 8%, var(--superficie-2))); }
+.chat-cabecera.pensando { background: linear-gradient(120deg, color-mix(in srgb, var(--higia-piensa) 16%, var(--superficie-2)), var(--superficie-2)); }
+.chat-cabecera.hablando { background: linear-gradient(120deg, color-mix(in srgb, var(--higia-habla) 14%, var(--superficie-2)), var(--superficie-2)); }
+.chat-cabecera-texto { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.chat-cabecera-texto strong { font-size: 16px; }
+.chat-cabecera-texto span { color: var(--texto-2); font-size: 13px; }
+.chat-cabecera-texto .chat-cabecera-parcial { font-size: 16px; color: var(--texto); font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Burbujas de iniciativa propia (preguntas proactivas, evaluación) */
+.burbuja-higia.proactiva { border-color: color-mix(in srgb, var(--higia-escucha) 45%, var(--borde)); background: color-mix(in srgb, var(--higia-escucha) 9%, var(--superficie-2)); }
+.burbuja-etiqueta { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: var(--higia-escucha); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 2px; }
+.respuestas-rapidas { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.respuestas-rapidas button { padding: 5px 12px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--higia-escucha) 50%, var(--borde-fuerte)); background: var(--superficie); color: var(--texto); cursor: pointer; font-size: 13px; }
+.respuestas-rapidas button:hover { background: color-mix(in srgb, var(--higia-escucha) 18%, var(--superficie)); }
+
+/* Barra de progreso de la evaluación en curso */
+.progreso-eval { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--borde); background: color-mix(in srgb, var(--higia-escucha) 8%, var(--superficie-2)); font-size: 13px; }
+.progreso-eval .pista { flex: 1; height: 6px; border-radius: 3px; background: var(--superficie-3); overflow: hidden; }
+.progreso-eval .pista span { display: block; height: 100%; background: linear-gradient(90deg, var(--higia-escucha), var(--higia-escucha-2)); transition: width .4s; }
+
+/* Acceso flotante: color según la actividad */
+.acceso-higia.actividad-escuchando .acceso-barra { border-color: var(--higia-escucha); box-shadow: 0 0 0 5px color-mix(in srgb, var(--higia-escucha) 25%, transparent), var(--sombra); }
+.acceso-higia.actividad-pensando .acceso-barra { border-color: var(--higia-piensa); }
+.acceso-higia.actividad-hablando .acceso-barra { border-color: var(--higia-habla); }
+.indicadores li.actividad-escuchando { color: #fff; border-color: var(--higia-escucha); background: color-mix(in srgb, var(--higia-escucha) 35%, var(--superficie)); }
+.indicadores li.actividad-hablando { color: var(--higia-habla); border-color: color-mix(in srgb, var(--higia-habla) 50%, transparent); }
+.indicadores li.actividad-pensando { color: var(--higia-piensa); border-color: color-mix(in srgb, var(--higia-piensa) 50%, transparent); }
+
+/* Opciones del chat (escucha, preguntas proactivas) */
+.chat-opciones { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 16px; }
+.chat-opciones .interruptor { border-bottom: 0; }
+.opcion-proactiva { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--texto-2); padding: 8px 0; flex-wrap: wrap; }
+.opcion-proactiva select { min-height: 32px; padding: 4px 8px; }
+
+/* ── Guía de inicio (para quien ve la app por primera vez) ───────────── */
+.guia-inicio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+.guia-paso { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: var(--radio); background: var(--superficie); border: 1px solid var(--borde); }
+.guia-n { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--acento-suave); color: var(--acento); font-weight: 700; font-size: 12px; flex-shrink: 0; }
+.guia-paso strong { display: block; font-size: 14px; }
+.guia-paso p { font-size: 13px; color: var(--texto-2); }
+.guia-paso kbd { font: inherit; font-size: 12px; padding: 0 5px; border-radius: 4px; border: 1px solid var(--borde-fuerte); background: var(--superficie-2); }
+
+/* ── Pruebas a bordo ─────────────────────────────────────────────────── */
+.pruebas-grilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.tarjeta-prueba { display: grid; gap: 10px; align-content: start; }
+.tarjeta-prueba.activa { border-color: var(--acento); }
+.tarjeta-prueba-cab { display: flex; align-items: center; gap: 12px; }
+.prueba-icono { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px; background: var(--acento-suave); color: var(--acento); flex-shrink: 0; }
+.prueba-icono.cog { background: color-mix(in srgb, var(--higia-escucha) 16%, transparent); color: var(--higia-escucha); }
+.prueba-icono.car { background: color-mix(in srgb, var(--alerta) 14%, transparent); color: #ff8a87; }
+.prueba-icono.mus { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+.prueba-icono.rea { background: color-mix(in srgb, var(--aviso) 14%, transparent); color: var(--aviso); }
+.tarjeta-prueba h2 { font-size: 16px; }
+.tarjeta-prueba .que-mide { color: var(--texto-2); font-size: 14px; }
+.prueba-resultado { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; padding: 10px 12px; border-radius: var(--radio-s); background: var(--superficie-2); border: 1px solid var(--borde); }
+.prueba-resultado b { font-size: 20px; font-variant-numeric: tabular-nums; }
+.prueba-resultado small { color: var(--texto-3); font-size: 12px; }
+.prueba-pie { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.prueba-meta { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.panel-prueba { border-color: color-mix(in srgb, var(--acento) 45%, var(--borde)); margin-bottom: 16px; animation: aparecer .2s ease-out; }
+.ancla-prueba { scroll-margin-top: calc(var(--tope) + 16px); }
+.panel-prueba-cuerpo { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 20px; align-items: start; }
+.lista-pasos { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; counter-reset: paso; }
+.lista-pasos li { counter-increment: paso; display: flex; gap: 10px; padding: 10px 12px; border-radius: var(--radio-s); border: 1px solid var(--borde); color: var(--texto-3); }
+.lista-pasos li::before { content: counter(paso); display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--superficie-3); font-size: 12px; font-weight: 700; flex-shrink: 0; }
+.lista-pasos li.hecho { color: var(--texto-2); }
+.lista-pasos li.hecho::before { content: "\2713"; background: color-mix(in srgb, var(--ok) 22%, transparent); color: var(--ok); }
+.lista-pasos li.actual { color: var(--texto); border-color: var(--acento); background: var(--acento-suave); }
+.lista-pasos li.actual::before { background: var(--acento); color: var(--sobre-acento); }
+.cuenta-atras { display: grid; justify-items: center; gap: 10px; text-align: center; }
+.anillo { position: relative; width: 160px; height: 160px; }
+.anillo svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.anillo circle { fill: none; stroke-width: 10; }
+.anillo .fondo-anillo { stroke: var(--superficie-3); }
+.anillo .avance { stroke: var(--acento); stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+.anillo.esfuerzo .avance { stroke: var(--aviso); }
+.anillo-texto { position: absolute; inset: 0; display: grid; place-content: center; }
+.anillo-texto b { font-size: 40px; font-variant-numeric: tabular-nums; line-height: 1; }
+.anillo-texto small { color: var(--texto-2); font-size: 12px; }
+.manometro { width: 100%; display: grid; gap: 4px; font-size: 12px; color: var(--texto-2); }
+.manometro-pista { position: relative; height: 10px; border-radius: 5px; background: var(--superficie-3); overflow: hidden; }
+.manometro-pista span { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, var(--info), var(--ok)); transition: width .3s; }
+.manometro-pista i { position: absolute; top: 0; bottom: 0; left: 66%; width: 2px; background: #fff; opacity: .8; }
+.advertencia-prueba { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: var(--radio-s); background: color-mix(in srgb, var(--aviso) 12%, var(--superficie-2)); border: 1px solid color-mix(in srgb, var(--aviso) 45%, transparent); font-size: 14px; color: var(--texto-2); margin-bottom: 12px; }
+.advertencia-prueba .icono { color: var(--aviso); margin-top: 2px; }
+.advertencia-prueba strong { color: var(--texto); }
+.advertencia-prueba ul { margin: 4px 0 0; padding-left: 18px; }
+.lectura-sim { display: grid; gap: 10px; }
+.lectura-sim .campos { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+.lectura-sim input { width: 110px; }
+.lectura-sim .resultado-calc { font-size: 15px; }
+.lectura-sim .resultado-calc b { font-size: 22px; }
+.acciones-prueba { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+
+/* PVT: tiempo de reacción */
+.pvt { display: grid; justify-items: center; gap: 12px; }
+.pvt-blanco {
+  width: min(360px, 100%); aspect-ratio: 1.7; border-radius: 20px; border: 2px solid var(--borde-fuerte); background: var(--superficie-2);
+  display: grid; place-content: center; text-align: center; gap: 4px; cursor: pointer; user-select: none; font-size: 18px; font-weight: 600; color: var(--texto-2);
+}
+.pvt-blanco small { font-size: 13px; font-weight: 400; }
+.pvt-blanco.espera { background: var(--superficie-3); }
+.pvt-blanco.ya { background: var(--ok); border-color: var(--ok); color: #06150d; font-size: 26px; }
+.pvt-blanco.adelanto { background: color-mix(in srgb, var(--alerta) 25%, var(--superficie-2)); border-color: var(--alerta); color: #fff; }
+.pvt-tiempos { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.pvt-tiempos span { padding: 3px 10px; border-radius: 999px; background: var(--superficie-2); border: 1px solid var(--borde); font-variant-numeric: tabular-nums; font-size: 13px; }
+
+@media (max-width: 760px) {
+  .guia-inicio { grid-template-columns: 1fr; }
+  .panel-prueba-cuerpo { grid-template-columns: 1fr; }
+  .chat-opciones { grid-template-columns: 1fr; }
+  .pastilla-higia { top: calc(var(--alto-barra) + 8px); }
+}
+@media (max-width: 520px) {
+  .navegacion a { padding: 12px 2px; }
+  .navegacion-nombre { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aura, .orbe *, .pastilla-higia { animation: none !important; }
+}

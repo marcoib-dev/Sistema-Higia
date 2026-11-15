@@ -23,6 +23,8 @@ export type TipoSensor =
   | 'tiempoReaccion'      // ms, prueba de vigilancia psicomotora (PVT)
   | 'equilibrio' | 'fuerza' | 'aptitudAerobica' | 'agudezaVisual' | 'presionIntraocular' | 'grosorRetina'
   | 'flujoYugular' | 'asimetriaPantorrilla'
+  | 'fuerzaIsometrica'    // kg, contracción isométrica máxima (dinamómetro de prensión)
+  | 'valsalva'            // cociente de Valsalva (FC máxima al pujar / FC mínima al soltar)
   // Hábitos y encuestas
   | 'horasSueno'          // horas de una noche
   | 'animo'               // autoevaluación 1–10
@@ -104,6 +106,8 @@ export const INFO_SENSOR: Record<TipoSensor, InfoSensor> = {
   grosorRetina: { nombre: 'Cambio en la retina (OCT)', unidad: 'µm', categoria: 'prueba', min: -20, max: 120, paso: 1, ayuda: 'Cambio respecto del valor previo al vuelo' },
   flujoYugular: { nombre: 'Flujo en la vena yugular', unidad: 'grado', categoria: 'prueba', min: 1, max: 4, paso: 1, ayuda: 'Ecografía: 1 normal, 2 lento, 3 estancado, 4 retrógrado o trombo' },
   asimetriaPantorrilla: { nombre: 'Diferencia entre pantorrillas', unidad: 'cm', categoria: 'prueba', min: 0, max: 8, paso: 0.5, ayuda: 'Autoexamen con cinta métrica' },
+  fuerzaIsometrica: { nombre: 'Fuerza isométrica (prensión)', unidad: 'kg', categoria: 'prueba', min: 5, max: 90, paso: 0.5, porVoz: true, ayuda: 'Contracción máxima sostenida 5 s en el dinamómetro de mano' },
+  valsalva: { nombre: 'Cociente de Valsalva', unidad: 'cociente', categoria: 'prueba', min: 0.8, max: 2.5, paso: 0.01, porVoz: true, ayuda: 'Maniobra de Valsalva: FC máxima al pujar ÷ FC mínima al soltar (reflejo autonómico)' },
 
   // Hábitos y encuestas
   horasSueno: { nombre: 'Horas de sueño', unidad: 'h', categoria: 'habito', min: 0, max: 14, paso: 0.5, porVoz: true },

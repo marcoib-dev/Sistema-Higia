@@ -239,3 +239,50 @@ export const reglaTrombosis = definirRegla(
     return d;
   },
 );
+
+// ── Maniobra de Valsalva (reflejo autonómico) ───────────────────────────
+
+/** Cociente de Valsalva: por debajo de esto el reflejo barorreceptor responde menos de lo esperable. */
+export const VALSALVA = { limite: 1.2, bajo: 1.1 };
+
+export const reglaValsalva = definirRegla(
+  {
+    id: 'cardio.valsalva', nombre: 'Reflejo autonómico (Valsalva)', sistema: 'corazon',
+    sensores: ['valsalva'],
+    fuente: '§7.1.3 Adaptaciones cardiovasculares: intolerancia ortostática al volver a la gravedad · Prueba autonómica: cociente de Valsalva (normal ≥ 1,2)',
+    hrp: ['cardiovascular'],
+  },
+  (h, p, ahora, c) => {
+    const ult = ultimaReciente(h, 'valsalva', ahora, 30 * 24);
+    if (!ult) return null;
+    const v = ult.valor;
+    const base = p.lineaBase.valsalva;
+    const caida = base ? (base - v) / base : 0;
+    const transicion = c.transicionGravedad;
+    const detalle = `Cociente de Valsalva ${v.toFixed(2)} (normal ≥ ${VALSALVA.limite}${base ? `; línea base ${base.toFixed(2)}` : ''})` +
+      `${transicion ? ' · en transición de gravedad' : ''}`;
+    let nivel: Nivel = v < VALSALVA.bajo ? 'aviso' : v < VALSALVA.limite || caida >= 0.2 ? 'info' : 'normal';
+    // Al cambiar de gravedad (aterrizaje, regreso) el riesgo de desmayo al ponerse de pie es real.
+    if (nivel !== 'normal' && transicion) nivel = subirNivel(nivel);
+    if (nivel === 'normal') return normal('Reflejo autonómico', detalle);
+    const d: DatosHallazgo = {
+      nivel, detalleTecnico: detalle,
+      titulo: nivel === 'info' ? 'Reflejo autonómico algo reducido' : 'Reflejo autonómico reducido: riesgo de mareo al incorporarte',
+      resumenSimple: 'Tu cuerpo regula la presión más lento que de costumbre: podrías marearte al ponerte de pie.',
+      textoCalmado: 'Tu cuerpo se está adaptando. Muévete despacio al levantarte y bebe agua.',
+      accion: 'Incorpórate despacio, bebe agua con sal antes de cambiar de gravedad y usa prendas de compresión.',
+      ruta: nivel === 'info' ? 'autogestion' : 'reporte', sensible: false,
+      bloquea: nivel === 'info' ? undefined : ['pilotaje'],
+    };
+    if (nivel === 'alerta') {
+      d.pasos = [
+        'No te pongas de pie de golpe: primero siéntate un minuto y luego levántate con apoyo.',
+        'Bebe un litro de agua con sal (carga de líquidos) antes de la transición de gravedad.',
+        'Usa las prendas de compresión de piernas y abdomen.',
+        'Si te mareas, acuéstate con las piernas elevadas y avisa a un compañero.',
+        'Higia envía el reporte; repite la prueba antes del aterrizaje o la salida del vehículo.',
+      ];
+    }
+    return d;
+  },
+);

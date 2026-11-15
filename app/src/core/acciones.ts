@@ -6,7 +6,7 @@
 import type { Actividad, DestinoComunicacion, Nivel, RegionCuerpo, SistemaCorporal, Ubicacion } from './tipos';
 import { REGIONES, SISTEMAS } from './tipos';
 
-export const SECCIONES_APP = ['asistente', 'resumen', 'mensajes', 'comunicaciones', 'perfil', 'entorno', 'reportes'] as const;
+export const SECCIONES_APP = ['asistente', 'resumen', 'pruebas', 'mensajes', 'comunicaciones', 'perfil', 'entorno', 'reportes'] as const;
 export type SeccionApp = (typeof SECCIONES_APP)[number];
 
 /** A quién puede escribir o pedir ayuda el asistente. "todos" = todos los disponibles ahora. */
@@ -22,6 +22,10 @@ export type Accion =
   | { tipo: 'emitir_alerta'; nivel: Exclude<Nivel, 'normal'>; sistema: SistemaCorporal; titulo: string; detalle: string; region?: RegionCuerpo }
   /** Preguntas rápidas de orientación (persona, lugar, tiempo, atención): mide la desorientación. */
   | { tipo: 'chequeo_orientacion' }
+  /** Evaluación cognitiva breve (memoria, atención, cálculo, razonamiento): seis preguntas en la conversación. */
+  | { tipo: 'evaluacion_cognitiva' }
+  /** Prueba guiada paso a paso en la sección Pruebas (fuerza isométrica, Valsalva, tiempo de reacción). */
+  | { tipo: 'prueba_guiada'; prueba: PruebaGuiada }
   /** "Estoy bien": responde a las alertas que esperan confirmación. */
   | { tipo: 'confirmar_bien' }
   | { tipo: 'ir_a'; seccion: SeccionApp }
@@ -34,6 +38,9 @@ export type Accion =
   | { tipo: 'ejecutar_escenario'; escenario: string }
   | { tipo: 'control_simulador'; orden: OrdenSimulador }
   | { tipo: 'cambiar_astronauta'; astronauta: string };
+
+export const PRUEBAS_GUIADAS = ['isometrica', 'valsalva', 'reaccion'] as const;
+export type PruebaGuiada = (typeof PRUEBAS_GUIADAS)[number];
 
 export const ORDENES_SIMULADOR = ['pausar', 'continuar', 'siguiente', 'reiniciar', 'detener'] as const;
 export type OrdenSimulador = (typeof ORDENES_SIMULADOR)[number];
@@ -60,6 +67,10 @@ export function validarAccion(a: unknown): Accion | null {
       return { tipo: 'chequeo_orientacion' };
     case 'confirmar_bien':
       return { tipo: 'confirmar_bien' };
+    case 'evaluacion_cognitiva':
+      return { tipo: 'evaluacion_cognitiva' };
+    case 'prueba_guiada':
+      return en(PRUEBAS_GUIADAS, o.prueba) ? { tipo: 'prueba_guiada', prueba: o.prueba } : null;
     case 'ir_a':
       return en(SECCIONES_APP, o.seccion) ? { tipo: 'ir_a', seccion: o.seccion } : null;
     case 'mostrar_sistema':

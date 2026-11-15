@@ -65,8 +65,8 @@ describe('sueno.deficit', () => {
 });
 
 describe('catálogo de reglas', () => {
-  it('36 reglas, ids únicos, cada una con fuente y riesgos HRP', () => {
-    expect(REGLAS).toHaveLength(36);
+  it('38 reglas, ids únicos, cada una con fuente y riesgos HRP', () => {
+    expect(REGLAS).toHaveLength(38);
     expect(new Set(REGLAS.map((r) => r.id)).size).toBe(REGLAS.length);
     for (const r of REGLAS) {
       expect(r.fuente, r.id).not.toBe('');

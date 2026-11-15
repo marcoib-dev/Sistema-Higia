@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   aceptarRespuestaSinNombre,
   detectarLlamado, detener, escucharFrase, escucharPalabraClave, estadoVoz, hablar,
-  motivoSinReconocimiento, motorVozPreferido, type EstadoEscucha, type MotorVoz,
+  motivoSinReconocimiento, motorVozPreferido, sonarLlamado, type EstadoEscucha, type MotorVoz,
 } from '../adaptadores/voz/voz';
 
 export interface Intercambio {
@@ -18,6 +18,8 @@ export interface Intercambio {
   hechos: string[];
   origen: 'voz' | 'texto';
   nota?: string;
+  /** Higia habló por iniciativa propia: "Pregunta de Higia", "Evaluación cognitiva 2/6"… */
+  etiqueta?: string;
 }
 
 export interface ResultadoConversacion {
@@ -25,6 +27,8 @@ export interface ResultadoConversacion {
   fuente: 'ia' | 'local';
   hechos: string[];
   nota?: string;
+  /** La respuesta es parte de algo que guía Higia (evaluación, chequeo): se muestra con esta etiqueta. */
+  etiqueta?: string;
 }
 
 const CLAVE_ESCUCHA = 'higia.escucha';
@@ -40,6 +44,14 @@ export interface Asistente {
   detalleEscucha?: string;
   /** Micrófono manual (sin palabra clave) abierto. */
   dictando: boolean;
+  /** Lo que se va oyendo después de «Higia», mientras habla (vacío si nada). */
+  parcial: string;
+  /** Higia está hablando en voz alta en este momento. */
+  hablando: boolean;
+  /** Estado único para la interfaz: qué está haciendo Higia ahora. */
+  actividad: ActividadHigia;
+  /** Última vez que el astronauta le habló o escribió (para no interrumpir con preguntas). */
+  ultimaInteraccion: number;
   micDisponible: boolean;
   /** Motor elegido: Vosk local, el del navegador o ninguno. */
   motorVoz: MotorVoz;
@@ -47,10 +59,13 @@ export interface Asistente {
   problemaVoz?: string;
   enviar: (frase: string, origen?: 'voz' | 'texto') => Promise<void>;
   /** Higia habla por iniciativa propia (p. ej. empieza un chequeo de orientación tras un golpe). */
-  decir: (texto: string, hechos?: string[]) => void;
+  decir: (texto: string, hechos?: string[], etiqueta?: string) => void;
   alternarEscucha: (v: boolean) => void;
   dictar: () => void;
 }
+
+/** Qué hace Higia ahora: lo que la interfaz muestra con color y animación. */
+export type ActividadHigia = 'inactiva' | 'esperando' | 'escuchando' | 'pensando' | 'hablando';
 
 export function useAsistente(onFrase: (frase: string) => Promise<ResultadoConversacion>, vozActiva: boolean): Asistente {
   const [historial, setHistorial] = useState<Intercambio[]>([]);
@@ -59,6 +74,9 @@ export function useAsistente(onFrase: (frase: string) => Promise<ResultadoConver
   const [estadoEscucha, setEstadoEscucha] = useState<EstadoEscucha>('apagada');
   const [detalleEscucha, setDetalleEscucha] = useState<string>();
   const [dictando, setDictando] = useState(false);
+  const [parcial, setParcial] = useState('');
+  const [hablando, setHablando] = useState(false);
+  const [ultimaInteraccion, setUltimaInteraccion] = useState(() => Date.now());
   const motorVoz = motorVozPreferido();
   const micDisponible = motorVoz !== 'ninguno';
   // Con Web Speech, Brave y algunos Chromium exponen la API pero nunca devuelven texto:
@@ -71,17 +89,19 @@ export function useAsistente(onFrase: (frase: string) => Promise<ResultadoConver
   const vozRef = useRef(vozActiva);
   vozRef.current = vozActiva;
   const pensandoRef = useRef(false);
+  const estadoRef = useRef<EstadoEscucha>('apagada');
 
   const enviar = useCallback(async (frase: string, origen: 'voz' | 'texto' = 'texto') => {
     // "Higia, …" escrito o dictado: el nombre no es parte del pedido.
     const llamado = detectarLlamado(frase);
     const f = (llamado.llamado && llamado.resto ? llamado.resto : frase).trim();
     if (!f || pensandoRef.current) return;
+    setUltimaInteraccion(Date.now());
     pensandoRef.current = true;
     setPensando(true);
     try {
       const r = await onFraseRef.current(f);
-      setHistorial((prev) => [{ id: Date.now(), pregunta: f, respuesta: r.texto, fuente: r.fuente, hechos: r.hechos, origen, nota: r.nota }, ...prev].slice(0, 40));
+      setHistorial((prev) => [{ id: Date.now(), pregunta: f, respuesta: r.texto, fuente: r.fuente, hechos: r.hechos, origen, nota: r.nota, etiqueta: r.etiqueta }, ...prev].slice(0, 40));
       if (origen === 'voz') {
         setProblemaVoz(undefined); // el reconocimiento funcionó
         aceptarRespuestaSinNombre(8000); // deja una ventana corta para seguir hablando sin repetir «Higia»
@@ -106,8 +126,13 @@ export function useAsistente(onFrase: (frase: string) => Promise<ResultadoConver
     const parar = escucharPalabraClave({
       motor: motorVoz,
       onComando: (t) => { detener(); void enviar(t, 'voz'); },
+      onParcial: setParcial,
       onEstado: (e, d) => {
+        // Tono de «te escucho» al oír su nombre: confirma sin mirar la pantalla.
+        if (e === 'llamado' && estadoRef.current !== 'llamado') sonarLlamado();
+        estadoRef.current = e;
         setEstadoEscucha(e);
+        if (e !== 'llamado') setParcial('');
         setDetalleEscucha(d);
         if (e === 'error' && d) setProblemaVoz(d);
         if (e === 'esperando' || e === 'llamado') setProblemaVoz(undefined);
@@ -118,8 +143,14 @@ export function useAsistente(onFrase: (frase: string) => Promise<ResultadoConver
     return parar;
   }, [escuchaActiva, dictando, motorVoz, enviar]);
 
-  const decir = useCallback((texto: string, hechos: string[] = []) => {
-    setHistorial((prev) => [{ id: Date.now(), pregunta: '', respuesta: texto, fuente: 'local' as const, hechos, origen: 'voz' as const }, ...prev].slice(0, 40));
+  // Si Higia está hablando se consulta seguido: la interfaz lo muestra con su propio color.
+  useEffect(() => {
+    const id = setInterval(() => setHablando(estadoVoz() === 'hablando'), 200);
+    return () => clearInterval(id);
+  }, []);
+
+  const decir = useCallback((texto: string, hechos: string[] = [], etiqueta?: string) => {
+    setHistorial((prev) => [{ id: Date.now() + Math.random(), pregunta: '', respuesta: texto, fuente: 'local' as const, hechos, origen: 'voz' as const, etiqueta }, ...prev].slice(0, 40));
     if (vozRef.current) hablar(texto);
   }, []);
 
@@ -148,11 +179,29 @@ export function useAsistente(onFrase: (frase: string) => Promise<ResultadoConver
   /** Micrófono manual: una frase, sin necesidad de decir «Higia». */
   const dictar = () => {
     detener(); // hablarle a Higia la interrumpe
+    sonarLlamado();
+    setUltimaInteraccion(Date.now());
     setDictando(true);
   };
 
-  return { historial, pensando, escuchaActiva, estadoEscucha, detalleEscucha, dictando, micDisponible, motorVoz, problemaVoz, enviar, decir, alternarEscucha, dictar };
+  const actividad: ActividadHigia = estadoEscucha === 'llamado' || dictando ? 'escuchando'
+    : pensando ? 'pensando'
+    : hablando ? 'hablando'
+    : estadoEscucha === 'esperando' ? 'esperando' : 'inactiva';
+
+  return {
+    historial, pensando, escuchaActiva, estadoEscucha, detalleEscucha, dictando, parcial, hablando, actividad, ultimaInteraccion,
+    micDisponible, motorVoz, problemaVoz, enviar, decir, alternarEscucha, dictar,
+  };
 }
+
+export const TEXTO_ACTIVIDAD: Record<ActividadHigia, string> = {
+  inactiva: 'Higia en espera',
+  esperando: 'Di «Higia» para hablarle',
+  escuchando: 'Te escucho…',
+  pensando: 'Pensando…',
+  hablando: 'Higia está hablando',
+};
 
 export const TEXTO_ESCUCHA: Record<EstadoEscucha, string> = {
   apagada: 'Escucha apagada',

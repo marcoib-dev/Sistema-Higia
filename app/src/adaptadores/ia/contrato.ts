@@ -27,6 +27,24 @@ export interface EstadoParaIA {
     historiaClinica: HistoriaClinica;
   };
   contexto: Record<string, unknown>;
+  /**
+   * El momento actual en palabras: la IA no tiene reloj propio, así que la hora, la fecha y el día
+   * de misión le llegan siempre aquí (son los mismos que ve el astronauta en la barra superior).
+   */
+  momento: {
+    horaHabitat: string;
+    fecha: string;
+    parteDelDia: string;
+    diaMision: number;
+    horarioSueno: string;
+    enHorarioDeSueno: boolean;
+  };
+  /** El contexto descrito en una frase (dónde está, qué hace, quién está cerca, conexión). */
+  entorno: string;
+  /** Tareas críticas que hoy están contraindicadas, con el motivo. */
+  aptitudTareas: { tarea: string; apto: boolean; motivos: string[] }[];
+  /** Nombres de los compañeros de tripulación (para entender a quién se refiere). */
+  companeros: string[];
   hallazgos: { titulo: string; nivel: Nivel; detalle: string; sensible: boolean; riesgosNASA?: string[] }[];
   ultimasLecturas: Record<string, number>;
   /** Últimas lecturas por dato (hasta 5), con unidad y antigüedad: la base de cualquier análisis. */
@@ -36,6 +54,8 @@ export interface EstadoParaIA {
   /** Estado de la app, para que el asistente pueda controlarla. */
   app?: {
     seccion: string;
+    /** Prueba o pregunta en curso que Higia le hizo al astronauta, si hay. */
+    enCurso?: string;
     alertasEsperandoRespuesta: string[];
     comunicacionesRecientes: { destinatario: string; asunto: string; estado: string }[];
     destinosDisponibles: string[];
