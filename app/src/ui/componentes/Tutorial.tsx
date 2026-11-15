@@ -124,7 +124,9 @@ export function ubicarBurbuja(r: Caja, b: { w: number; h: number }, preferido: L
 const visible = (el: Element | null): el is HTMLElement => {
   if (!(el instanceof HTMLElement)) return false;
   const r = el.getBoundingClientRect();
-  return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden';
+  if (r.width <= 0 || r.height <= 0 || getComputedStyle(el).visibility === 'hidden') return false;
+  // Un grupo cuyos elementos están todos ocultos (p. ej. los indicadores en una pantalla muy angosta) no se señala.
+  return !el.children.length || [...el.children].some((c) => c.getBoundingClientRect().width > 0);
 };
 
 interface Props {

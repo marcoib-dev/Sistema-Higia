@@ -1,5 +1,5 @@
 /** Estructura de la app: barra superior, navegación y aviso global de alerta. */
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { EstadoEscucha } from '../../adaptadores/voz/voz';
 import type { Comunicacion, Contexto, Mensaje } from '../../core/tipos';
 import { horaHabitat } from '../../core/momento';
@@ -32,6 +32,7 @@ interface PropsBarra {
 export function BarraSuperior({ contexto: c, nombreAstronauta, iaActiva, iaConfigurada, escucha, actividad, ahora, vozActiva, onVozActiva, demoAbierta, onDemo, recorridoAbierto, onRecorrido }: PropsBarra) {
   const { t } = useIdioma();
   const atenta = actividad === 'escuchando' || actividad === 'pensando' || actividad === 'hablando';
+  const indicadores = useIndicadoresQueCaben();
   return (
     <header className="barra-superior">
       <div className="marca">
@@ -48,7 +49,7 @@ export function BarraSuperior({ contexto: c, nombreAstronauta, iaActiva, iaConfi
         </span>
       </div>
 
-      <ul data-tutorial="indicadores" className="indicadores" aria-label={t('Estado del sistema')}>
+      <ul ref={indicadores} data-tutorial="indicadores" className="indicadores" aria-label={t('Estado del sistema')}>
         <li className={c.conexionHabitat ? 'ok' : ''} title={c.conexionHabitat ? t('Conectado al hábitat') : t('Sin conexión: todo se resuelve en el dispositivo')}>
           <Icono nombre={c.conexionHabitat ? 'conexion' : 'sinConexion'} tamano={16} />
           <span className="indicador-texto">{c.conexionHabitat ? t('Conectado') : t('Autónomo')}</span>
@@ -92,6 +93,35 @@ export function BarraSuperior({ contexto: c, nombreAstronauta, iaActiva, iaConfi
       </div>
     </header>
   );
+}
+
+/**
+ * Indicadores que caben: se ocultan desde el último (los de menor prioridad) hasta que el resto entre
+ * completo, en vez de recortar una pastilla a medias. Mide el espacio real, así se adapta al idioma y a
+ * los textos que cambian (hora, ubicación). Las alertas (tormenta solar) nunca se ocultan.
+ */
+function useIndicadoresQueCaben() {
+  const ref = useRef<HTMLUListElement>(null);
+  useLayoutEffect(() => {
+    const ul = ref.current;
+    if (!ul) return;
+    const ajustar = () => {
+      const items = [...ul.children] as HTMLElement[];
+      items.forEach((li) => li.removeAttribute('data-oculto'));
+      for (let k = items.length - 1; k >= 0 && ul.scrollWidth > ul.clientWidth + 1; k--) {
+        if (!items[k].classList.contains('alerta')) items[k].setAttribute('data-oculto', '');
+      }
+    };
+    ajustar();
+    const ro = new ResizeObserver(ajustar);
+    ro.observe(ul);
+    // Textos que cambian (hora, idioma, estado de la escucha) o una pastilla nueva (tormenta solar).
+    const mo = new MutationObserver(ajustar);
+    mo.observe(ul, { childList: true, subtree: true, characterData: true });
+    window.addEventListener('resize', ajustar);
+    return () => { ro.disconnect(); mo.disconnect(); window.removeEventListener('resize', ajustar); };
+  }, []);
+  return ref;
 }
 
 interface PropsNav {

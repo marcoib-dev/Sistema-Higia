@@ -24,7 +24,7 @@ export function ControlVoz({ vozActiva, onVozActiva }: Props) {
 
   return (
     <div
-      data-tutorial="voz" className="control-voz" role="group" aria-label={t('Voz de Higia')}
+      data-tutorial="voz" className={`control-voz ${vozActiva && (estado === 'hablando' || estado === 'pausada') ? 'con-voz' : ''}`} role="group" aria-label={t('Voz de Higia')}
       title={motor === 'neuronal' ? t('Voz neuronal local (Piper): sin conexión') : motor === 'cargando' ? t('Cargando la voz neuronal local…') : t('Voz del navegador (la voz neuronal no está disponible)')}
     >
       <button
@@ -35,9 +35,9 @@ export function ControlVoz({ vozActiva, onVozActiva }: Props) {
       </button>
       <span className={`control-voz-estado ${vozActiva ? estado : 'silenciada'}`} aria-live="polite">{texto}</span>
       {estado === 'pausada'
-        ? <button className="boton-icono" onClick={reanudar} aria-label={t('Reanudar')} title={t('Reanudar')}><Icono nombre="reproducir" /></button>
-        : <button className="boton-icono" onClick={pausar} disabled={estado !== 'hablando'} aria-label={t('Pausar')} title={t('Pausar')}><Icono nombre="pausa" /></button>}
-      <button className="boton-icono" onClick={detener} disabled={estado === 'callada'} aria-label={t('Detener (Esc)')} title={t('Detener (Esc)')}>
+        ? <button className="boton-icono control-voz-reproduccion" onClick={reanudar} aria-label={t('Reanudar')} title={t('Reanudar')}><Icono nombre="reproducir" /></button>
+        : <button className="boton-icono control-voz-reproduccion" onClick={pausar} disabled={estado !== 'hablando'} aria-label={t('Pausar')} title={t('Pausar')}><Icono nombre="pausa" /></button>}
+      <button className="boton-icono control-voz-reproduccion" onClick={detener} disabled={estado === 'callada'} aria-label={t('Detener (Esc)')} title={t('Detener (Esc)')}>
         <Icono nombre="detener" />
       </button>
       <input
