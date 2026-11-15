@@ -502,7 +502,7 @@ export function FiguraCorporal({ estado, regiones = {}, historial, hallazgos = [
   const imagen = (filtro: string) => <image href={ruta(vista, ilustracion)} {...pos} preserveAspectRatio="none" filter={`url(#${filtro})`} />;
 
   const selectorSistemas = (
-    <div className="figura-sistemas" role="group" aria-label={t('Sistema del cuerpo')}>
+    <div data-tutorial="sistemas" className="figura-sistemas" role="group" aria-label={t('Sistema del cuerpo')}>
       {ORDEN_SISTEMAS.map((s) => (
         <button key={s} aria-pressed={sistema === s} onClick={() => { setPiezaActiva(null); cambiar({ sistema: s }); }}>
           {t(SISTEMAS_ANATOMICOS[s].nombre)}

@@ -24,7 +24,7 @@ export function ControlVoz({ vozActiva, onVozActiva }: Props) {
 
   return (
     <div
-      className="control-voz" role="group" aria-label={t('Voz de Higia')}
+      data-tutorial="voz" className="control-voz" role="group" aria-label={t('Voz de Higia')}
       title={motor === 'neuronal' ? t('Voz neuronal local (Piper): sin conexión') : motor === 'cargando' ? t('Cargando la voz neuronal local…') : t('Voz del navegador (la voz neuronal no está disponible)')}
     >
       <button

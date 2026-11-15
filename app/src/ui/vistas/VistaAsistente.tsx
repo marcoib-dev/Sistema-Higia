@@ -33,6 +33,8 @@ interface Props {
   onProactivo: (minutos: number) => void;
   onPreguntarAhora: () => void;
   onAbrirSimulador: () => void;
+  /** Abre el recorrido guiado con burbujas. */
+  onTutorial: () => void;
   onIr: (s: Seccion) => void;
   onPedirAyuda: () => void;
 }
@@ -61,7 +63,7 @@ export const OPCIONES_PROACTIVO = [
 ];
 
 export function VistaAsistente({
-  asistente: a, iaActiva, perfil, hallazgos, alertasPendientes, enCurso, proactivo, onProactivo, onPreguntarAhora, onAbrirSimulador, onIr, onPedirAyuda,
+  asistente: a, iaActiva, perfil, hallazgos, alertasPendientes, enCurso, proactivo, onProactivo, onPreguntarAhora, onAbrirSimulador, onTutorial, onIr, onPedirAyuda,
 }: Props) {
   const t = useT();
   const [texto, setTexto] = useState('');
@@ -120,7 +122,7 @@ export function VistaAsistente({
               <Icono nombre="pregunta" />
             </button>
           )}
-          <button className="boton boton-peligro boton-ayuda" onClick={onPedirAyuda}><Icono nombre="alerta" /> {t('Pedir ayuda')}</button>
+          <button data-tutorial="ayuda" className="boton boton-peligro boton-ayuda" onClick={onPedirAyuda}><Icono nombre="alerta" /> {t('Pedir ayuda')}</button>
         </div>
       </header>
 
@@ -147,7 +149,10 @@ export function VistaAsistente({
               </div>
             </li>
           </ol>
-          <button className="boton guia-entendido" onClick={cerrarGuia}><Icono nombre="check" /> {t('Entendido')}</button>
+          <div className="guia-acciones">
+            <button className="boton boton-fantasma" onClick={onTutorial}><Icono nombre="brujula" /> {t('Ver recorrido guiado')}</button>
+            <button className="boton guia-entendido" onClick={cerrarGuia}><Icono nombre="check" /> {t('Entendido')}</button>
+          </div>
         </section>
       )}
 

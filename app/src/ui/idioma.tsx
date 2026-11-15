@@ -1296,6 +1296,31 @@ const INGLES: Record<string, string> = {
   'Estrés': 'Stress',
   'Afecta las defensas desde 300 mSv': 'Affects defenses from 300 mSv',
   'Radiación acumulada': 'Cumulative radiation',
+
+  // ── Recorrido guiado (burbujas del tutorial) ──
+  'Empieza por el simulador': 'Start with the simulator',
+  'Higia todavía no tiene sensores reales conectados. Ábrelo para lanzar escenarios (fiebre, un golpe en una EVA, una tormenta solar) y mira cómo reacciona.': 'Higia has no real sensors connected yet. Open it to run scenarios (fever, an impact during an EVA, a solar storm) and watch how she reacts.',
+  'Atajo: tecla D': 'Shortcut: D key',
+  'El estado de un vistazo': 'Status at a glance',
+  'Conexión con el hábitat, IA, micrófono, astronauta, ubicación y hora de la misión. Pasa el mouse sobre cada uno para ver más.': 'Habitat connection, AI, microphone, astronaut, location and mission time. Hover over each one to see more.',
+  'Controla su voz': 'Control her voice',
+  'Pausa, detén o silencia a Higia cuando no quieras escucharla.': 'Pause, stop or mute Higia when you don\'t want to hear her.',
+  'Esc también la calla': 'Esc also silences her',
+  'Español o inglés': 'Spanish or English',
+  'Cambia el idioma cuando quieras: se guarda en este dispositivo.': 'Change the language anytime: it is saved on this device.',
+  'Todas las secciones': 'All sections',
+  'Resumen del cuerpo, pruebas a bordo, mensajes, comunicaciones, perfil, entorno y reportes.': 'Body overview, onboard tests, messages, communications, profile, environment and reports.',
+  'Si algo va mal': 'If something goes wrong',
+  'Pedir ayuda avisa de inmediato a los demás, aunque no puedas hablar.': 'Request help alerts the others right away, even if you can\'t speak.',
+  'El cuerpo por sistemas': 'The body by systems',
+  'Elige un sistema para ver solo sus órganos. El color marca su estado: verde normal, ámbar aviso y rojo alerta. El sistema inmune se muestra con métricas.': 'Choose a system to see only its organs. Color shows its status: green normal, amber warning and red alert. The immune system is shown with metrics.',
+  'Higia siempre a mano': 'Higia always at hand',
+  'Desde cualquier sección puedes hablarle o escribirle aquí.': 'From any section you can talk or write to her here.',
+  'Paso {n} de {total}': 'Step {n} of {total}',
+  'Saltar': 'Skip',
+  'Anterior': 'Back',
+  'Siguiente': 'Next',
+  'Ver recorrido guiado': 'Take the guided tour',
 };
 
 export const traducirTexto = (idioma: Idioma, texto: string, vars?: Variables): string => {
@@ -1383,7 +1408,7 @@ function AvisoIdioma({ onElegir }: { onElegir: (i: Idioma) => void }) {
 export function SelectorIdioma({ compacto = true }: { compacto?: boolean }) {
   const { idioma, cambiarIdioma } = useIdioma();
   return (
-    <div className="selector-idioma" role="group" aria-label={idioma === 'es' ? 'Cambiar idioma' : 'Change language'}>
+    <div data-tutorial="idioma" className="selector-idioma" role="group" aria-label={idioma === 'es' ? 'Cambiar idioma' : 'Change language'}>
       {!compacto && <span className="selector-idioma-etiqueta">{idioma === 'es' ? 'Idioma' : 'Language'}</span>}
       {IDIOMAS.map((i) => (
         <button

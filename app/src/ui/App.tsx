@@ -24,6 +24,7 @@ import { useIdioma, useT } from './idioma';
 import { BarraReproduccion } from './simulador/BarraReproduccion';
 import { CoberturaPantallaCompleta } from './simulador/CoberturaHRP';
 import { PanelSimulador } from './simulador/PanelSimulador';
+import { Tutorial, tutorialVisto } from './componentes/Tutorial';
 import { useSimulador } from './simulador/useSimulador';
 import { VistaAsistente, type EnCurso } from './vistas/VistaAsistente';
 import { VistaPruebas } from './vistas/VistaPruebas';
@@ -79,7 +80,7 @@ const esInmediata = (a: Accion) => esUrgente(a) || a.tipo === 'evaluacion_cognit
 
 export function App() {
   const t = useT();
-  const { idioma } = useIdioma();
+  const { idioma, sinElegir } = useIdioma();
   // El núcleo se puede reemplazar: el simulador reinicia con uno limpio entre escenarios.
   const [nucleo, setNucleo] = useState<NucleoSalud>(() => nuevoNucleo(conHistoriaGuardada(PERFILES[0]), CONTEXTO_INICIAL));
   /** Cambia en cada reinicio: los temporizadores de un núcleo anterior no deben actuar sobre el nuevo. */
@@ -88,6 +89,8 @@ export function App() {
   const simRef = useRef<ReturnType<typeof useSimulador> | null>(null);
   const [interop] = useState(() => new AdaptadorEjemplo());
   const [seccion, ir] = useSeccion();
+  /** Recorrido guiado: se abre solo la primera vez y se puede repetir desde «Cómo usar Higia». */
+  const [tutorial, setTutorial] = useState(() => !tutorialVisto());
   const [, setVersion] = useState(0);
   const [ahora, setAhora] = useState(Date.now());
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
@@ -709,7 +712,7 @@ export function App() {
             <VistaAsistente
               asistente={asistente} iaActiva={iaActiva} perfil={nucleo.perfil} hallazgos={nucleo.hallazgosActuales()}
               alertasPendientes={pendientes.length} enCurso={enCurso} proactivo={proactivo} onProactivo={cambiarProactivo}
-              onPreguntarAhora={() => lanzarProactiva(true)} onAbrirSimulador={() => alternarDemo(true)} onIr={ir} onPedirAyuda={() => pedirAyuda()}
+              onPreguntarAhora={() => lanzarProactiva(true)} onAbrirSimulador={() => alternarDemo(true)} onIr={ir} onPedirAyuda={() => pedirAyuda()} onTutorial={() => setTutorial(true)}
             />
           )}
           {seccion === 'pruebas' && (
@@ -752,6 +755,7 @@ export function App() {
 
       {seccion !== 'asistente' && <AccesoHigia asistente={asistente} onAbrir={() => ir('asistente')} />}
       <AuraHigia asistente={asistente} />
+      <Tutorial abierto={tutorial && !sinElegir && !grabando} seccion={seccion} onIr={ir} onCerrar={() => setTutorial(false)} />
 
       {!grabando && (
         <PanelSimulador

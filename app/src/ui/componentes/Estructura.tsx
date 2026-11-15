@@ -45,7 +45,7 @@ export function BarraSuperior({ contexto: c, nombreAstronauta, iaActiva, iaConfi
         </span>
       </div>
 
-      <ul className="indicadores" aria-label={t('Estado del sistema')}>
+      <ul data-tutorial="indicadores" className="indicadores" aria-label={t('Estado del sistema')}>
         <li className={c.conexionHabitat ? 'ok' : ''} title={c.conexionHabitat ? t('Conectado al hábitat') : t('Sin conexión: todo se resuelve en el dispositivo')}>
           <Icono nombre={c.conexionHabitat ? 'conexion' : 'sinConexion'} tamano={16} />
           <span className="indicador-texto">{c.conexionHabitat ? t('Conectado') : t('Autónomo')}</span>
@@ -77,7 +77,7 @@ export function BarraSuperior({ contexto: c, nombreAstronauta, iaActiva, iaConfi
       <div className="barra-acciones">
         <SelectorIdioma />
         <ControlVoz vozActiva={vozActiva} onVozActiva={onVozActiva} />
-        <button className={`boton boton-simulador ${demoAbierta ? 'boton-activo' : ''}`} onClick={onDemo} aria-expanded={demoAbierta} aria-controls="panel-simulador" title={t('Simulador (D)')}>
+        <button data-tutorial="simulador" className={`boton boton-simulador ${demoAbierta ? 'boton-activo' : ''}`} onClick={onDemo} aria-expanded={demoAbierta} aria-controls="panel-simulador" title={t('Simulador (D)')}>
           <Icono nombre="demo" /> <span className="ocultar-movil">{t('Simulador')}</span>
         </button>
       </div>
@@ -95,7 +95,7 @@ interface PropsNav {
 export function Navegacion({ seccion, onIr, contadores }: PropsNav) {
   const t = useT();
   return (
-    <nav className="navegacion" aria-label={t('Secciones')}>
+    <nav data-tutorial="navegacion" className="navegacion" aria-label={t('Secciones')}>
       <ul>
         {SECCIONES.map((s) => (
           <li key={s.id}>

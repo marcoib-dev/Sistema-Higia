@@ -27,7 +27,7 @@ export function AccesoHigia({ asistente: a, onAbrir }: { asistente: Asistente; o
     : a.actividad === 'inactiva' || a.actividad === 'esperando' ? t(TEXTO_ESCUCHA[a.estadoEscucha]) : t(TEXTO_ACTIVIDAD[a.actividad]);
 
   return (
-    <div className={`acceso-higia actividad-${a.actividad}`} aria-label={t('Asistente Higia')}>
+    <div data-tutorial="acceso-higia" className={`acceso-higia actividad-${a.actividad}`} aria-label={t('Asistente Higia')}>
       {verUltimo && ultimo && !abierto && (
         <div className="acceso-burbuja" role="status">
           {ultimo.pregunta && <p className="acceso-pregunta">«{ultimo.pregunta}»</p>}
