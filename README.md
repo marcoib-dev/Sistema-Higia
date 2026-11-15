@@ -389,7 +389,7 @@ En la barra superior: **silenciar o activar** la voz, **pausar y reanudar**, **d
 - Para forzar un motor: `VITE_VOSK_MOTOR=local` (Vosk, también en Chrome, para una demo sin conexión) o `VITE_VOSK_MOTOR=navegador`. `VITE_VOSK_MODELO` permite usar otro modelo. Se configuran en `app/.env.local`.
 - Debe abrirse en **localhost o HTTPS**: en una IP de la red local (por ejemplo `http://192.168.1.20:5173`) el navegador bloquea el micrófono.
 - Si el audio queda suspendido hasta que haya un gesto, la app pide **tocar la pantalla una vez**.
-- Con Vosk, «Higia» puede aparecer transcrito como «guía», «y jia», «igia»… La app acepta esas variantes al principio de la frase.
+- El reconocedor escribe «Higia» de muchas formas («hija», «gía», «guía», «y jia», «ilia»…), sobre todo si no se marca la tilde. Al principio de la frase, la app acepta cualquier palabra que **suene** a «Higia» con a lo sumo una letra de diferencia (compara por sonido: la h muda, «gi» y «j» iguales, «y» como «i»). Palabras que solo se le parecen de lejos («día», «tía», «hijo») no la activan.
 - **Brave no transcribe con el motor del navegador** (expone la API pero bloquea el servicio de Google); por eso usa Vosk automáticamente.
 
 ### 11. Reportes y sistemas médicos (interfaz de ejemplo)

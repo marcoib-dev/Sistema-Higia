@@ -26,10 +26,20 @@ describe('palabra clave «Higia»', () => {
     expect(respuestaSinNombreActiva(Date.now() + 6000)).toBe(false);
   });
 
-  it('no se activa si no la nombran al principio, ni con palabras parecidas', () => {
+  it('se activa aunque no se marque la tilde al decirla (lo que escribe el reconocedor)', () => {
+    for (const v of ['Hija', 'hija', 'Ija', 'Gía', 'Ilia', 'Hilia', 'Higía', 'Hixia', 'Igía']) {
+      expect(detectarLlamado(`${v}, ¿cómo estoy?`), v).toEqual({ llamado: true, resto: '¿cómo estoy?' });
+    }
+    expect(detectarLlamado('Oye hija pide ayuda')).toEqual({ llamado: true, resto: 'pide ayuda' });
+    expect(detectarLlamado('hi jia estoy bien')).toEqual({ llamado: true, resto: 'estoy bien' });
+    expect(detectarLlamado('Hija')).toEqual({ llamado: true, resto: '' });
+  });
+
+  it('no se activa si no la nombran al principio, ni con palabras que solo se le parecen de lejos', () => {
     expect(detectarLlamado('le dije a Higia que me ayude').llamado).toBe(false);
-    expect(detectarLlamado('hija, ven aquí').llamado).toBe(false);
-    expect(detectarLlamado('pide ayuda').llamado).toBe(false);
+    for (const f of ['día de mucho trabajo', 'tía ven', 'hijo ven aquí', 'mía', 'pide ayuda', 'iglesia', 'idea nueva', 'ya está']) {
+      expect(detectarLlamado(f).llamado, f).toBe(false);
+    }
   });
 });
 

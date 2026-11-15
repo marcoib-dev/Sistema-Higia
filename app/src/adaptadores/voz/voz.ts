@@ -215,15 +215,67 @@ const normalizarVoz = (s: string) => s.toLowerCase().normalize('NFD').replace(/[
  */
 const LLAMADO = /^(?:(?:oye|hola|ey|hey|ok|okey|eh)[\s,]+)?(?:y\s+)?(?:h?i\s*[gj]i?ia|hygeia|higea|higuia|higa|guia|jia|lijia)\b[\s,.:!?]*/;
 
+/** Saludos que pueden ir antes del nombre ("Oye, Higia…"). */
+const SALUDO = /^(?:(?:oye|hola|ey|hey|ok|okey|eh)[\s,]+)?/;
+
+/**
+ * Cómo suena una palabra, para comparar sin depender de la ortografía que elija el reconocedor:
+ * la h es muda, «gi/ge» y «j» suenan igual, «y» y «ll» como «i», «gu» delante de i/e como «g».
+ */
+export function sonido(palabra: string): string {
+  return normalizarVoz(palabra)
+    .replace(/[^a-zñ]/g, '')
+    .replace(/h/g, '')
+    .replace(/gu(?=[ie])/g, 'g')
+    .replace(/g(?=[ie])/g, 'j')
+    .replace(/ll|y/g, 'i')
+    .replace(/(.)\1+/g, '$1');
+}
+
+/** Distancia de edición (cuántas letras cambiar, sacar o poner para pasar de una a otra). */
+function distancia(a: string, b: string): number {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  }
+  return d[a.length][b.length];
+}
+
+const SONIDO_HIGIA = sonido('Higia');
+
+/**
+ * Llamado por parecido: la primera palabra (o las dos primeras juntas, «hi jia») suena a «Higia»
+ * con a lo sumo una letra de diferencia. Así se activa aunque no se marque la tilde al decirla
+ * («hija», «ija», «gía», «ilia»), pero no con palabras que solo se le parecen de lejos («día», «tía», «hijo»).
+ */
+function llamadoPorSonido(normal: string): string | null {
+  const saludo = normal.match(SALUDO)![0];
+  const resto = normal.slice(saludo.length);
+  const palabras = resto.match(/^(\S+)(?:\s+(\S+))?/);
+  if (!palabras) return null;
+  const parecido = (p: string) => p.length >= 3 && distancia(p, SONIDO_HIGIA) <= 1;
+  const [, primera, segunda] = palabras;
+  const una = primera.replace(/[\s,.:!?]+$/, '');
+  let largo = 0;
+  if (parecido(sonido(una))) largo = primera.length;
+  else if (segunda && /^(?:y|hi|i)$/.test(una) && parecido(sonido(una + segunda))) largo = palabras[0].length;
+  if (!largo) return null;
+  const fin = resto.slice(largo).match(/^[\s,.:!?]*/)![0];
+  return normal.slice(0, saludo.length + largo + fin.length);
+}
+
 /** ¿La frase empieza llamando a Higia? Devuelve el resto (el pedido), sin el nombre. */
 export function detectarLlamado(texto: string): { llamado: boolean; resto: string } {
   const original = texto.trim().normalize('NFC');
-  const m = normalizarVoz(original).match(LLAMADO);
+  const normal = normalizarVoz(original);
+  const exacto = normal.match(LLAMADO)?.[0];
+  const m = exacto ?? llamadoPorSonido(normal);
   if (!m) return { llamado: false, resto: original };
   // Se recorta el original (con sus tildes) avanzando letra por letra hasta cubrir lo que coincidió.
   let consumido = 0;
   let i = 0;
-  while (i < original.length && consumido < m[0].length) consumido += normalizarVoz(original[i++]).length;
+  while (i < original.length && consumido < m.length) consumido += normalizarVoz(original[i++]).length;
   return { llamado: true, resto: original.slice(i).trim() };
 }
 
