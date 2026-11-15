@@ -722,7 +722,7 @@ export function App() {
           {seccion === 'resumen' && (
             <VistaResumen
               perfil={nucleo.perfil} contexto={c} estado={nucleo.estadoCorporal()} regiones={nucleo.estadoRegiones()} hallazgos={nucleo.hallazgosActuales()}
-              aptitud={nucleo.aptitudTareas()}
+              historial={nucleo.historial} aptitud={nucleo.aptitudTareas()}
               seleccion={seleccion} onSeleccionar={setSeleccion} onIrMensajes={() => ir('mensajes')}
             />
           )}

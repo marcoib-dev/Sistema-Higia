@@ -1,19 +1,28 @@
 /**
- * FIGURA ANATÓMICA 2D — ilustraciones del cuerpo por categoría (órganos, músculos, huesos) y vista
- * (frente, espalda). En cada categoría solo aparece lo que se pidió: su ilustración y sus zonas.
+ * FIGURA ANATÓMICA 2D — el cuerpo clasificado por sistemas (respiratorio, circulatorio, digestivo,
+ * urinario, nervioso, endocrino, inmune, muscular, óseo) y vista (frente, espalda). En cada sistema
+ * solo aparece lo suyo:
  *
- * Las imágenes se muestran sin su fondo (un filtro SVG convierte la luminancia en transparencia) y
- * sobre ellas se dibujan las zonas anatómicas (cráneo, costillas, pectorales, hígado…). Cada zona se
- * tiñe con el peor nivel entre su sistema (p. ej. huesos) y su región del cuerpo (p. ej. un golpe en el
- * cráneo). El tinte se recorta con la propia figura, así que solo colorea el cuerpo y respeta el dibujo.
- * Lienzo común: 400 × 900, eje del cuerpo en x = 200. Las coordenadas de cada zona son las de su ilustración.
+ * - Sistemas de órganos: la silueta del cuerpo (sacada de la ilustración, sin sus órganos) y encima
+ *   solo los órganos del sistema elegido, dibujados en SVG (`anatomia.ts`).
+ * - Muscular y óseo: la ilustración de músculos o huesos con sus zonas, como antes.
+ * - Inmune: no tiene un lugar en la figura; se muestran sus métricas (`MetricasInmunes`).
+ *
+ * Cada órgano o zona se tiñe con el peor nivel entre su sistema de salud (p. ej. pulmones) y su región
+ * del cuerpo (p. ej. un golpe en el cráneo). Lienzo común: 400 × 900, eje del cuerpo en x = 200.
  */
 import { useEffect, useId, useState, type KeyboardEvent } from 'react';
+import type { Historial } from '../core/historial';
 import {
-  NOMBRE_SISTEMA, ORDEN_NIVEL, type EstadoCorporal, type Nivel, type RegionCuerpo, type SistemaCorporal,
+  NOMBRE_SISTEMA, ORDEN_NIVEL, type EstadoCorporal, type Hallazgo, type Nivel, type RegionCuerpo, type SistemaCorporal,
 } from '../core/tipos';
+import {
+  ALTO, ANCHO, EJE, ORDEN_SISTEMAS, ORGANOS, SISTEMAS_ANATOMICOS, curva, linea, par,
+  type Organo, type Puntos, type SistemaAnatomico,
+} from './anatomia';
 import { NOMBRE_NIVEL } from './componentes/basicos';
 import { useT } from './idioma';
+import { MetricasInmunes } from './MetricasInmunes';
 
 type EstadoVisual = Nivel | 'sinDatos';
 
@@ -32,18 +41,15 @@ const peor = (a: EstadoVisual, b: EstadoVisual | undefined): EstadoVisual =>
 
 // ── Ilustraciones ──────────────────────────────────────────────────────
 
-type Vista = 'frente' | 'espalda';
-export type Categoria = 'organos' | 'musculos' | 'huesos';
+export type Vista = 'frente' | 'espalda';
+/** Ilustración de fondo: la de órganos solo aporta la silueta; músculos y huesos se muestran completas. */
+type Ilustracion = 'organos' | 'musculos' | 'huesos';
 
-const ANCHO = 400;
-const ALTO = 900;
-const EJE = ANCHO / 2;
-
-/** Archivo de cada categoría (public/cuerpo/<vista>-<archivo>.jpg). */
-const ARCHIVO: Record<Categoria, string> = { organos: 'organos', musculos: 'musculos', huesos: 'esqueleto' };
+/** Archivo de cada ilustración (public/cuerpo/<vista>-<archivo>.jpg). */
+const ARCHIVO: Record<Ilustracion, string> = { organos: 'organos', musculos: 'musculos', huesos: 'esqueleto' };
 
 /** Tamaño original y caja de la figura dentro de cada imagen (px). */
-const ILUSTRACIONES: Record<Vista, Record<Categoria, { W: number; H: number; caja: [number, number, number, number] }>> = {
+const ILUSTRACIONES: Record<Vista, Record<Ilustracion, { W: number; H: number; caja: [number, number, number, number] }>> = {
   frente: {
     organos: { W: 1408, H: 768, caja: [589, 37, 818, 734] },
     musculos: { W: 1024, H: 572, caja: [428, 25, 595, 538] },
@@ -56,21 +62,21 @@ const ILUSTRACIONES: Record<Vista, Record<Categoria, { W: number; H: number; caj
   },
 };
 
+/** Ilustración que usa cada sistema que no se dibuja con órganos vectoriales. */
+const ILUSTRACION_DE: Partial<Record<SistemaAnatomico, 'musculos' | 'huesos'>> = { muscular: 'musculos', oseo: 'huesos' };
+
 /** Relativa al documento (la app navega con #), así funciona igual en desarrollo y en un build publicado en otra ruta. */
-const ruta = (v: Vista, c: Categoria) => `cuerpo/${v}-${ARCHIVO[c]}.jpg`;
+const ruta = (v: Vista, c: Ilustracion) => `cuerpo/${v}-${ARCHIVO[c]}.jpg`;
 
 /** Ubica la imagen para que la figura ocupe el lienzo (de y = 20 a y = 880), centrada en el eje. */
-function ubicacion(v: Vista, c: Categoria) {
+function ubicacion(v: Vista, c: Ilustracion) {
   const il = ILUSTRACIONES[v][c];
   const [x0, y0, x1, y1] = il.caja;
   const s = 860 / (y1 - y0);
   return { x: EJE - ((x0 + x1) / 2) * s, y: 20 - y0 * s, width: il.W * s, height: il.H * s };
 }
 
-// ── Zonas anatómicas ───────────────────────────────────────────────────
-
-/** Contorno cerrado: vértices [x, y] de la silueta real de cada estructura. */
-type Puntos = [number, number][];
+// ── Zonas de músculos y huesos (sobre su ilustración) ──────────────────
 
 interface ZonaFigura {
   id: string;
@@ -82,127 +88,8 @@ interface ZonaFigura {
   formas: Puntos[];
 }
 
-/**
- * Curva cerrada con cuadráticas por el punto medio de cada arista: el contorno pasa pegado a los
- * vértices trazados sin sobrepasarlos, así la silueta encaja con el dibujo de la ilustración.
- */
-function curva(puntos: Puntos): string {
-  const n = puntos.length;
-  const medio = (a: [number, number], b: [number, number]): [number, number] => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-  const inicio = medio(puntos[n - 1], puntos[0]);
-  let d = `M ${inicio[0]} ${inicio[1]}`;
-  for (let i = 0; i < n; i++) {
-    const p = puntos[i];
-    const m = medio(p, puntos[(i + 1) % n]);
-    d += ` Q ${p[0]} ${p[1]} ${m[0]} ${m[1]}`;
-  }
-  return `${d} Z`;
-}
-
-/** Estructura par: el contorno y su espejo respecto al eje del cuerpo. */
-const par = (p: Puntos): Puntos[] => [p, p.map(([x, y]) => [2 * EJE - x, y] as [number, number])];
-
-/** Nódulo redondeado (ganglios linfáticos) como contorno vectorial. */
-const circulo = (cx: number, cy: number, r: number, n = 12): Puntos =>
-  Array.from({ length: n }, (_, i) => {
-    const a = (2 * Math.PI * i) / n;
-    return [cx + r * Math.cos(a), cy + r * Math.sin(a)] as [number, number];
-  });
-
 const z = (id: string, nombre: string, sistema: SistemaCorporal, region: RegionCuerpo | undefined, ...formas: Puntos[]): ZonaFigura =>
   ({ id, nombre, sistema, region, formas });
-
-const FO_INTESTINO: Puntos = [
-  [150, 352], [200, 343], [250, 344], [262, 352], [260, 380], [258, 410], [255, 440], [240, 458],
-  [228, 458], [222, 470], [218, 486], [200, 489], [193, 474], [188, 460], [170, 452], [150, 445],
-  [142, 428], [141, 400], [142, 375], [145, 357]
-];
-
-const FO_HIGADO: Puntos = [
-  [141.4, 317.4], [143.9, 353.1], [159.9, 345.7], [171, 347], [178.4, 334.6], [184.6, 332.2],
-  [185.8, 339.6], [179.6, 348.2], [179.6, 361.8], [184.6, 364.2], [184.6, 351.9], [190.7, 343.3],
-  [199.4, 344.5], [211.7, 353.1], [227.8, 353.1], [246.3, 342], [254.9, 324.8], [252.4, 307.5],
-  [231.5, 296.4], [163.6, 295.2], [148.8, 302.6]
-];
-
-const FO_ESTOMAGO: Puntos = [
-  [252.4, 307.5], [238.9, 301.3], [222.8, 317.4], [221.6, 327.2], [215.4, 335.9], [188.3, 337.1],
-  [180.9, 344.5], [179.6, 361.8], [187, 364.2], [184.6, 351.9], [190.7, 343.3], [217.9, 354.4],
-  [237.6, 349.4], [252.4, 332.2]
-];
-
-const FO_PULMON_IZQ: Puntos = [
-  [204.3, 169.3], [196.9, 169.3], [196.9, 211.2], [190.7, 221.1], [185.8, 216.2], [187, 197.7],
-  [182.1, 190.3], [171, 192.7], [150, 217.4], [135.2, 259.4], [136.5, 295.2], [175.9, 284], [184.6, 277.9],
-  [182.1, 250.7], [187, 227.3], [192, 222.4], [196.9, 226.1], [196.9, 219.9], [208, 216.2], [204.3, 210]
-];
-
-const FO_PULMON_DER: Puntos = [
-  [220.4, 190.3], [215.4, 196.4], [214.2, 212.5], [219.1, 231], [227.8, 231], [230.2, 234.7], [229, 240.9],
-  [224.1, 242.1], [233.9, 266.8], [232.7, 284], [263.5, 296.4], [268.5, 284], [267.2, 259.4],
-  [257.4, 227.3], [243.8, 205.1], [232.7, 194]
-];
-
-const FO_CORAZON: Puntos = [
-  [209, 210], [221, 209], [233, 215], [241, 226], [242, 240], [238, 256], [232, 272], [233, 286],
-  [232, 296], [224, 293], [212, 284], [202, 271], [194, 255], [192, 241], [197, 226], [203, 215]
-];
-
-const FO_TRAQUEA: Puntos = [
-  [195, 150], [205, 150], [206, 164], [205, 179], [206, 194], [208, 203], [203, 208], [197, 208],
-  [192, 203], [194, 194], [195, 179], [194, 164]
-];
-
-const FO_CEREBRO: Puntos = [
-  [200, 24], [219, 28], [232, 38], [238, 55], [237, 72], [232, 86], [224, 94], [214, 97], [205, 91],
-  [200, 89], [195, 91], [186, 97], [176, 94], [168, 86], [163, 72], [162, 55], [168, 38], [181, 28]
-];
-
-const FO_OREJA: Puntos = [
-  [153, 82], [160, 86], [162, 96], [160, 107], [154, 113], [149, 106], [149, 94]
-];
-
-const FO_OJO: Puntos = [
-  [175, 88], [180, 84], [187, 84], [192, 87], [188, 92], [181, 92]
-];
-
-const EO_INTESTINO: Puntos = [
-  [132, 340], [145, 330], [162, 325], [180, 326], [200, 328], [220, 327], [238, 331], [252, 340],
-  [260, 352], [264, 366], [266, 382], [266, 398], [264, 414], [260, 428], [252, 440], [242, 450],
-  [230, 458], [220, 466], [210, 472], [200, 474], [190, 472], [180, 466], [170, 458], [158, 450],
-  [148, 440], [140, 428], [134, 414], [130, 398], [128, 382], [128, 366], [129, 352]
-];
-
-const EO_PULMON_IZQ: Puntos = [
-  [200, 166], [186, 170], [170, 182], [153, 198], [140, 220], [132, 248], [130, 272], [134, 291],
-  [148, 299], [166, 298], [180, 291], [188, 280], [187, 262], [190, 244], [195, 228], [199, 212],
-  [200, 195]
-];
-
-const EO_PULMON_DER: Puntos = [
-  [200, 166], [214, 170], [230, 182], [247, 198], [260, 220], [268, 248], [270, 272], [266, 291],
-  [252, 299], [234, 298], [220, 291], [212, 280], [213, 262], [210, 244], [205, 228], [201, 212],
-  [200, 195]
-];
-
-const EO_RINON: Puntos = [
-  [181, 308], [173, 304], [164, 306], [157, 314], [154, 326], [156, 340], [162, 352], [171, 358],
-  [178, 355], [182, 346], [180, 336], [184, 326], [186, 316]
-];
-
-const EO_TRAQUEA: Puntos = [
-  [195, 155], [205, 155], [206, 168], [205, 181], [206, 194], [208, 203], [203, 208], [197, 208],
-  [192, 203], [194, 194], [195, 181], [194, 168]
-];
-
-const EO_CEREBRO: Puntos = [
-  [200, 18], [220, 22], [233, 33], [238, 50], [237, 68], [232, 84], [224, 93], [213, 97], [205, 93],
-  [200, 91], [195, 93], [187, 97], [176, 93], [168, 84], [163, 68], [162, 50], [167, 33], [180, 22]
-];
-
-const EO_OREJA: Puntos = [
-  [152, 88], [159, 92], [162, 101], [160, 112], [154, 119], [149, 112], [148, 100]
-];
 
 const FM_CUELLO: Puntos = [
   [187, 136], [213, 136], [220, 152], [225, 170], [222, 183], [214, 188], [200, 190], [186, 188],
@@ -451,23 +338,8 @@ const EH_PIE: Puntos = [
 ];
 
 /** Orden de dibujo: lo de atrás primero; lo que se dibuja después tiene prioridad al hacer clic. */
-const ZONAS: Record<Vista, Record<Categoria, ZonaFigura[]>> = {
+const ZONAS: Record<Vista, Record<'musculos' | 'huesos', ZonaFigura[]>> = {
   frente: {
-    organos: [
-      z('intestino', 'Intestinos', 'intestino', 'abdomen', FO_INTESTINO),
-      z('higado', 'Hígado', 'metabolismo', 'abdomen', FO_HIGADO),
-      z('estomago', 'Estómago', 'intestino', 'abdomen', FO_ESTOMAGO),
-      z('pulmones', 'Pulmones', 'pulmones', 'torax', FO_PULMON_IZQ, FO_PULMON_DER),
-      z('corazon', 'Corazón', 'corazon', 'torax', FO_CORAZON),
-      z('traquea', 'Tráquea', 'pulmones', 'cuello', FO_TRAQUEA),
-      z('ganglios', 'Ganglios linfáticos', 'inmune', undefined,
-        circulo(184, 157, 7), circulo(216, 157, 7),
-        circulo(139, 250, 8), circulo(261, 250, 8),
-        circulo(178, 462, 8), circulo(222, 462, 8)),
-      z('cerebro', 'Cerebro', 'cerebro', 'craneo', FO_CEREBRO),
-      z('oido', 'Oído interno', 'oidoInterno', 'craneo', ...par(FO_OREJA)),
-      z('ojos', 'Ojos', 'ojos', 'cara', ...par(FO_OJO)),
-    ],
     musculos: [
       z('cuello-m', 'Cuello', 'musculos', 'cuello', FM_CUELLO),
       z('pectorales', 'Pectorales', 'musculos', 'torax', ...par(FM_PECTORAL)),
@@ -496,15 +368,6 @@ const ZONAS: Record<Vista, Record<Categoria, ZonaFigura[]>> = {
     ],
   },
   espalda: {
-    organos: [
-      z('intestino', 'Intestinos', 'intestino', 'abdomen', EO_INTESTINO),
-      z('pulmones', 'Pulmones', 'pulmones', 'torax', EO_PULMON_IZQ, EO_PULMON_DER),
-      z('rinones', 'Riñones', 'metabolismo', 'abdomen', ...par(EO_RINON)),
-      z('traquea', 'Tráquea', 'pulmones', 'cuello', EO_TRAQUEA),
-      z('ganglios', 'Ganglios linfáticos', 'inmune', undefined, ...par(circulo(184, 155, 7))),
-      z('cerebro', 'Cerebro', 'cerebro', 'craneo', EO_CEREBRO),
-      z('oido', 'Oído interno', 'oidoInterno', 'craneo', ...par(EO_OREJA)),
-    ],
     musculos: [
       z('trapecio', 'Trapecio', 'musculos', 'cuello', EM_TRAPECIO),
       z('dorsales', 'Dorsales', 'musculos', 'torax', ...par(EM_DORSAL)),
@@ -533,14 +396,26 @@ const ZONAS: Record<Vista, Record<Categoria, ZonaFigura[]>> = {
 };
 
 const VISTAS: [Vista, string][] = [['frente', 'Frente'], ['espalda', 'Espalda']];
-export const CATEGORIAS: [Categoria, string][] = [['organos', 'Órganos'], ['musculos', 'Músculos'], ['huesos', 'Huesos']];
 
-/** Dónde mostrar un sistema: primero la vista y categoría actuales, luego las demás. */
-function ubicarSistema(s: SistemaCorporal, vista: Vista, categoria: Categoria): { vista: Vista; categoria: Categoria } | null {
-  const vistas: Vista[] = [vista, vista === 'frente' ? 'espalda' : 'frente'];
-  const categorias: Categoria[] = [categoria, ...(['organos', 'musculos', 'huesos'] as Categoria[]).filter((c) => c !== categoria)];
-  for (const c of categorias) for (const v of vistas) if (ZONAS[v][c].some((zona) => zona.sistema === s)) return { vista: v, categoria: c };
-  return null;
+/** Órganos de un sistema tal como se ven: de espalda se quitan los que solo se ven de frente y se invierte el orden. */
+function organosVisibles(s: SistemaAnatomico, vista: Vista): Organo[] {
+  const lista = ORGANOS[s] ?? [];
+  return vista === 'frente' ? lista : lista.filter((x) => !x.soloFrente).reverse();
+}
+
+/** ¿El sistema anatómico muestra algo del sistema de salud `s`? */
+function muestra(a: SistemaAnatomico, s: SistemaCorporal): boolean {
+  const info = SISTEMAS_ANATOMICOS[a];
+  if (info.modo === 'metricas') return s === 'inmune';
+  if (info.modo === 'organos') return (ORGANOS[a] ?? []).some((x) => x.sistema === s);
+  const il = ILUSTRACION_DE[a]!;
+  return ZONAS.frente[il].some((x) => x.sistema === s) || ZONAS.espalda[il].some((x) => x.sistema === s);
+}
+
+/** Sistema anatómico donde ver un sistema de salud: el actual si lo muestra; si no, el primero que lo tenga. */
+export function ubicarSistema(s: SistemaCorporal, actual: SistemaAnatomico): SistemaAnatomico | null {
+  if (s === 'cuerpo' || muestra(actual, s)) return null;
+  return ORDEN_SISTEMAS.find((a) => muestra(a, s)) ?? null;
 }
 
 // ── Componente ─────────────────────────────────────────────────────────
@@ -549,119 +424,204 @@ interface Props {
   estado: EstadoCorporal;
   /** Peor nivel por región del cuerpo (hallazgos localizados, p. ej. golpe en el cráneo). */
   regiones?: Partial<Record<RegionCuerpo, Nivel>>;
+  /** Lecturas de los sensores: alimentan las métricas de los sistemas que no se ven en la figura. */
+  historial?: Historial;
+  hallazgos?: Hallazgo[];
   seleccion: SistemaCorporal[] | null;
   onSeleccionar: (sistemas: SistemaCorporal[]) => void;
 }
 
+interface Preferencia { vista: Vista; sistema: SistemaAnatomico }
+
 const CLAVE_VISTA = 'higia.figura';
-const leerPreferencia = (): { vista: Vista; categoria: Categoria } => {
+const POR_DEFECTO: Preferencia = { vista: 'frente', sistema: 'respiratorio' };
+const leerPreferencia = (): Preferencia => {
   try {
-    const v = JSON.parse(localStorage.getItem(CLAVE_VISTA) ?? '{}') as { vista?: Vista; categoria?: Categoria };
-    return { vista: v.vista === 'espalda' ? 'espalda' : 'frente', categoria: v.categoria === 'musculos' || v.categoria === 'huesos' ? v.categoria : 'organos' };
-  } catch { return { vista: 'frente', categoria: 'organos' }; }
+    const v = JSON.parse(localStorage.getItem(CLAVE_VISTA) ?? '{}') as { vista?: Vista; sistema?: string; categoria?: string };
+    const vista: Vista = v.vista === 'espalda' ? 'espalda' : 'frente';
+    // Preferencias guardadas antes de la clasificación por sistemas: músculos → muscular, huesos → óseo.
+    const antigua = v.categoria === 'musculos' ? 'muscular' : v.categoria === 'huesos' ? 'oseo' : undefined;
+    const pedido = v.sistema ?? antigua;
+    const sistema = pedido && pedido in SISTEMAS_ANATOMICOS ? (pedido as SistemaAnatomico) : POR_DEFECTO.sistema;
+    return { vista, sistema };
+  } catch { return POR_DEFECTO; }
 };
 
-export function FiguraCorporal({ estado, regiones = {}, seleccion, onSeleccionar }: Props) {
-  const t = useT();
-  const [{ vista, categoria }, setPreferencia] = useState(leerPreferencia);
-  const [zonaActiva, setZonaActiva] = useState<string | null>(null);
-  const id = useId().replace(/:/g, '');
-  const pos = ubicacion(vista, categoria);
-  const zonas = ZONAS[vista][categoria];
+/** Lo que tienen en común un órgano y una zona: se pueden elegir y se tiñen igual. */
+type Pieza = Pick<ZonaFigura, 'id' | 'nombre' | 'sistema' | 'region'>;
 
-  const cambiar = (p: Partial<{ vista: Vista; categoria: Categoria }>) => setPreferencia((prev) => {
+export function FiguraCorporal({ estado, regiones = {}, historial, hallazgos = [], seleccion, onSeleccionar }: Props) {
+  const t = useT();
+  const [{ vista, sistema }, setPreferencia] = useState(leerPreferencia);
+  const [piezaActiva, setPiezaActiva] = useState<string | null>(null);
+  const id = useId().replace(/:/g, '');
+  const info = SISTEMAS_ANATOMICOS[sistema];
+  /** «sistema respiratorio» / «respiratory system». */
+  const nombreSistema = t('Sistema {nombre}', { nombre: t(info.nombre).toLowerCase() }).toLowerCase();
+  const ilustracion: Ilustracion = ILUSTRACION_DE[sistema] ?? 'organos';
+  const pos = ubicacion(vista, ilustracion);
+  const zonas = info.modo === 'ilustracion' ? ZONAS[vista][ilustracion as 'musculos' | 'huesos'] : [];
+  const organos = info.modo === 'organos' ? organosVisibles(sistema, vista) : [];
+  const piezas: Pieza[] = [...zonas, ...organos];
+
+  const cambiar = (p: Partial<Preferencia>) => setPreferencia((prev) => {
     const nuevo = { ...prev, ...p };
     try { localStorage.setItem(CLAVE_VISTA, JSON.stringify(nuevo)); } catch { /* sin almacenamiento */ }
     return nuevo;
   });
 
-  // Precarga las seis ilustraciones para que cambiar de vista o categoría sea instantáneo.
+  // Precarga las ilustraciones para que cambiar de vista o sistema sea instantáneo.
   useEffect(() => {
-    for (const v of ['frente', 'espalda'] as Vista[]) for (const c of ['organos', 'musculos', 'huesos'] as Categoria[]) new Image().src = ruta(v, c);
+    for (const v of ['frente', 'espalda'] as Vista[]) for (const c of ['organos', 'musculos', 'huesos'] as Ilustracion[]) new Image().src = ruta(v, c);
   }, []);
 
-  // Si piden un sistema que no aparece en lo que se ve (p. ej. los huesos con la categoría Órganos), se cambia a donde está.
+  // Si piden un sistema de salud que no aparece en lo que se ve (p. ej. el corazón con Digestivo), se cambia a donde está.
   useEffect(() => {
     const s = seleccion?.[0];
-    if (!s || s === 'cuerpo' || zonas.some((zona) => zona.sistema === s)) return;
-    const destino = ubicarSistema(s, vista, categoria);
-    if (destino) cambiar(destino);
+    if (!s) return;
+    const destino = ubicarSistema(s, sistema);
+    if (destino) cambiar({ sistema: destino });
   }, [seleccion]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const nivelZona = (zona: ZonaFigura): EstadoVisual => peor(peorEstado(estado, [zona.sistema]), zona.region ? regiones[zona.region] : undefined);
-  const etiqueta = (zona: ZonaFigura) => `${t(zona.nombre)} · ${t(NOMBRE_SISTEMA[zona.sistema])}: ${t(NOMBRE_NIVEL[nivelZona(zona)])}`;
-  // Si se tocó una zona, se resalta solo esa; si el sistema se eligió desde la lista, todas sus zonas.
-  const activa = zonas.find((x) => x.id === zonaActiva && seleccion?.includes(x.sistema));
-  const elegida = (zona: ZonaFigura) => (activa ? zona.id === activa.id : !!seleccion?.includes(zona.sistema));
-  const elegir = (zona: ZonaFigura) => { setZonaActiva(zona.id); onSeleccionar([zona.sistema]); };
+  const nivelPieza = (p: Pieza): EstadoVisual => peor(peorEstado(estado, [p.sistema]), p.region ? regiones[p.region] : undefined);
+  const etiqueta = (p: Pieza) => `${t(p.nombre)} · ${t(NOMBRE_SISTEMA[p.sistema])}: ${t(NOMBRE_NIVEL[nivelPieza(p)])}`;
+  // Si se tocó una pieza, se resalta solo esa; si el sistema se eligió desde la lista, todas las suyas.
+  const activa = piezas.find((x) => x.id === piezaActiva && seleccion?.includes(x.sistema));
+  const elegida = (p: Pieza) => (activa ? p.id === activa.id : !!seleccion?.includes(p.sistema));
+  const elegir = (p: Pieza) => { setPiezaActiva(p.id); onSeleccionar([p.sistema]); };
   const alTeclear = (f: () => void) => (ev: KeyboardEvent) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); f(); } };
+  const interactiva = (p: Pieza) => ({
+    role: 'button', tabIndex: 0, 'aria-label': etiqueta(p), 'aria-pressed': elegida(p),
+    onClick: () => elegir(p), onKeyDown: alTeclear(() => elegir(p)),
+  });
 
   const nivelCuerpo = peorEstado(estado, ['cuerpo']);
+  const elegirCuerpo = () => { setPiezaActiva(null); onSeleccionar(['cuerpo']); };
 
   const formas = (zona: ZonaFigura) => zona.formas.map((f, i) => <path key={i} d={curva(f)} />);
+  const imagen = (filtro: string) => <image href={ruta(vista, ilustracion)} {...pos} preserveAspectRatio="none" filter={`url(#${filtro})`} />;
 
-  const imagen = (filtro: string) => <image href={ruta(vista, categoria)} {...pos} preserveAspectRatio="none" filter={`url(#${filtro})`} />;
+  const selectorSistemas = (
+    <div className="figura-sistemas" role="group" aria-label={t('Sistema del cuerpo')}>
+      {ORDEN_SISTEMAS.map((s) => (
+        <button key={s} aria-pressed={sistema === s} onClick={() => { setPiezaActiva(null); cambiar({ sistema: s }); }}>
+          {t(SISTEMAS_ANATOMICOS[s].nombre)}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
     <div className="figura">
       <div className="figura-controles">
-        <div className="figura-selector" role="group" aria-label={t('Qué mostrar')}>
-          {CATEGORIAS.map(([c, n]) => <button key={c} aria-pressed={categoria === c} onClick={() => cambiar({ categoria: c })}>{t(n)}</button>)}
-        </div>
-        <div className="figura-selector" role="group" aria-label={t('Vista')}>
-          {VISTAS.map(([v, n]) => <button key={v} aria-pressed={vista === v} onClick={() => cambiar({ vista: v })}>{t(n)}</button>)}
-        </div>
+        {selectorSistemas}
+        <p className="figura-sistema-desc">
+          <strong>{nombreSistema.charAt(0).toUpperCase() + nombreSistema.slice(1)}</strong> · {t(info.descripcion)}
+        </p>
+        {info.modo !== 'metricas' && (
+          <div className="figura-selector" role="group" aria-label={t('Vista')}>
+            {VISTAS.map(([v, n]) => <button key={v} aria-pressed={vista === v} onClick={() => cambiar({ vista: v })}>{t(n)}</button>)}
+          </div>
+        )}
       </div>
 
-      <svg viewBox={`0 0 ${ANCHO} ${ALTO}`} className="figura-svg" aria-label={`${t('Figura anatómica')}: ${t(CATEGORIAS.find(([c]) => c === categoria)![1]).toLowerCase()}, ${t('vista de {vista}', { vista: t(vista) })}`}>
-        <defs>
-          {/* Luminancia → transparencia: quita el fondo oscuro y deja la figura en un blanco azulado del tema. */}
-          <filter id={`${id}-figura`} colorInterpolationFilters="sRGB">
-            <feColorMatrix type="matrix" values="0 0 0 0 0.87  0 0 0 0 0.91  0 0 0 0 1  0.404 1.359 0.137 0 -0.57" />
-            {/* Curva sobre la transparencia: borra los grises tenues del piso sin afectar la figura. */}
-            <feComponentTransfer><feFuncA type="gamma" amplitude={1} exponent={2.2} offset={0} /></feComponentTransfer>
-          </filter>
-          <mask id={`${id}-mascara`} maskUnits="userSpaceOnUse" x={0} y={0} width={ANCHO} height={ALTO}>
-            {imagen(`${id}-figura`)}
-          </mask>
-        </defs>
+      {info.modo === 'metricas' ? (
+        <MetricasInmunes
+          nivel={estado.inmune} historial={historial} hallazgos={hallazgos.filter((h) => h.sistema === 'inmune')}
+          seleccionado={!!seleccion?.includes('inmune')} onSeleccionar={() => onSeleccionar(['inmune'])}
+        />
+      ) : (
+        <svg viewBox={`0 0 ${ANCHO} ${ALTO}`} className="figura-svg" aria-label={`${t('Figura anatómica')}: ${nombreSistema}, ${t('vista de {vista}', { vista: t(vista) })}`}>
+          <defs>
+            {/* Luminancia → transparencia: quita el fondo oscuro y deja la figura en un blanco azulado del tema. */}
+            <filter id={`${id}-figura`} colorInterpolationFilters="sRGB">
+              <feColorMatrix type="matrix" values="0 0 0 0 0.87  0 0 0 0 0.91  0 0 0 0 1  0.404 1.359 0.137 0 -0.57" />
+              {/* Curva sobre la transparencia: borra los grises tenues del piso sin afectar la figura. */}
+              <feComponentTransfer><feFuncA type="gamma" amplitude={1} exponent={2.2} offset={0} /></feComponentTransfer>
+            </filter>
+            {/*
+              Silueta sin órganos: la misma luminancia, umbral a blanco/negro y un cierre (dilatar y erosionar)
+              que rellena las líneas finas de los órganos dibujados. Queda un cuerpo translúcido con su borde.
+            */}
+            <filter id={`${id}-silueta`} colorInterpolationFilters="sRGB" x="-5%" y="-3%" width="110%" height="106%">
+              <feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.404 1.359 0.137 0 -0.57" />
+              <feComponentTransfer><feFuncA type="discrete" tableValues="0 1" /></feComponentTransfer>
+              <feMorphology operator="dilate" radius={5} />
+              <feMorphology operator="erode" radius={5} />
+              {/* Desenfoque y nuevo contraste: borde suave en lugar de escalonado. */}
+              <feGaussianBlur stdDeviation={1.3} result="suave" />
+              <feComponentTransfer in="suave" result="silueta"><feFuncA type="linear" slope={3} intercept={-1} /></feComponentTransfer>
+              {/* El borde es la franja donde la transparencia pasa por la mitad. */}
+              <feComponentTransfer in="suave" result="borde"><feFuncA type="table" tableValues="0 0.55 1 0.55 0" /></feComponentTransfer>
+              <feFlood floodColor="#c9d6ff" floodOpacity={0.09} />
+              <feComposite in2="silueta" operator="in" result="relleno" />
+              <feFlood floodColor="#c9d6ff" floodOpacity={0.6} />
+              <feComposite in2="borde" operator="in" result="linea" />
+              <feMerge><feMergeNode in="relleno" /><feMergeNode in="linea" /></feMerge>
+            </filter>
+            <mask id={`${id}-mascara`} maskUnits="userSpaceOnUse" x={0} y={0} width={ANCHO} height={ALTO}>
+              {imagen(`${id}-figura`)}
+            </mask>
+          </defs>
 
-        {/* Todo el cuerpo (radiación): el halo de la figura toma su color. */}
-        <g
-          className={`sistema-svg nivel-${nivelCuerpo} aura-cuerpo ${seleccion?.includes('cuerpo') ? 'seleccionado' : ''}`}
-          role="button" tabIndex={0} aria-label={`${t('Todo el cuerpo (radiación)')}: ${t(NOMBRE_NIVEL[nivelCuerpo])}`}
-          aria-pressed={!!seleccion?.includes('cuerpo')} onClick={() => { setZonaActiva(null); onSeleccionar(['cuerpo']); }}
-          onKeyDown={alTeclear(() => { setZonaActiva(null); onSeleccionar(['cuerpo']); })}
-        >
-          <title>{`${t('Todo el cuerpo (radiación)')}: ${t(NOMBRE_NIVEL[nivelCuerpo])}`}</title>
-          {imagen(`${id}-figura`)}
-        </g>
+          {/* Todo el cuerpo (radiación): el halo de la figura toma su color. */}
+          <g
+            className={`sistema-svg nivel-${nivelCuerpo} aura-cuerpo ${info.modo === 'organos' ? 'aura-silueta' : ''} ${seleccion?.includes('cuerpo') ? 'seleccionado' : ''}`}
+            role="button" tabIndex={0} aria-label={`${t('Todo el cuerpo (radiación)')}: ${t(NOMBRE_NIVEL[nivelCuerpo])}`}
+            aria-pressed={!!seleccion?.includes('cuerpo')} onClick={elegirCuerpo} onKeyDown={alTeclear(elegirCuerpo)}
+          >
+            <title>{`${t('Todo el cuerpo (radiación)')}: ${t(NOMBRE_NIVEL[nivelCuerpo])}`}</title>
+            {imagen(info.modo === 'organos' ? `${id}-silueta` : `${id}-figura`)}
+          </g>
 
-        {/* Tinte por zona, recortado con la figura. */}
-        <g mask={`url(#${id}-mascara)`} className="tintes" aria-hidden>
-          {zonas.map((zona) => (
-            <g key={zona.id} className={`tinte sistema-svg nivel-${nivelZona(zona)} ${elegida(zona) ? 'seleccionado' : ''}`}>{formas(zona)}</g>
-          ))}
-        </g>
+          {info.modo === 'ilustracion' && (
+            <>
+              {/* Tinte por zona, recortado con la figura. */}
+              <g mask={`url(#${id}-mascara)`} className="tintes" aria-hidden>
+                {zonas.map((zona) => (
+                  <g key={zona.id} className={`tinte sistema-svg nivel-${nivelPieza(zona)} ${elegida(zona) ? 'seleccionado' : ''}`}>{formas(zona)}</g>
+                ))}
+              </g>
 
-        {/* Zonas interactivas (invisibles salvo el contorno al pasar o seleccionar). */}
-        <g className="zonas">
-          {zonas.map((zona) => (
-            <g
-              key={zona.id} className={`zona-sistema sistema-svg nivel-${nivelZona(zona)} ${elegida(zona) ? 'seleccionado' : ''}`}
-              role="button" tabIndex={0} aria-label={etiqueta(zona)} aria-pressed={elegida(zona)}
-              onClick={() => elegir(zona)} onKeyDown={alTeclear(() => elegir(zona))}
-            >
-              <title>{etiqueta(zona)}</title>
-              {formas(zona)}
+              {/* Zonas interactivas (invisibles salvo el contorno al pasar o seleccionar). */}
+              <g className="zonas">
+                {zonas.map((zona) => (
+                  <g key={zona.id} className={`zona-sistema sistema-svg nivel-${nivelPieza(zona)} ${elegida(zona) ? 'seleccionado' : ''}`} {...interactiva(zona)}>
+                    <title>{etiqueta(zona)}</title>
+                    {formas(zona)}
+                  </g>
+                ))}
+              </g>
+            </>
+          )}
+
+          {info.modo === 'organos' && (
+            // De espalda se ven los mismos órganos en espejo.
+            <g className="organos" transform={vista === 'espalda' ? `translate(${ANCHO} 0) scale(-1 1)` : undefined}>
+              {organos.map((org) => (
+                <g
+                  key={org.id}
+                  className={`organo sistema-svg nivel-${nivelPieza(org)} ${org.tenue ? 'tenue' : ''} ${elegida(org) ? 'seleccionado' : ''}`}
+                  {...interactiva(org)}
+                >
+                  <title>{etiqueta(org)}</title>
+                  {org.formas.map((f, i) => <path key={`h${i}`} className="organo-toque" d={curva(f)} />)}
+                  {org.formas.map((f, i) => <path key={`f${i}`} className="organo-forma" d={curva(f)} />)}
+                  {org.trazos?.map((t, i) => <path key={`t${i}`} className="organo-trazo" d={linea(t)} />)}
+                </g>
+              ))}
             </g>
-          ))}
-        </g>
-      </svg>
+          )}
+        </svg>
+      )}
 
-      <p className="figura-zona" aria-live="polite">
-        {activa ? <><strong>{t(activa.nombre)}</strong> · {t(NOMBRE_SISTEMA[activa.sistema])}: {t(NOMBRE_NIVEL[nivelZona(activa)])}</> : t('Pasa el mouse o usa Tab para ver cada zona · clic o Enter para ver su detalle')}
-      </p>
+      {info.modo !== 'metricas' && (
+        <p className="figura-zona" aria-live="polite">
+          {activa
+            ? <><strong>{t(activa.nombre)}</strong> · {t(NOMBRE_SISTEMA[activa.sistema])}: {t(NOMBRE_NIVEL[nivelPieza(activa)])}</>
+            : t('Pasa el mouse o usa Tab para ver cada órgano · clic o Enter para ver su detalle')}
+        </p>
+      )}
       <ul className="leyenda">
         {(['normal', 'info', 'aviso', 'alerta', 'sinDatos'] as EstadoVisual[]).map((n) => (
           <li key={n}><span className={`punto nivel-${n}`} />{t(NOMBRE_NIVEL[n])}</li>

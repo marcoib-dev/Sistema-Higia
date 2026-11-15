@@ -1,3 +1,4 @@
+import type { Historial } from '../../core/historial';
 import { ID_SENALES_COMBINADAS, senalesQueSeSuman, type AptitudTareas } from '../../core/nucleo';
 import { redactar } from '../../core/personalizador';
 import { RIESGO_HRP } from '../../core/riesgosHRP';
@@ -13,13 +14,15 @@ interface Props {
   estado: EstadoCorporal;
   regiones: Partial<Record<RegionCuerpo, Nivel>>;
   hallazgos: Hallazgo[];
+  /** Lecturas de sensores: alimentan las métricas de los sistemas que no se ven en la figura (inmune). */
+  historial?: Historial;
   aptitud: AptitudTareas;
   seleccion: SistemaCorporal[] | null;
   onSeleccionar: (s: SistemaCorporal[] | null) => void;
   onIrMensajes: () => void;
 }
 
-export function VistaResumen({ perfil, contexto, estado, regiones, hallazgos, aptitud, seleccion, onSeleccionar, onIrMensajes }: Props) {
+export function VistaResumen({ perfil, contexto, estado, regiones, hallazgos, historial, aptitud, seleccion, onSeleccionar, onIrMensajes }: Props) {
   const t = useT();
   const combinada = hallazgos.find((h) => h.riesgoId === ID_SENALES_COMBINADAS);
   const senales = combinada ? senalesQueSeSuman(hallazgos) : [];
@@ -45,7 +48,7 @@ export function VistaResumen({ perfil, contexto, estado, regiones, hallazgos, ap
       <div className="resumen">
         <section className="tarjeta tarjeta-figura" aria-labelledby="titulo-cuerpo">
           <h2 id="titulo-cuerpo" className="titulo-tarjeta">{t('Cuerpo')}</h2>
-          <FiguraCorporal estado={estado} regiones={regiones} seleccion={seleccion} onSeleccionar={onSeleccionar} />
+          <FiguraCorporal estado={estado} regiones={regiones} historial={historial} hallazgos={hallazgos} seleccion={seleccion} onSeleccionar={onSeleccionar} />
         </section>
 
         <div className="resumen-lateral">

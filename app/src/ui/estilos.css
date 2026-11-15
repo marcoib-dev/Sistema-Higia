@@ -375,6 +375,62 @@ select, input[type='text'], input[type='number'], input:not([type]) {
 .zona-sistema.seleccionado path,
 .zona-sistema:focus-visible path { stroke: color-mix(in srgb, var(--c) 80%, #fff); stroke-dasharray: none; filter: drop-shadow(0 0 4px var(--c)); }
 
+/* Selector de sistemas del cuerpo (respiratorio, circulatorio…) */
+.figura-sistemas { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; width: 100%; }
+.figura-sistemas button {
+  border: 1px solid var(--borde); background: var(--superficie-2); color: var(--texto-2);
+  padding: 5px 11px; border-radius: 999px; font-size: 12.5px; cursor: pointer; transition: color .15s, border-color .15s, background .15s;
+}
+.figura-sistemas button:hover { color: var(--texto); border-color: var(--borde-fuerte); }
+.figura-sistemas button[aria-pressed='true'] { background: var(--acento-suave); border-color: color-mix(in srgb, var(--acento) 45%, transparent); color: var(--acento); font-weight: 600; }
+.figura-sistema-desc { width: 100%; margin: 2px 0 0; text-align: center; font-size: 12.5px; color: var(--texto-3); }
+.figura-sistema-desc strong { color: var(--texto-2); font-weight: 600; }
+
+/* Órganos vectoriales: solo los del sistema elegido, sobre la silueta translúcida */
+.aura-silueta.nivel-sinDatos { filter: none; }
+.organo .organo-forma { fill: color-mix(in srgb, var(--c) 42%, transparent); stroke: color-mix(in srgb, var(--c) 75%, #fff); stroke-width: 1.1; stroke-linejoin: round; transition: fill .3s, stroke .15s; }
+.organo.nivel-sinDatos .organo-forma { fill: color-mix(in srgb, var(--c) 30%, transparent); stroke: color-mix(in srgb, var(--c) 70%, #fff); }
+.organo .organo-trazo { fill: none; stroke: color-mix(in srgb, var(--c) 55%, #fff); stroke-width: .9; stroke-linecap: round; opacity: .7; pointer-events: none; }
+/* Área de toque más ancha que el dibujo: los vasos y nervios finos también se pueden tocar. */
+.organo .organo-toque { fill: transparent; stroke: transparent; stroke-width: 8; pointer-events: all; }
+.organo.tenue .organo-forma { fill: color-mix(in srgb, var(--c) 22%, transparent); stroke-opacity: .7; }
+.organo:hover .organo-forma { fill: color-mix(in srgb, var(--c) 58%, transparent); }
+.organo.seleccionado .organo-forma,
+.organo:focus-visible .organo-forma { fill: color-mix(in srgb, var(--c) 68%, transparent); stroke: color-mix(in srgb, var(--c) 40%, #fff); stroke-width: 1.5; filter: drop-shadow(0 0 4px var(--c)); }
+.organo.nivel-alerta .organo-forma { animation: pulso-alerta 1.1s ease-in-out 2; }
+.organo { outline: none; }
+
+/* Sistema inmune: métricas en lugar de la figura */
+.metricas-inmunes { display: grid; gap: 10px; margin: 6px 0 12px; }
+.metricas-cab {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left;
+  padding: 12px 14px; border-radius: var(--radio-s); background: var(--superficie-2); border: 1px solid var(--borde); color: var(--texto); cursor: pointer;
+}
+.metricas-cab:hover, .metricas-cab.seleccionado { border-color: color-mix(in srgb, var(--acento) 45%, transparent); }
+.metricas-cab > span { display: grid; gap: 2px; min-width: 0; }
+.metricas-cab small { color: var(--texto-2); font-size: 12px; }
+.metricas-titulo { margin: 6px 0 0; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--texto-3); }
+.metricas-grilla { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+.metrica {
+  display: grid; gap: 4px; padding: 10px 12px; border-radius: var(--radio-s); background: var(--superficie-2);
+  border: 1px solid var(--borde); border-left: 3px solid var(--sin-datos);
+}
+.metrica-nombre { font-size: 12px; color: var(--texto-2); }
+.metrica-valor { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; color: var(--texto); line-height: 1.1; }
+.metrica-valor small { font-size: 12px; font-weight: 500; color: var(--texto-2); margin-left: 4px; }
+.metrica-nota { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--texto-3); line-height: 1.3; }
+.metrica-nota .punto { width: 7px; height: 7px; }
+.organos-inmunes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; }
+.organos-inmunes li {
+  display: grid; justify-items: center; gap: 3px; padding: 10px 8px; text-align: center;
+  border-radius: var(--radio-s); background: var(--superficie-2); border: 1px solid var(--borde);
+}
+.organos-inmunes strong { font-size: 12.5px; color: var(--texto); }
+.organos-inmunes small { font-size: 11px; color: var(--texto-3); line-height: 1.3; }
+.organo-mini { width: 52px; height: 52px; cursor: default; }
+.organo-mini .organo-forma { fill: color-mix(in srgb, var(--c) 35%, transparent); stroke: color-mix(in srgb, var(--c) 75%, #fff); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.organo-mini .organo-trazo { fill: none; stroke: color-mix(in srgb, var(--c) 55%, #fff); stroke-width: .9; opacity: .75; vector-effect: non-scaling-stroke; }
+
 /* ── Botón de peligro (pedir ayuda) ──────────────────────────────────── */
 .boton-peligro { background: var(--alerta); border-color: var(--alerta); color: #fff; font-weight: 600; }
 .boton-peligro:hover:not(:disabled) { background: color-mix(in srgb, var(--alerta) 85%, #fff); border-color: color-mix(in srgb, var(--alerta) 85%, #fff); color: #fff; }
