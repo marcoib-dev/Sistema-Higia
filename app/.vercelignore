@@ -1,0 +1,8 @@
+node_modules
+dist
+.vercel
+.env
+.env.*
+!.env.example
+# 1,4 GB: supera el límite de Vercel. En producción se usa el modelo pequeño o uno alojado fuera.
+public/voz/vosk-model-es-0.42.tar.gz
