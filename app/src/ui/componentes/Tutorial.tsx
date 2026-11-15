@@ -71,6 +71,11 @@ export const PASOS_TUTORIAL: Paso[] = [
     titulo: 'Higia siempre a mano',
     texto: 'Desde cualquier sección puedes hablarle o escribirle aquí.',
   },
+  {
+    ancla: 'recorrido', icono: 'brujula', lado: 'abajo',
+    titulo: 'Vuelve a verlo cuando quieras',
+    texto: 'Este botón repite el recorrido desde cualquier sección.',
+  },
 ];
 
 const CLAVE = 'higia.tutorial';

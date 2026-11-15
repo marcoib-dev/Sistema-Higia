@@ -577,7 +577,7 @@ select, input[type='text'], input[type='number'], input:not([type]) {
 .dosis-proyeccion { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--aviso) 55%, transparent) 0 4px, transparent 4px 7px); }
 
 /* Modo grabación (tecla G): solo la app del astronauta */
-.app.modo-grabacion .boton-simulador { display: none; }
+.app.modo-grabacion .boton-simulador, .app.modo-grabacion .boton-recorrido { display: none; }
 .app.cursor-oculto, .app.cursor-oculto * { cursor: none !important; }
 .indicador-grabacion { position: fixed; right: 14px; bottom: 14px; z-index: 90; width: 8px; height: 8px; border-radius: 50%; background: var(--alerta); animation: desvanecer 2.4s ease-out forwards; pointer-events: none; }
 @keyframes desvanecer { 0%, 60% { opacity: .9; } to { opacity: 0; } }
@@ -746,3 +746,7 @@ select, input[type='text'], input[type='number'], input:not([type]) {
 .tutorial-puntos li { width: 6px; height: 6px; border-radius: 999px; background: var(--borde-fuerte); transition: width .25s, background .25s; }
 .tutorial-puntos li.hecho { background: color-mix(in srgb, var(--acento) 55%, var(--borde-fuerte)); }
 .tutorial-puntos li.actual { width: 18px; background: var(--acento); }
+/* Botón fijo del recorrido: en pantallas medianas solo el ícono, para no apretar los indicadores. */
+@media (max-width: 1320px) {
+  .boton-recorrido span { display: none; }
+}

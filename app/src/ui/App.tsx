@@ -695,6 +695,7 @@ export function App() {
       <BarraSuperior
         contexto={c} nombreAstronauta={nucleo.perfil.nombre} iaActiva={iaActiva} iaConfigurada={ia.configurada}
         escucha={asistente.estadoEscucha} actividad={asistente.actividad} ahora={ahora} vozActiva={vozActiva} onVozActiva={setVozActiva} demoAbierta={demoAbierta} onDemo={() => alternarDemo()}
+        recorridoAbierto={tutorial} onRecorrido={() => setTutorial(true)}
       />
       <BannerAlerta pendientes={pendientes} ahora={ahora} onConfirmar={confirmar} onVer={() => ir('mensajes')} />
       {avisoComunicacion && (

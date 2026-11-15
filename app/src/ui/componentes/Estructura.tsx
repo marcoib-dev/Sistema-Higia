@@ -24,9 +24,12 @@ interface PropsBarra {
   onVozActiva: (v: boolean) => void;
   demoAbierta: boolean;
   onDemo: () => void;
+  /** Recorrido guiado: el botón queda siempre en la barra para repetirlo. */
+  recorridoAbierto: boolean;
+  onRecorrido: () => void;
 }
 
-export function BarraSuperior({ contexto: c, nombreAstronauta, iaActiva, iaConfigurada, escucha, actividad, ahora, vozActiva, onVozActiva, demoAbierta, onDemo }: PropsBarra) {
+export function BarraSuperior({ contexto: c, nombreAstronauta, iaActiva, iaConfigurada, escucha, actividad, ahora, vozActiva, onVozActiva, demoAbierta, onDemo, recorridoAbierto, onRecorrido }: PropsBarra) {
   const { t } = useIdioma();
   const atenta = actividad === 'escuchando' || actividad === 'pensando' || actividad === 'hablando';
   return (
@@ -77,6 +80,12 @@ export function BarraSuperior({ contexto: c, nombreAstronauta, iaActiva, iaConfi
       <div className="barra-acciones">
         <SelectorIdioma />
         <ControlVoz vozActiva={vozActiva} onVozActiva={onVozActiva} />
+        <button
+          data-tutorial="recorrido" className={`boton boton-recorrido ${recorridoAbierto ? 'boton-activo' : ''}`} onClick={onRecorrido}
+          aria-pressed={recorridoAbierto} aria-label={t('Ver recorrido guiado')} title={t('Ver recorrido guiado')}
+        >
+          <Icono nombre="brujula" /> <span className="ocultar-movil">{t('Recorrido')}</span>
+        </button>
         <button data-tutorial="simulador" className={`boton boton-simulador ${demoAbierta ? 'boton-activo' : ''}`} onClick={onDemo} aria-expanded={demoAbierta} aria-controls="panel-simulador" title={t('Simulador (D)')}>
           <Icono nombre="demo" /> <span className="ocultar-movil">{t('Simulador')}</span>
         </button>

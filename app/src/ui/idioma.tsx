@@ -1321,6 +1321,11 @@ const INGLES: Record<string, string> = {
   'Anterior': 'Back',
   'Siguiente': 'Next',
   'Ver recorrido guiado': 'Take the guided tour',
+
+  // ── Recorrido guiado: botón fijo en la barra superior ──
+  'Recorrido': 'Tour',
+  'Vuelve a verlo cuando quieras': 'Watch it again anytime',
+  'Este botón repite el recorrido desde cualquier sección.': 'This button replays the tour from any section.',
 };
 
 export const traducirTexto = (idioma: Idioma, texto: string, vars?: Variables): string => {
