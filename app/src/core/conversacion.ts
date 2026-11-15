@@ -6,8 +6,9 @@
  */
 import type { Accion, DestinoPedido, SeccionApp } from './acciones';
 import type { NucleoSalud } from './nucleo';
+import { palabrasANumeros } from './numeros';
 import { redactar } from './personalizador';
-import { ORDEN_NIVEL, type Lectura, type TipoSensor } from './tipos';
+import { enRango, INFO_SENSOR, ORDEN_NIVEL, type Lectura, type TipoSensor } from './tipos';
 
 export interface Respuesta {
   texto: string;
@@ -17,19 +18,10 @@ export interface Respuesta {
   acciones: Accion[];
 }
 
-const NUMEROS: Record<string, number> = {
-  un: 1, uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7,
-  ocho: 8, nueve: 9, diez: 10, once: 11, doce: 12, veinte: 20, treinta: 30,
-  cuarenta: 40, cincuenta: 50, sesenta: 60, noventa: 90,
-};
-
 const normalizar = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[¿?¡!]/g, '');
 
-function numero(token: string): number | null {
-  const n = parseFloat(token.replace(',', '.'));
-  if (!Number.isNaN(n)) return n;
-  return NUMEROS[token] ?? null;
-}
+/** Un número en cifras (los números en palabras ya se convirtieron con `palabrasANumeros`). */
+const NUM = String.raw`(\d+(?:\.\d+)?)`;
 
 const CONSULTAS: { claves: RegExp; riesgoId: string; nombre: string }[] = [
   { claves: /presion/, riesgoId: 'cardio.presion', nombre: 'presión arterial' },
@@ -40,6 +32,14 @@ const CONSULTAS: { claves: RegExp; riesgoId: string; nombre: string }[] = [
   { claves: /animo/, riesgoId: 'mental.animo', nombre: 'ánimo' },
   { claves: /ejercicio|entren/, riesgoId: 'musculo.ejercicio', nombre: 'ejercicio' },
   { claves: /radiacion|dosis/, riesgoId: 'radiacion.dosis', nombre: 'radiación' },
+  { claves: /temperatura|fiebre/, riesgoId: 'inmune.fiebre', nombre: 'temperatura' },
+  { claves: /glucemia|glucosa|azucar/, riesgoId: 'metabolismo.glucemia', nombre: 'glucemia' },
+  { claves: /vision|\bojos?\b|\bvista\b/, riesgoId: 'sans.vision', nombre: 'visión' },
+  { claves: /hueso/, riesgoId: 'hueso.perdida', nombre: 'huesos' },
+  { claves: /fuerza|musculo/, riesgoId: 'musculo.aptitud', nombre: 'fuerza' },
+  { claves: /\bpeso\b|nutricion|comida|calorias/, riesgoId: 'nutricion.peso', nombre: 'peso y nutrición' },
+  { claves: /equilibrio/, riesgoId: 'vestibular.equilibrio', nombre: 'equilibrio' },
+  { claves: /pierna|pantorrilla|coagulo/, riesgoId: 'vascular.trombosis', nombre: 'piernas y circulación' },
 ];
 
 /** A quién se refiere una frase ("a Tierra", "al médico", "a Kai"…). */
@@ -58,8 +58,11 @@ const SECCION_POR_PALABRA: [RegExp, SeccionApp][] = [
   [/perfil|historia|clinic|ficha/, 'perfil'], [/entorno|camara|contexto/, 'entorno'], [/reporte/, 'reportes'], [/asistente|chat|conversa/, 'asistente'],
 ];
 
-/** Síntomas que el astronauta puede contar y que Higia convierte en aviso o alerta. */
-const SINTOMAS: { claves: RegExp; alerta: Extract<Accion, { tipo: 'emitir_alerta' }>; extra?: Accion[] }[] = [
+/**
+ * Lo urgente, que no depende de ninguna regla: alerta inmediata (camino de seguridad, sin red ni IA).
+ * Si el síntoma tiene un dato propio, además se registra la lectura para que las reglas lo crucen.
+ */
+const URGENTES: { claves: RegExp; alerta: Extract<Accion, { tipo: 'emitir_alerta' }>; lectura?: [TipoSensor, number]; extra?: Accion[] }[] = [
   // Un golpe en la cabeza va antes que el golpe genérico: además de la alerta, Higia evalúa la orientación.
   {
     claves: /(golpe|golpee|pegue|di|darme) (fuerte )?(en |con )?(la )?cabeza|cabezazo|me (cai|desmaye) y me (golpee|pegue)/,
@@ -67,14 +70,38 @@ const SINTOMAS: { claves: RegExp; alerta: Extract<Accion, { tipo: 'emitir_alerta
     extra: [{ tipo: 'chequeo_orientacion' }],
   },
   { claves: /dolor (en el|de) pecho|duele (el|mucho el) pecho|opresion en el pecho/, alerta: { tipo: 'emitir_alerta', nivel: 'alerta', sistema: 'corazon', titulo: 'Dolor en el pecho', detalle: 'El astronauta reporta dolor u opresión en el pecho.', region: 'torax' } },
-  { claves: /no puedo respirar|me falta el aire|me ahogo|falta de aire/, alerta: { tipo: 'emitir_alerta', nivel: 'alerta', sistema: 'pulmones', titulo: 'Dificultad para respirar', detalle: 'El astronauta reporta falta de aire.' } },
+  { claves: /no puedo respirar|me ahogo|me asfixio/, alerta: { tipo: 'emitir_alerta', nivel: 'alerta', sistema: 'pulmones', titulo: 'Dificultad para respirar', detalle: 'El astronauta reporta que no puede respirar.', region: 'torax' }, lectura: ['sxDisnea', 9] },
   { claves: /me voy a desmayar|me desmayo|perdi el conocimiento/, alerta: { tipo: 'emitir_alerta', nivel: 'alerta', sistema: 'cerebro', titulo: 'Sensación de desmayo', detalle: 'El astronauta reporta sensación de desmayo.' } },
-  { claves: /mareo|mareado|mareada|vertigo|todo me da vueltas/, alerta: { tipo: 'emitir_alerta', nivel: 'aviso', sistema: 'oidoInterno', titulo: 'Mareo', detalle: 'El astronauta reporta mareo o vértigo.' } },
-  { claves: /duele (la|mucho la) cabeza|dolor de cabeza|jaqueca|migrana/, alerta: { tipo: 'emitir_alerta', nivel: 'aviso', sistema: 'cerebro', titulo: 'Dolor de cabeza', detalle: 'El astronauta reporta dolor de cabeza.', region: 'craneo' } },
-  { claves: /veo borroso|vision borrosa|no veo bien/, alerta: { tipo: 'emitir_alerta', nivel: 'aviso', sistema: 'ojos', titulo: 'Visión borrosa', detalle: 'El astronauta reporta visión borrosa.' } },
+  // Signos de ACV: alerta siempre, esté o no en la ventana de la EVA.
+  { claves: /no puedo mover (el|la|un|una|mi)|me cuesta hablar|no puedo hablar bien|se me cae (la cara|un lado)|debilidad (de|en) un lado/, alerta: { tipo: 'emitir_alerta', nivel: 'alerta', sistema: 'cerebro', titulo: 'Debilidad o dificultad para hablar', detalle: 'El astronauta reporta debilidad de un lado o dificultad para hablar.', region: 'craneo' }, lectura: ['sxNeurologico', 8] },
   { claves: /me (cai|golpee)|me lastime|me torci/, alerta: { tipo: 'emitir_alerta', nivel: 'aviso', sistema: 'huesos', titulo: 'Golpe o caída', detalle: 'El astronauta reporta un golpe o una caída.' } },
-  { claves: /nauseas|ganas de vomitar|vomite/, alerta: { tipo: 'emitir_alerta', nivel: 'aviso', sistema: 'intestino', titulo: 'Náuseas', detalle: 'El astronauta reporta náuseas.' } },
 ];
+
+/** Síntomas que se registran como dato (intensidad 0–10): las reglas los cruzan con sensores y contexto. */
+const SINTOMAS: { claves: RegExp; sensor: TipoSensor }[] = [
+  { claves: /duele.{0,20}cabeza|dolor de cabeza|jaqueca|migrana|cefalea/, sensor: 'sxCefalea' },
+  { claves: /mareo|mareado|mareada|vertigo|todo me da vueltas|desorientad[oa] en el espacio/, sensor: 'sxMareo' },
+  { claves: /nauseas|ganas de vomitar|vomite|vomito/, sensor: 'sxNauseas' },
+  { claves: /veo borroso|vision borrosa|no veo bien|veo doble|cambios? (en la|de) vision/, sensor: 'sxVision' },
+  { claves: /me falta (el|un poco el|algo de) aire|falta de aire|me cuesta respirar|me agito/, sensor: 'sxDisnea' },
+  { claves: /duelen?.{0,20}(hombros?|codos?|rodillas?|articulacion(es)?)|dolor (de|en) (las? |el |los )?(articulaciones|hombros?|codos?|rodillas?)/, sensor: 'sxDolorArticular' },
+  { claves: /hormigueo|se me duerme|adormecid[oa]|cosquilleo/, sensor: 'sxNeurologico' },
+  { claves: /erupcion|sarpullido|herpes|ampolla en el labio|me salio una ampolla|ronchas|lesion en la piel/, sensor: 'sxPiel' },
+  { claves: /alergia|estornud|picazon|me pica|congestion/, sensor: 'sxAlergia' },
+  { claves: /diarrea|dolor de (panza|estomago|barriga)|duele (la panza|el estomago)|retortijones/, sensor: 'sxDigestivo' },
+  { claves: /dolor de espalda|duele.{0,20}espalda|lumbar|columna/, sensor: 'sxDolorEspalda' },
+  { claves: /(duele|dolor (en|de)|hinchad[ao]|hinchazon (en|de)) (la |una |mi )?(pierna|pantorrilla)|(pierna|pantorrilla) hinchad[ao]/, sensor: 'sxDolorPierna' },
+  { claves: /no tengo hambre|sin apetito|perdi el apetito|la comida me aburre|no me dan ganas de comer/, sensor: 'sxApetito' },
+];
+
+/** Intensidad de un síntoma según cómo lo cuenta: "un poco" → 3, "mucho" → 8, "7 de 10" → 7. */
+function intensidad(f: string): number {
+  const escala = f.match(/\b(\d+(?:\.\d+)?) de 10\b/);
+  if (escala) return enRango('sxCefalea', Number(escala[1]));
+  if (/\b(insoportable|muy fuerte|fuertisim[oa]|muchisim[oa]|terrible|intens[oa]|fuerte|mucho|mucha)\b/.test(f)) return 8;
+  if (/\b(leve|un poco|algo|poquito|ligero|ligera|apenas)\b/.test(f)) return 3;
+  return 5;
+}
 
 /**
  * Señales de posible alteración de la percepción. No es un diagnóstico: cada señal suma al dato
@@ -95,15 +122,22 @@ const NOMBRE_DESTINO_PEDIDO: Record<DestinoPedido, string> = {
 };
 
 export function interpretar(frase: string, nucleo: NucleoSalud, ahora = Date.now()): Respuesta {
-  const f = normalizar(frase).replace(/[.,;:]/g, ' ').replace(/\s+/g, ' ').trim();
-  const lectura = (sensor: TipoSensor, valor: number): Lectura => ({ sensor, valor, timestamp: ahora, fuente: 'voz' });
+  // Se conservan los decimales ("38,2") y los números en palabras pasan a cifras.
+  const f = palabrasANumeros(normalizar(frase).replace(/(?<!\d)[.,;:]|[.,;:](?!\d)/g, ' ').replace(/\s+/g, ' ').trim());
+  const lectura = (sensor: TipoSensor, valor: number): Lectura => ({ sensor, valor: enRango(sensor, valor), timestamp: ahora, fuente: 'voz' });
+  /** Total del día: suma a lo ya registrado hoy, salvo que diga "llevo" (ya es el total). */
+  const delDia = (sensor: TipoSensor, v: number, total: boolean) => {
+    const previo = nucleo.historial.ultima(sensor);
+    const mismoDia = previo && new Date(previo.timestamp).toDateString() === new Date(ahora).toDateString();
+    return total || !mismoDia ? v : previo.valor + v;
+  };
   const r = (texto: string, acciones: Accion[] = [], lecturas: Lectura[] = []): Respuesta => ({ texto, lecturas, acciones });
 
   // ── Emergencia: pedir ayuda (siempre primero) ──
   if (/\b(ayuda|ayudenme|auxilio|socorro|emergencia|mayday)\b/.test(f) && !/que (es|significa)/.test(f)) {
     const destino = destinoEn(f, nucleo.companeros) ?? 'todos';
     // Si además cuenta un síntoma ("me duele el pecho, pide ayuda"), queda también la alerta.
-    const sintoma = SINTOMAS.find((s) => s.claves.test(f));
+    const sintoma = URGENTES.find((s) => s.claves.test(f));
     return r(`Pido ayuda a ${NOMBRE_DESTINO_PEDIDO[destino]}. Quédate en un lugar seguro, sigo contigo.`,
       [{ tipo: 'pedir_ayuda', destino, motivo: `Pedido de voz: "${frase.trim()}"` }, ...(sintoma ? [sintoma.alerta] : [])]);
   }
@@ -120,15 +154,25 @@ export function interpretar(frase: string, nucleo: NucleoSalud, ahora = Date.now
     return r('Vamos a comprobarlo juntos, con calma.', [{ tipo: 'chequeo_orientacion' }]);
   }
 
-  // ── Síntomas: generan un aviso o una alerta ──
-  for (const s of SINTOMAS) {
-    if (s.claves.test(f)) {
-      if (s.extra) return r(`${s.alerta.titulo.replace(/ \(reportado\)$/, '')}: lo registro y vamos a revisar cómo estás.`, [s.alerta, ...s.extra]);
-      const grave = s.alerta.nivel === 'alerta';
-      return r(grave
-        ? `${s.alerta.titulo}: lo registro como alerta. Detente y ponte en un lugar seguro. Si no respondes, aviso a otros.`
-        : `${s.alerta.titulo}: lo registro como aviso y lo sigo de cerca. Avísame si empeora.`, [s.alerta]);
-    }
+  // ── Lo urgente: alerta inmediata ──
+  const urgente = URGENTES.find((s) => s.claves.test(f));
+  if (urgente) {
+    const lecturas = urgente.lectura ? [lectura(urgente.lectura[0], urgente.lectura[1])] : [];
+    if (urgente.extra) return r(`${urgente.alerta.titulo.replace(/ \(reportado\)$/, '')}: lo registro y vamos a revisar cómo estás.`, [urgente.alerta, ...urgente.extra], lecturas);
+    const grave = urgente.alerta.nivel === 'alerta';
+    return r(grave
+      ? `${urgente.alerta.titulo}: lo registro como alerta. Detente y ponte en un lugar seguro. Si no respondes, aviso a otros.`
+      : `${urgente.alerta.titulo}: lo registro como aviso y lo sigo de cerca. Avísame si empeora.`, [urgente.alerta], lecturas);
+  }
+
+  // ── Síntomas: se registran como dato; las reglas deciden si hay que avisar ──
+  const contados = SINTOMAS.filter((s) => s.claves.test(f));
+  if (contados.length) {
+    const v = intensidad(f);
+    const sensores = [...new Set(contados.map((s) => s.sensor))];
+    const nombres = sensores.map((s) => INFO_SENSOR[s].nombre.toLowerCase());
+    return r(`Lo registro: ${nombres.join(', ')} (intensidad ${v} de 10). Lo cruzo con tus otros datos y te aviso si hace falta hacer algo. Cuéntame si empeora.`,
+      [], sensores.map((s) => lectura(s, v)));
   }
 
   // ── "Estoy bien" ──
@@ -163,23 +207,58 @@ export function interpretar(frase: string, nucleo: NucleoSalud, ahora = Date.now
   if (alergia) return r(`Anoto la alergia a ${alergia[1]} en tu historia clínica.`, [{ tipo: 'actualizar_historia', campo: 'alergias', valor: alergia[1] }]);
 
   // ── Registros ──
-  let m = f.match(/dormi\s+(\S+)\s+horas?/);
-  if (m && numero(m[1]) !== null) {
-    const v = numero(m[1])!;
+  let m = f.match(new RegExp(`dormi\\s+${NUM}\\s+horas?`));
+  if (m) {
+    const v = Number(m[1]);
     return r(`Anotado: dormiste ${v} horas.`, [], [lectura('horasSueno', v)]);
   }
-  m = f.match(/animo\s+(?:es\s+|de\s+|esta\s+en\s+|en\s+)?(\S+)/);
-  if (m && numero(m[1]) !== null) {
-    const v = Math.min(10, Math.max(1, numero(m[1])!));
+  m = f.match(new RegExp(`animo\\s+(?:es\\s+|de\\s+|esta\\s+en\\s+|en\\s+)?${NUM}`));
+  if (m) {
+    const v = enRango('animo', Number(m[1]));
     return r(`Anotado tu ánimo: ${v} de 10. Gracias por registrarlo.`, [], [lectura('animo', v)]);
   }
-  m = f.match(/(?:hice|entrene)\s+(\S+)\s+minutos/);
-  if (m && numero(m[1]) !== null) {
-    const v = numero(m[1])!;
-    const previo = nucleo.historial.ultima('minutosEjercicio');
-    const mismoDia = previo && new Date(previo.timestamp).toDateString() === new Date(ahora).toDateString();
-    const total = (mismoDia ? previo.valor : 0) + v;
+  m = f.match(new RegExp(`(?:hice|entrene)\\s+${NUM}\\s+minutos`));
+  if (m) {
+    const v = Number(m[1]);
+    const total = delDia('minutosEjercicio', v, false);
     return r(`Anotado: ${v} minutos. Llevas ${total} hoy.`, [], [lectura('minutosEjercicio', total)]);
+  }
+  m = f.match(new RegExp(`presion\\D{0,20}?${NUM}\\s*(?:sobre|/|con)\\s*${NUM}`));
+  if (m) {
+    const [sis, dia] = [Number(m[1]), Number(m[2])];
+    return r(`Anotado: presión ${sis} sobre ${dia}.`, [], [lectura('presionSistolica', sis), lectura('presionDiastolica', dia)]);
+  }
+  m = f.match(new RegExp(`(?:temperatura|fiebre)\\D{0,15}?${NUM}`)) ?? f.match(new RegExp(`${NUM}\\s*(?:grados|de fiebre)`));
+  if (m && Number(m[1]) >= 30 && Number(m[1]) <= 45) {
+    const v = Number(m[1]);
+    return r(`Anotado: temperatura de ${v} grados.`, [], [lectura('temperatura', v)]);
+  }
+  m = f.match(new RegExp(`(?:glucemia|glucosa|azucar)\\D{0,15}?${NUM}`));
+  if (m) {
+    const v = Number(m[1]);
+    return r(`Anotado: glucemia de ${v}.`, [], [lectura('glucemia', v)]);
+  }
+  m = f.match(new RegExp(`(?:peso|pese)\\D{0,10}?${NUM}`));
+  if (m) {
+    const v = Number(m[1]);
+    return r(`Anotado: ${v} kilos.`, [], [lectura('pesoCorporal', v)]);
+  }
+  m = f.match(new RegExp(`(tome|bebi|llevo)\\s+${NUM}\\s*(litros?|l|ml|mililitros|vasos?)\\s+(?:de\\s+)?agua`));
+  if (m) {
+    const factor = /^l/.test(m[3]) && m[3] !== 'ml' ? 1000 : /^vaso/.test(m[3]) ? 250 : 1;
+    const ml = Math.round(Number(m[2]) * factor);
+    const total = delDia('hidratacion', ml, m[1] === 'llevo');
+    return r(`Anotado: llevas ${total} mililitros de agua hoy.`, [], [lectura('hidratacion', total)]);
+  }
+  m = f.match(new RegExp(`(comi|consumi|llevo)\\s+${NUM}\\s*(?:calorias|kcal)`));
+  if (m) {
+    const total = delDia('caloriasDia', Number(m[2]), m[1] === 'llevo');
+    return r(`Anotado: llevas ${total} calorías hoy.`, [], [lectura('caloriasDia', total)]);
+  }
+  m = f.match(new RegExp(`trabaje\\s+${NUM}\\s*horas?`));
+  if (m) {
+    const v = Number(m[1]);
+    return r(`Anotado: ${v} horas de trabajo hoy.${v > 10 ? ' Es una jornada larga: reserva un rato para descansar.' : ''}`, [], [lectura('horasTrabajo', v)]);
   }
 
   // ── Consultas ──

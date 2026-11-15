@@ -103,9 +103,49 @@ describe('intérprete local (sin IA)', () => {
   it('pedido de ayuda con síntoma: pide ayuda y deja la alerta', () => {
     expect(acciones('me duele el pecho, pide ayuda').map((a) => a.tipo)).toEqual(['pedir_ayuda', 'emitir_alerta']);
   });
-  it('convierte un síntoma en alerta', () => {
+  it('lo urgente sigue siendo una alerta inmediata', () => {
     expect(acciones('me duele el pecho')[0]).toMatchObject({ tipo: 'emitir_alerta', nivel: 'alerta', sistema: 'corazon' });
-    expect(acciones('estoy mareado')[0]).toMatchObject({ tipo: 'emitir_alerta', nivel: 'aviso', sistema: 'oidoInterno' });
+    const ahogo = interpretar('no puedo respirar', n, T);
+    expect(ahogo.acciones[0]).toMatchObject({ tipo: 'emitir_alerta', nivel: 'alerta', sistema: 'pulmones' });
+    expect(ahogo.lecturas).toEqual([expect.objectContaining({ sensor: 'sxDisnea', valor: 9 })]);
+    expect(acciones('me cuesta hablar y no puedo mover el brazo')[0]).toMatchObject({ tipo: 'emitir_alerta', nivel: 'alerta', sistema: 'cerebro' });
+  });
+  it('los demás síntomas se registran como dato con su intensidad', () => {
+    const lect = (f: string) => interpretar(f, n, T).lecturas.map((l) => [l.sensor, l.valor]);
+    expect(acciones('estoy mareado')).toEqual([]);
+    expect(lect('estoy mareado')).toEqual([['sxMareo', 5]]);
+    expect(lect('me duele un poco la cabeza')).toEqual([['sxCefalea', 3]]);
+    expect(lect('me duele mucho el hombro')).toEqual([['sxDolorArticular', 8]]);
+    expect(lect('me duele la cabeza y veo borroso')).toEqual([['sxCefalea', 5], ['sxVision', 5]]);
+    expect(lect('me salió una ampolla en el labio')).toEqual([['sxPiel', 5]]);
+    expect(lect('tengo diarrea')).toEqual([['sxDigestivo', 5]]);
+    expect(lect('siento hormigueo en la mano')).toEqual([['sxNeurologico', 5]]);
+    expect(lect('tengo la pantorrilla hinchada, dolor 6 de 10')).toEqual([['sxDolorPierna', 6]]);
+    expect(lect('la comida me aburre, no tengo hambre')).toEqual([['sxApetito', 5]]);
+    expect(interpretar('estoy mareado', n, T).texto).toMatch(/Lo registro/);
+  });
+  it('registros numéricos nuevos, en cifras o en palabras', () => {
+    const lect = (f: string) => interpretar(f, n, T).lecturas.map((l) => [l.sensor, l.valor]);
+    expect(lect('mi temperatura es 38,2')).toEqual([['temperatura', 38.2]]);
+    expect(lect('tengo treinta y ocho coma cinco de fiebre')).toEqual([['temperatura', 38.5]]);
+    expect(lect('glucemia 95')).toEqual([['glucemia', 95]]);
+    expect(lect('peso 71 kilos')).toEqual([['pesoCorporal', 71]]);
+    expect(lect('tomé dos litros de agua')).toEqual([['hidratacion', 2000]]);
+    expect(lect('tomé dos litros y medio de agua')).toEqual([['hidratacion', 2500]]);
+    expect(lect('comí mil ochocientas calorías')).toEqual([['caloriasDia', 1800]]);
+    expect(lect('trabajé once horas')).toEqual([['horasTrabajo', 11]]);
+    expect(lect('mi presión es 120 sobre 80')).toEqual([['presionSistolica', 120], ['presionDiastolica', 80]]);
+    expect(lect('dormí cinco horas y media')).toEqual([['horasSueno', 5.5]]);
+    expect(lect('hice ciento veinte minutos')).toEqual([['minutosEjercicio', 120]]);
+  });
+  it('recorta los valores al rango del dato', () => {
+    expect(interpretar('mi ánimo es 15', n, T).lecturas[0].valor).toBe(10);
+  });
+  it('responde consultas de los datos nuevos', () => {
+    const m = nuevo(MEDICA);
+    expect(interpretar('¿cómo está mi glucemia?', m, T).texto).toMatch(/no tengo datos de glucemia/);
+    m.registrar(L('temperatura', 38.4), T);
+    expect(interpretar('¿tengo fiebre?', m, T).texto).toMatch(/38.4/);
   });
   it('entiende "estoy bien" y la navegación', () => {
     expect(acciones('estoy bien')).toEqual([{ tipo: 'confirmar_bien' }]);

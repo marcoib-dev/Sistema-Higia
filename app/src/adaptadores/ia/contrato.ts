@@ -2,11 +2,17 @@
  * Contrato entre la app y el servidor de IA (app/server). Solo tipos y listas: lo importan los dos lados.
  */
 import type { Accion } from '../../core/acciones';
-import type { Actividad, Destino, HistoriaClinica, Nivel, Ubicacion } from '../../core/tipos';
+import { INFO_SENSOR, SENSORES, type Actividad, type Destino, type HistoriaClinica, type Nivel, type TipoSensor, type Ubicacion } from '../../core/tipos';
 
-/** Datos que el astronauta puede reportar hablando y que la IA puede extraer. */
-export const SENSORES_CONVERSACION = ['horasSueno', 'animo', 'minutosEjercicioRealizados', 'marcadoresPsicoticos'] as const;
-export type SensorConversacion = (typeof SENSORES_CONVERSACION)[number];
+/**
+ * Datos que el astronauta puede reportar hablando y que la IA puede extraer: salen del catálogo
+ * (`porVoz`), más el caso especial de los minutos de ejercicio que acaba de hacer (se suman a los del día).
+ */
+export type SensorConversacion = TipoSensor | 'minutosEjercicioRealizados';
+export const SENSORES_CONVERSACION: [SensorConversacion, ...SensorConversacion[]] = [
+  'minutosEjercicioRealizados',
+  ...SENSORES.filter((s) => INFO_SENSOR[s].porVoz),
+];
 
 export interface TurnoConversacion {
   rol: 'astronauta' | 'higia';
@@ -21,7 +27,7 @@ export interface EstadoParaIA {
     historiaClinica: HistoriaClinica;
   };
   contexto: Record<string, unknown>;
-  hallazgos: { titulo: string; nivel: Nivel; detalle: string; sensible: boolean }[];
+  hallazgos: { titulo: string; nivel: Nivel; detalle: string; sensible: boolean; riesgosNASA?: string[] }[];
   ultimasLecturas: Record<string, number>;
   /** Últimas lecturas por dato (hasta 5), con unidad y antigüedad: la base de cualquier análisis. */
   lecturasRecientes: Record<string, { valor: number; unidad: string; haceMin: number }[]>;
@@ -83,6 +89,8 @@ export interface DatoParaIA {
 export interface PeticionEvaluacion {
   hallazgo: {
     titulo: string; nivel: Nivel; resumen: string; detalle: string; accion: string; sensible: boolean; fuente: string;
+    /** Riesgos del HRP de la NASA a los que responde el hallazgo. */
+    riesgosNASA?: string[];
     /** Datos exactos en que se basó el motor de reglas. */
     datos: DatoParaIA[];
     /** Serie reciente de esos mismos datos, para ver la tendencia. */

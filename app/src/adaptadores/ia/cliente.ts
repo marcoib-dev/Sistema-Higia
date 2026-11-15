@@ -3,7 +3,8 @@
  * La app la usa siempre que el servidor tenga clave configurada. Si falla, se vuelve al intérprete local.
  */
 import type { NucleoSalud } from '../../core/nucleo';
-import { INFO_SENSOR, type Mensaje, type TipoSensor } from '../../core/tipos';
+import { RIESGO_HRP } from '../../core/riesgosHRP';
+import { INFO_SENSOR, type Hallazgo, type Mensaje, type TipoSensor } from '../../core/tipos';
 import type {
   AnalisisEntorno, EstadoIA, EstadoParaIA, EvaluacionIA, PeticionConversacion, PeticionEntorno, PeticionEvaluacion,
   RespuestaConversacion,
@@ -37,6 +38,7 @@ export function peticionEvaluacion(m: Mensaje, n: NucleoSalud, ahora = Date.now(
     hallazgo: {
       titulo: h.titulo, nivel: h.nivel, resumen: h.resumenSimple, detalle: h.detalleTecnico,
       accion: h.accionPorUbicacion?.[n.contexto.ubicacion] ?? h.accion, sensible: h.sensible, fuente: h.fuente,
+      riesgosNASA: riesgosNASA(h),
       datos: (h.datos ?? []).map((d) => ({
         dato: INFO_SENSOR[d.sensor].nombre, valor: d.valor, unidad: INFO_SENSOR[d.sensor].unidad,
         haceMin: minutosDesde(d.timestamp, ahora), lineaBase: d.lineaBase,
@@ -49,6 +51,8 @@ export function peticionEvaluacion(m: Mensaje, n: NucleoSalud, ahora = Date.now(
     estado: estadoParaIA(n),
   };
 }
+
+const riesgosNASA = (h: Hallazgo) => (h.hrp ?? []).map((id) => `${RIESGO_HRP[id].nombre} (§${RIESGO_HRP[id].seccion})`);
 
 const minutosDesde = (ts: number, ahora: number) => Math.max(0, Math.round((ahora - ts) / 60_000));
 
@@ -71,7 +75,7 @@ export function estadoParaIA(n: NucleoSalud, app?: EstadoParaIA['app']): EstadoP
   return {
     perfil: { formacionMedica, experiencia, toleranciaEstres, propensoPanico, historiaClinica },
     contexto: { ...n.contexto },
-    hallazgos: n.hallazgosActuales().map((h) => ({ titulo: h.titulo, nivel: h.nivel, detalle: h.detalleTecnico, sensible: h.sensible })),
+    hallazgos: n.hallazgosActuales().map((h) => ({ titulo: h.titulo, nivel: h.nivel, detalle: h.detalleTecnico, sensible: h.sensible, riesgosNASA: riesgosNASA(h) })),
     ultimasLecturas,
     lecturasRecientes,
     lineaBase,

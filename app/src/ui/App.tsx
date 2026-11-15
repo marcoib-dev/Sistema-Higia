@@ -11,7 +11,7 @@ import { interpretar } from '../core/conversacion';
 import { NucleoSalud } from '../core/nucleo';
 import { ChequeoOrientacion } from '../core/orientacion';
 import { REGLAS } from '../core/reglas';
-import { NOMBRE_SISTEMA, type Comunicacion, type Contexto, type HistoriaClinica, type Lectura, type Mensaje, type Perfil, type SistemaCorporal } from '../core/tipos';
+import { enRango, esSensor, NOMBRE_SISTEMA, type Comunicacion, type Contexto, type HistoriaClinica, type Lectura, type Mensaje, type Perfil, type SistemaCorporal } from '../core/tipos';
 import { useAsistente, type ResultadoConversacion } from './asistente';
 import { AccesoHigia } from './componentes/AccesoHigia';
 import { BannerAlerta, BannerComunicacion, BarraSuperior, Navegacion } from './componentes/Estructura';
@@ -344,11 +344,12 @@ export function App() {
   /** Convierte lo que la IA extrajo de la conversación en lecturas del núcleo. */
   const lecturasDesdeIA = (r: RespuestaConversacion): Lectura[] => {
     const t = Date.now();
-    return r.lecturas.map(({ sensor, valor }) => {
-      if (sensor !== 'minutosEjercicioRealizados') return { sensor, valor, timestamp: t, fuente: 'voz' as const };
+    // Lo que llega de la IA se valida: datos desconocidos se descartan y los valores se recortan al rango.
+    return r.lecturas.filter(({ sensor, valor }) => Number.isFinite(valor) && (sensor === 'minutosEjercicioRealizados' || esSensor(sensor))).map(({ sensor, valor }): Lectura => {
+      if (sensor !== 'minutosEjercicioRealizados') return { sensor, valor: enRango(sensor, valor), timestamp: t, fuente: 'voz' as const };
       const previo = nucleo.historial.ultima('minutosEjercicio');
       const mismoDia = previo && new Date(previo.timestamp).toDateString() === new Date(t).toDateString();
-      return { sensor: 'minutosEjercicio' as const, valor: (mismoDia ? previo.valor : 0) + valor, timestamp: t, fuente: 'voz' as const };
+      return { sensor: 'minutosEjercicio' as const, valor: enRango('minutosEjercicio', (mismoDia ? previo.valor : 0) + valor), timestamp: t, fuente: 'voz' as const };
     });
   };
 
