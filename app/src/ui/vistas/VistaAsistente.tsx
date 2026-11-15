@@ -7,8 +7,8 @@ import type { Hallazgo, Perfil } from '../../core/tipos';
 import { ORDEN_NIVEL } from '../../core/tipos';
 import { TEXTO_ACTIVIDAD, TEXTO_ESCUCHA, type Asistente } from '../asistente';
 import { OrbeHigia } from '../componentes/AuraHigia';
-import { EncabezadoSeccion, Etiqueta, Interruptor } from '../componentes/basicos';
-import { Icono } from '../iconos';
+import { Interruptor } from '../componentes/basicos';
+import { Icono, type NombreIcono } from '../iconos';
 import type { Seccion } from '../navegacion';
 
 /** Evaluación o pregunta en curso, para mostrar el progreso y respuestas rápidas. */
@@ -36,26 +36,27 @@ interface Props {
   onPedirAyuda: () => void;
 }
 
-const SUGERENCIAS = [
-  '¿Cómo estoy?',
-  '¿Qué hora es?',
-  'Anoche dormí como cinco horas y me siento cansado',
-  'Hazme una evaluación cognitiva',
-  'Quiero hacer la maniobra de Valsalva',
-  'Dile a Tierra que terminé la reparación',
-  'Me duele la cabeza',
-  'Pide ayuda',
+/** Ideas para empezar, agrupadas por lo que resuelven. */
+const SUGERENCIAS: { texto: string; icono: NombreIcono }[] = [
+  { texto: '¿Cómo estoy?', icono: 'resumen' },
+  { texto: 'Me duele la cabeza', icono: 'corazon' },
+  { texto: 'Anoche dormí como cinco horas y me siento cansado', icono: 'reloj' },
+  { texto: 'Hazme una evaluación cognitiva', icono: 'cerebro' },
+  { texto: 'Quiero hacer la maniobra de Valsalva', icono: 'pruebas' },
+  { texto: 'Dile a Tierra que terminé la reparación', icono: 'enviar' },
+  { texto: '¿Qué hora es?', icono: 'reloj' },
+  { texto: 'Pide ayuda', icono: 'alerta' },
 ];
 
 const CLAVE_GUIA = 'higia.guiaVista';
 const leerGuia = () => { try { return localStorage.getItem(CLAVE_GUIA) !== 'si'; } catch { return true; } };
 
 export const OPCIONES_PROACTIVO = [
-  { min: 2, nombre: 'cada 2 min (demo)' },
-  { min: 5, nombre: 'cada 5 min' },
-  { min: 15, nombre: 'cada 15 min' },
-  { min: 60, nombre: 'cada hora' },
-  { min: 0, nombre: 'nunca' },
+  { min: 2, nombre: 'Cada 2 min (demo)' },
+  { min: 5, nombre: 'Cada 5 min' },
+  { min: 15, nombre: 'Cada 15 min' },
+  { min: 60, nombre: 'Cada hora' },
+  { min: 0, nombre: 'Nunca' },
 ];
 
 export function VistaAsistente({
@@ -63,18 +64,30 @@ export function VistaAsistente({
 }: Props) {
   const [texto, setTexto] = useState('');
   const [verGuia, setVerGuia] = useState(leerGuia);
-  const fin = useRef<HTMLDivElement>(null);
+  const [verAjustes, setVerAjustes] = useState(false);
+  const historial = useRef<HTMLDivElement>(null);
   const entrada = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { fin.current?.scrollIntoView({ block: 'end' }); }, [a.historial.length, a.pensando]);
+  // Desplaza solo la conversación (no la página) hasta el último mensaje.
+  useEffect(() => {
+    const h = historial.current;
+    if (h) h.scrollTo({ top: h.scrollHeight, behavior: 'smooth' });
+  }, [a.historial.length, a.pensando]);
 
-  const enviar = (f: string) => { void a.enviar(f); setTexto(''); };
+  const enviar = (f: string) => {
+    if (!f.trim()) return;
+    void a.enviar(f);
+    setTexto('');
+  };
   const cerrarGuia = () => { setVerGuia(false); try { localStorage.setItem(CLAVE_GUIA, 'si'); } catch { /* sin almacenamiento */ } };
+  const abrirGuia = () => { setVerGuia(true); try { localStorage.removeItem(CLAVE_GUIA); } catch { /* sin almacenamiento */ } };
 
   // El historial llega del más nuevo al más viejo; en un chat se lee de arriba hacia abajo.
   const cronologico = [...a.historial].reverse();
   const atencion = hallazgos.filter((h) => ORDEN_NIVEL[h.nivel] >= ORDEN_NIVEL.aviso);
   const ultimoId = a.historial[0]?.id;
+  const hayRapidas = !!enCurso?.rapidas?.length;
+  const nombreProactivo = OPCIONES_PROACTIVO.find((o) => o.min === proactivo)?.nombre ?? '';
 
   const titular = a.actividad === 'escuchando' ? 'Te escucho…'
     : a.actividad === 'pensando' ? 'Pensando…'
@@ -85,56 +98,74 @@ export function VistaAsistente({
     ? (a.parcial ? `«${a.parcial}»` : a.dictando ? 'Habla ahora: no hace falta decir «Higia».' : 'Sigue hablando…')
     : a.actividad === 'hablando' ? 'Toca el orbe o pulsa Esc para callarla.'
     : a.detalleEscucha && !a.problemaVoz ? a.detalleEscucha
-    : a.micDisponible ? 'También puedes tocar el micrófono o escribir.' : 'Escríbele: tu navegador no tiene reconocimiento de voz.';
+    : a.micDisponible ? 'Toca el orbe para hablar, o escríbele abajo.' : 'Escríbele: tu navegador no tiene reconocimiento de voz.';
 
   return (
     <div className="asistente">
-      <EncabezadoSeccion
-        titulo={`Hola, ${perfil.nombre.split(' ')[0]}`}
-        descripcion="Soy Higia. Vigilo tu salud, te aviso cuando algo cambia y manejo la app por ti."
-        acciones={(
-          <>
-            {a.motorVoz === 'local' && <Etiqueta icono="microfono" tono="ia">Voz local</Etiqueta>}
-            {iaActiva ? <Etiqueta icono="ia" tono="ia">IA activa</Etiqueta> : <Etiqueta icono="sinConexion">Modo local</Etiqueta>}
-            <button className="boton boton-peligro" onClick={onPedirAyuda}><Icono nombre="alerta" /> Pedir ayuda</button>
-          </>
-        )}
-      />
+      <header className="asistente-cab">
+        <div className="asistente-saludo">
+          <h1>Hola, {perfil.nombre.split(' ')[0]}</h1>
+          <p>Soy Higia. Vigilo tu salud, te aviso cuando algo cambia y manejo la app por ti.</p>
+        </div>
+        <div className="asistente-acciones">
+          <span className={`estado-motor ${iaActiva ? 'ia' : ''}`} title={a.motorVoz === 'local' ? 'Reconocimiento de voz en el dispositivo' : undefined}>
+            <Icono nombre={iaActiva ? 'ia' : 'sinConexion'} tamano={14} />
+            {iaActiva ? 'IA activa' : 'Modo local'}
+            {a.motorVoz === 'local' && <><span aria-hidden>·</span><Icono nombre="microfono" tamano={13} /> Voz local</>}
+          </span>
+          {!verGuia && (
+            <button className="boton-icono" onClick={abrirGuia} aria-label="Cómo usar Higia" title="Cómo usar Higia">
+              <Icono nombre="pregunta" />
+            </button>
+          )}
+          <button className="boton boton-peligro boton-ayuda" onClick={onPedirAyuda}><Icono nombre="alerta" /> Pedir ayuda</button>
+        </div>
+      </header>
 
       {verGuia && (
-        <div className="guia-inicio" aria-label="Cómo usar Higia">
-          <div className="guia-paso">
-            <span className="guia-n">1</span>
-            <div><strong>Háblale</strong><p>Di «Higia» y tu pedido. El borde de la pantalla se ilumina cuando te escucha.</p></div>
+        <section className="guia-inicio" aria-labelledby="titulo-guia">
+          <div className="guia-cab">
+            <h2 id="titulo-guia">Cómo usar Higia</h2>
+            <button className="boton-icono" onClick={cerrarGuia} aria-label="Cerrar la guía"><Icono nombre="cerrar" tamano={16} /></button>
           </div>
-          <div className="guia-paso">
-            <span className="guia-n">2</span>
-            <div><strong>Ella también pregunta</strong><p>De vez en cuando te hace preguntas y evaluaciones cognitivas breves.</p></div>
-          </div>
-          <div className="guia-paso">
-            <span className="guia-n">3</span>
-            <div>
-              <strong>Simula situaciones</strong>
-              <p>Abre el <button className="boton-enlace" onClick={onAbrirSimulador}>Simulador</button> (tecla <kbd>D</kbd>) para ver a Higia reaccionar. <button className="boton-enlace" onClick={cerrarGuia}>Entendido</button></p>
-            </div>
-          </div>
-        </div>
+          <ol className="guia-pasos">
+            <li className="guia-paso">
+              <span className="guia-n" aria-hidden><Icono nombre="microfono" tamano={16} /></span>
+              <div><strong>Háblale</strong><p>Di «Higia» y tu pedido. El borde de la pantalla se ilumina cuando te escucha.</p></div>
+            </li>
+            <li className="guia-paso">
+              <span className="guia-n" aria-hidden><Icono nombre="pregunta" tamano={16} /></span>
+              <div><strong>Ella también pregunta</strong><p>De vez en cuando te hace preguntas y evaluaciones cognitivas breves.</p></div>
+            </li>
+            <li className="guia-paso">
+              <span className="guia-n" aria-hidden><Icono nombre="demo" tamano={16} /></span>
+              <div>
+                <strong>Simula situaciones</strong>
+                <p>Abre el <button className="boton-enlace" onClick={onAbrirSimulador}>Simulador</button> (tecla <kbd>D</kbd>) para ver a Higia reaccionar.</p>
+              </div>
+            </li>
+          </ol>
+          <button className="boton guia-entendido" onClick={cerrarGuia}><Icono nombre="check" /> Entendido</button>
+        </section>
       )}
 
-      <div className="estado-rapido">
-        <button className={atencion.length ? 'con-aviso' : ''} onClick={() => onIr('resumen')}>
-          <Icono nombre="resumen" tamano={20} />
+      <nav className="estado-rapido" aria-label="Accesos rápidos">
+        <button className={atencion.length ? 'con-aviso' : 'con-ok'} onClick={() => onIr('resumen')}>
+          <span className="estado-icono"><Icono nombre="resumen" tamano={20} /></span>
           <span><strong>{atencion.length ? `${atencion.length} punto${atencion.length > 1 ? 's' : ''} a atender` : 'Todo en orden'}</strong><small>Estado de salud</small></span>
+          <Icono nombre="flecha" tamano={16} />
         </button>
         <button className={alertasPendientes ? 'con-alerta' : ''} onClick={() => onIr('mensajes')}>
-          <Icono nombre="alerta" tamano={20} />
-          <span><strong>{alertasPendientes ? `${alertasPendientes} esperando respuesta` : 'Sin alertas'}</strong><small>Alertas</small></span>
+          <span className="estado-icono"><Icono nombre="mensajes" tamano={20} /></span>
+          <span><strong>{alertasPendientes ? `${alertasPendientes} sin responder` : 'Sin alertas'}</strong><small>Alertas</small></span>
+          <Icono nombre="flecha" tamano={16} />
         </button>
         <button onClick={() => onIr('pruebas')}>
-          <Icono nombre="pruebas" tamano={20} />
-          <span><strong>Pruebas a bordo</strong><small>Cognitiva, reacción, fuerza, Valsalva</small></span>
+          <span className="estado-icono"><Icono nombre="pruebas" tamano={20} /></span>
+          <span><strong>Pruebas a bordo</strong><small>Cognitiva, reacción, fuerza…</small></span>
+          <Icono nombre="flecha" tamano={16} />
         </button>
-      </div>
+      </nav>
 
       <section className="tarjeta chat" aria-label="Conversación con Higia">
         <div className={`chat-cabecera ${a.actividad}`} aria-live="polite">
@@ -149,7 +180,38 @@ export function VistaAsistente({
             <strong>{titular}</strong>
             <span className={a.actividad === 'escuchando' && a.parcial ? 'chat-cabecera-parcial' : undefined}>{subtitulo}</span>
           </div>
+          <button
+            type="button" className={`boton-icono boton-ajustes ${verAjustes ? 'abierto' : ''}`} onClick={() => setVerAjustes((v) => !v)}
+            aria-expanded={verAjustes} aria-controls="ajustes-higia" aria-label="Ajustes de Higia" title="Ajustes de Higia"
+          >
+            <Icono nombre="demo" />
+          </button>
         </div>
+
+        {verAjustes && (
+          <div className="chat-ajustes" id="ajustes-higia">
+            <Interruptor
+              etiqueta="Escuchar «Higia»"
+              descripcion="Solo se activa cuando la nombras: «Higia, pide ayuda»."
+              activo={a.escuchaActiva} onCambio={a.alternarEscucha}
+            />
+            <div className="ajuste-proactivo">
+              <label htmlFor="proactivo">
+                <span>Preguntas de Higia</span>
+                <small>Con qué frecuencia te pregunta cómo estás.</small>
+              </label>
+              <div className="ajuste-proactivo-controles">
+                <select id="proactivo" value={proactivo} onChange={(e) => onProactivo(Number(e.target.value))}>
+                  {OPCIONES_PROACTIVO.map((o) => <option key={o.min} value={o.min}>{o.nombre}</option>)}
+                </select>
+                <button type="button" className="boton" onClick={() => { onPreguntarAhora(); setVerAjustes(false); }} disabled={!!enCurso || a.pensando}>
+                  Pregúntame ahora
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {a.problemaVoz && (
           <p className="aviso-voz" role="status">
             <Icono nombre="alerta" tamano={14} /> {a.problemaVoz}
@@ -162,17 +224,23 @@ export function VistaAsistente({
             {enCurso.total ? (
               <>
                 <span className="pista" aria-hidden><span style={{ width: `${(((enCurso.paso ?? 1) - 1) / enCurso.total) * 100}%` }} /></span>
-                <span>Pregunta {enCurso.paso} de {enCurso.total}</span>
+                <span className="progreso-paso">{enCurso.paso}/{enCurso.total}</span>
               </>
             ) : <span className="texto-suave">Responde sin decir «Higia»</span>}
           </div>
         )}
-        <div className="chat-historial" aria-live="polite">
+
+        <div className="chat-historial" ref={historial} aria-live="polite">
           {cronologico.length === 0 && !a.pensando && (
             <div className="chat-bienvenida">
-              <p>Prueba decir «Higia» seguido de una de estas frases, o tócala:</p>
+              <p className="chat-bienvenida-titulo">¿En qué te ayudo?</p>
+              <p className="texto-suave">Toca una idea o di «Higia» seguido de la frase.</p>
               <div className="sugerencias">
-                {SUGERENCIAS.map((s) => <button key={s} className="sugerencia" onClick={() => enviar(s)}>{s}</button>)}
+                {SUGERENCIAS.map((s) => (
+                  <button key={s.texto} className="sugerencia" onClick={() => enviar(s.texto)}>
+                    <Icono nombre={s.icono} tamano={16} /> <span>{s.texto}</span>
+                  </button>
+                ))}
               </div>
             </div>
           )}
@@ -189,18 +257,31 @@ export function VistaAsistente({
                     {i.hechos.map((h) => <li key={h}><Icono nombre="check" tamano={14} /> {h}</li>)}
                   </ul>
                 )}
-                {i.id === ultimoId && enCurso?.rapidas?.length ? (
+                {i.id === ultimoId && hayRapidas ? (
                   <div className="respuestas-rapidas" aria-label="Respuestas rápidas">
-                    {enCurso.rapidas.map((r) => <button key={r} onClick={() => enviar(r)} disabled={a.pensando}>{r}</button>)}
+                    {enCurso!.rapidas!.map((r) => <button key={r} onClick={() => enviar(r)} disabled={a.pensando}>{r}</button>)}
                   </div>
                 ) : null}
                 {i.nota && <p className="burbuja-nota">{i.nota}</p>}
               </div>
             </div>
           ))}
-          {a.pensando && <p className="burbuja burbuja-higia pensando">Higia está pensando…</p>}
-          <div ref={fin} />
+          {a.pensando && (
+            <p className="burbuja burbuja-higia pensando" aria-label="Higia está pensando">
+              <span className="puntos-escribiendo" aria-hidden><span /><span /><span /></span>
+            </p>
+          )}
         </div>
+
+        {cronologico.length > 0 && !enCurso && (
+          <div className="sugerencias-fila" aria-label="Ideas">
+            {SUGERENCIAS.slice(0, 6).map((s) => (
+              <button key={s.texto} className="sugerencia" onClick={() => enviar(s.texto)} disabled={a.pensando}>
+                <Icono nombre={s.icono} tamano={14} /> {s.texto}
+              </button>
+            ))}
+          </div>
+        )}
 
         <form className="chat-redactor" onSubmit={(e) => { e.preventDefault(); enviar(texto); }}>
           {a.micDisponible && (
@@ -212,28 +293,22 @@ export function VistaAsistente({
             </button>
           )}
           <input
-            ref={entrada} value={texto} onChange={(e) => setTexto(e.target.value)}
+            ref={entrada} value={texto} onChange={(e) => setTexto(e.target.value)} enterKeyHint="send"
             placeholder={a.dictando ? 'Escuchando…' : enCurso ? 'Escribe tu respuesta' : 'Escríbele a Higia'} aria-label="Mensaje para Higia"
           />
-          <button type="submit" className="boton boton-primario" disabled={a.pensando || !texto.trim()} aria-label="Enviar">
+          <button type="submit" className="boton boton-primario boton-enviar" disabled={a.pensando || !texto.trim()} aria-label="Enviar">
             <Icono nombre="enviar" /> <span className="ocultar-movil">Enviar</span>
           </button>
         </form>
-        <div className="chat-opciones">
-          <Interruptor
-            etiqueta="Escuchar «Higia»"
-            descripcion="Solo se activa cuando la nombras: «Higia, pide ayuda», «Higia, ¿qué hora es?»"
-            activo={a.escuchaActiva} onCambio={a.alternarEscucha}
-          />
-          <div className="opcion-proactiva">
-            <Icono nombre="pregunta" tamano={16} />
-            <label htmlFor="proactivo">Preguntas de Higia</label>
-            <select id="proactivo" value={proactivo} onChange={(e) => onProactivo(Number(e.target.value))}>
-              {OPCIONES_PROACTIVO.map((o) => <option key={o.min} value={o.min}>{o.nombre}</option>)}
-            </select>
-            <button type="button" className="boton" onClick={onPreguntarAhora} disabled={!!enCurso || a.pensando}>Pregúntame algo</button>
-          </div>
-        </div>
+        <p className="chat-pie">
+          <span className={`punto-escucha ${a.escuchaActiva ? 'activa' : ''}`} aria-hidden />
+          {a.escuchaActiva ? 'Escuchando «Higia»' : 'Escucha por voz apagada'}
+          <span aria-hidden>·</span>
+          Preguntas: {nombreProactivo.toLowerCase()}
+          <button type="button" className="boton-enlace" onClick={() => setVerAjustes((v) => !v)} aria-controls="ajustes-higia" aria-expanded={verAjustes}>
+            {verAjustes ? 'Cerrar ajustes' : 'Cambiar'}
+          </button>
+        </p>
       </section>
     </div>
   );

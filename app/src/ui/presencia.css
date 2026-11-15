@@ -113,19 +113,6 @@
 .indicadores li.actividad-hablando { color: var(--higia-habla); border-color: color-mix(in srgb, var(--higia-habla) 50%, transparent); }
 .indicadores li.actividad-pensando { color: var(--higia-piensa); border-color: color-mix(in srgb, var(--higia-piensa) 50%, transparent); }
 
-/* Opciones del chat (escucha, preguntas proactivas) */
-.chat-opciones { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 16px; }
-.chat-opciones .interruptor { border-bottom: 0; }
-.opcion-proactiva { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--texto-2); padding: 8px 0; flex-wrap: wrap; }
-.opcion-proactiva select { min-height: 32px; padding: 4px 8px; }
-
-/* ── Guía de inicio (para quien ve la app por primera vez) ───────────── */
-.guia-inicio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
-.guia-paso { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: var(--radio); background: var(--superficie); border: 1px solid var(--borde); }
-.guia-n { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--acento-suave); color: var(--acento); font-weight: 700; font-size: 12px; flex-shrink: 0; }
-.guia-paso strong { display: block; font-size: 14px; }
-.guia-paso p { font-size: 13px; color: var(--texto-2); }
-.guia-paso kbd { font: inherit; font-size: 12px; padding: 0 5px; border-radius: 4px; border: 1px solid var(--borde-fuerte); background: var(--superficie-2); }
 
 /* ── Pruebas a bordo ─────────────────────────────────────────────────── */
 .pruebas-grilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
@@ -194,9 +181,7 @@
 .pvt-tiempos span { padding: 3px 10px; border-radius: 999px; background: var(--superficie-2); border: 1px solid var(--borde); font-variant-numeric: tabular-nums; font-size: 13px; }
 
 @media (max-width: 760px) {
-  .guia-inicio { grid-template-columns: 1fr; }
   .panel-prueba-cuerpo { grid-template-columns: 1fr; }
-  .chat-opciones { grid-template-columns: 1fr; }
   .pastilla-higia { top: calc(var(--alto-barra) + 8px); }
 }
 @media (max-width: 520px) {
