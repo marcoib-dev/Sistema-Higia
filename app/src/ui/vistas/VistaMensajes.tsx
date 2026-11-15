@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { PERFILES } from '../../adaptadores/simulador/perfiles';
+import type { Historial } from '../../core/historial';
 import { redactar } from '../../core/personalizador';
-import { antecedentesDe, INFO_SENSOR, type Contexto, type DatoClinico, type HistoriaClinica, type Mensaje } from '../../core/tipos';
+import { RIESGO_HRP } from '../../core/riesgosHRP';
+import { antecedentesDe, INFO_SENSOR, type Contexto, type DatoClinico, type HistoriaClinica, type Mensaje, type TipoSensor } from '../../core/tipos';
 import { CANAL, EncabezadoSeccion, Etiqueta, InsigniaNivel, sinTitulo, Vacio } from '../componentes/basicos';
+import { DATOS_CON_TENDENCIA, MiniTendencia } from '../componentes/MiniTendencia';
 import { Icono } from '../iconos';
 
 type Filtro = 'todos' | 'alertas' | 'retenidos' | 'escalados';
@@ -27,11 +30,12 @@ interface Props {
   ahora: number;
   contexto: Contexto;
   historia: HistoriaClinica;
+  historial: Historial;
   onConfirmar: (id: string) => void;
   onAbrirDemo: () => void;
 }
 
-export function VistaMensajes({ mensajes, evaluaciones, pendientes, ahora, contexto, historia, onConfirmar, onAbrirDemo }: Props) {
+export function VistaMensajes({ mensajes, evaluaciones, pendientes, ahora, contexto, historia, historial, onConfirmar, onAbrirDemo }: Props) {
   const [filtro, setFiltro] = useState<Filtro>('todos');
   const visibles = mensajes.filter(FILTROS.find((f) => f.id === filtro)!.aplica);
 
@@ -51,12 +55,12 @@ export function VistaMensajes({ mensajes, evaluaciones, pendientes, ahora, conte
 
       {visibles.length === 0 ? (
         <Vacio icono="mensajes" titulo={mensajes.length ? 'Nada en este filtro' : 'Sin mensajes todavía'}>
-          {!mensajes.length && <>Higia solo habla cuando algo cambia. <button className="boton-enlace" onClick={onAbrirDemo}>Ejecuta un escenario</button> para ver cómo responde.</>}
+          {!mensajes.length && <>Higia solo habla cuando algo cambia. <button className="boton-enlace" onClick={onAbrirDemo}>Ejecuta un escenario en el simulador</button> para ver cómo responde.</>}
         </Vacio>
       ) : (
         <ol className="lista-mensajes">
           {visibles.map((m) => (
-            <TarjetaMensaje key={m.id} mensaje={m} historia={historia} evaluacion={evaluaciones[m.id]} vence={pendientes.get(m.id)} ahora={ahora} contexto={contexto} onConfirmar={onConfirmar} />
+            <TarjetaMensaje key={m.id} mensaje={m} historia={historia} historial={historial} evaluacion={evaluaciones[m.id]} vence={pendientes.get(m.id)} ahora={ahora} contexto={contexto} onConfirmar={onConfirmar} />
           ))}
         </ol>
       )}
@@ -64,8 +68,8 @@ export function VistaMensajes({ mensajes, evaluaciones, pendientes, ahora, conte
   );
 }
 
-function TarjetaMensaje({ mensaje: m, historia, evaluacion, vence, ahora, contexto, onConfirmar }: {
-  mensaje: Mensaje; historia: HistoriaClinica; evaluacion?: EvaluacionMensaje; vence?: number; ahora: number; contexto: Contexto; onConfirmar: (id: string) => void;
+function TarjetaMensaje({ mensaje: m, historia, historial, evaluacion, vence, ahora, contexto, onConfirmar }: {
+  mensaje: Mensaje; historia: HistoriaClinica; historial: Historial; evaluacion?: EvaluacionMensaje; vence?: number; ahora: number; contexto: Contexto; onConfirmar: (id: string) => void;
 }) {
   const canal = CANAL[m.canal];
   const segundos = vence ? Math.max(0, Math.ceil((vence - ahora) / 1000)) : 0;
@@ -91,6 +95,7 @@ function TarjetaMensaje({ mensaje: m, historia, evaluacion, vence, ahora, contex
         {m.diferido && <Etiqueta icono="retenido">Retenido</Etiqueta>}
         {m.hallazgo.sensible && <Etiqueta icono="candado">Privado</Etiqueta>}
         {m.esRecordatorio && <Etiqueta icono="recordatorio">Recordatorio</Etiqueta>}
+        {m.hallazgo.hrp?.slice(0, 2).map((id) => <Etiqueta key={id} icono="escudo" tono="nasa">Riesgo NASA: {RIESGO_HRP[id].nombre}</Etiqueta>)}
       </div>
 
       {vence !== undefined && (
@@ -130,6 +135,8 @@ function TarjetaMensaje({ mensaje: m, historia, evaluacion, vence, ahora, contex
         </div>
       )}
 
+      <Tendencias mensaje={m} historial={historial} />
+
       {!!m.hallazgo.datos?.length && <DatosUsados datos={m.hallazgo.datos} />}
 
       <details className="mensaje-detalles">
@@ -155,6 +162,21 @@ function TarjetaMensaje({ mensaje: m, historia, evaluacion, vence, ahora, contex
       </details>
     </li>
   );
+}
+
+/** Datos de semanas del hallazgo (y los que usa su regla aunque no los cite): su evolución en minigráficos. */
+const TENDENCIA_POR_REGLA: Record<string, TipoSensor[]> = {
+  'radiacion.dosis': ['dosisRadiacion'], 'hueso.perdida': ['minutosResistencia'], 'sueno.deficit': ['horasSueno'],
+  'mental.animoSostenido': ['animo'], 'mental.animo': ['animo'],
+};
+
+function Tendencias({ mensaje: m, historial }: { mensaje: Mensaje; historial: Historial }) {
+  if (m.escalamiento || m.hallazgo.nivel === 'normal') return null;
+  const deDatos = (m.hallazgo.datos ?? []).map((d) => d.sensor).filter((s) => DATOS_CON_TENDENCIA.includes(s));
+  const sensores = [...new Set([...(TENDENCIA_POR_REGLA[m.hallazgo.riesgoId] ?? []), ...deDatos])].slice(0, 2);
+  if (!sensores.length) return null;
+  const base = (s: TipoSensor) => m.hallazgo.datos?.find((d) => d.sensor === s && d.lineaBase !== undefined)?.lineaBase;
+  return <div className="tendencias">{sensores.map((s) => <MiniTendencia key={s} sensor={s} historial={historial} base={base(s)} />)}</div>;
 }
 
 const horaDato = (ts: number) => new Date(ts).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });

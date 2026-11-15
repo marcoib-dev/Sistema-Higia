@@ -1,4 +1,4 @@
-import { diaNormal, L, noches, type Escenario } from './modelo';
+import { DIA, diaNormal, L, noches, serie, type Escenario } from './modelo';
 
 /** Escenarios del sistema: día normal, entrega diferida y autonomía. */
 export const ESCENARIOS_SISTEMA: Escenario[] = [
@@ -51,23 +51,42 @@ export const ESCENARIOS_SISTEMA: Escenario[] = [
     ],
   },
   {
-    id: 'dia-200', nombre: 'Día 200: todo un poco', categoria: 'sistema',
-    descripcion: 'Muchas señales leves a la vez: los peligros se potencian.',
-    hrp: ['sueno', 'aptitud', 'nutricion', 'oseo', 'hipoxia', 'inmune'], peligros: ['gravedad', 'aislamiento', 'entorno'], nivelMaximo: 'info',
-    queObservar: ['Nada es grave por sí solo: la figura se llena de amarillo claro.', 'Higia no habla por cada uno: es información, no alarma.'],
-    contextoInicial: { destino: 'marte', diaMision: 200, hora: 20 },
-    pasos: [{
-      enMs: 0, titulo: 'Un día cualquiera en el día 200', narracion: 'Sueño algo corto, fuerza y peso un poco más bajos, poca agua, oxígeno y temperatura apenas fuera.',
-      lecturas: (t) => [
-        ...noches([6.5, 6.5, 6.5], t), L('fuerza', 82, t), L('pesoCorporal', 60, t), L('hidratacion', 1300, t),
-        L('spo2', 94, t), L('temperatura', 37.6, t), L('minutosResistencia', 40, t),
-      ],
-      sinHallazgosSobre: 'info',
-      esperado: [
-        { riesgoId: 'sueno.deficit', nivel: 'info' }, { riesgoId: 'musculo.aptitud', nivel: 'info' }, { riesgoId: 'nutricion.peso', nivel: 'info' },
-        { riesgoId: 'nutricion.hidratacion', nivel: 'info' }, { riesgoId: 'pulmones.spo2', nivel: 'info' }, { riesgoId: 'inmune.fiebre', nivel: 'info' },
-        { riesgoId: 'hueso.perdida', nivel: 'info' },
-      ],
-    }],
+    id: 'dia-200', nombre: 'Día 200: las señales se suman', categoria: 'sistema',
+    descripcion: 'Dos semanas de mal sueño, el ánimo en baja, radiación y hueso: nada es grave solo, pero juntas desaconsejan la EVA.',
+    hrp: ['sueno', 'conductual', 'radiacion', 'oseo'], peligros: ['aislamiento', 'radiacion', 'gravedad'], nivelMaximo: 'aviso',
+    queObservar: [
+      'Cada señal es leve, pero Higia las conecta: aparece "Varias señales leves se suman".',
+      'En el Resumen, "Aptitud para tareas" marca la EVA como no recomendada.',
+      'Al intentar salir a EVA, Higia avisa: no lo impide, lo advierte.',
+    ],
+    perfil: 'AST-04',
+    contextoInicial: { destino: 'luna', diaMision: 200, hora: 7, ubicacion: 'habitat' },
+    // Historia: 14 noches cortas, el ánimo que viene bajando, 60 % del límite de radiación y resistencia irregular.
+    precarga: (t, p) => {
+      const base = p.lineaBase.animo ?? 7;
+      const animo = [base, base, base, base - 1, base, base, base - 1, base, base - 2, base, base - 2, base - 2, base - 2];
+      return [
+        ...noches([5.5, 5, 5.5, 5, 5.5, 5, 5, 5.5, 5, 5, 5.5, 5, 5, 5.5], t),
+        ...serie('animo', animo, t - DIA),
+        ...serie('dosisRadiacion', Array.from({ length: 14 }, (_, i) => 347 + i), t),
+        ...serie('minutosResistencia', Array.from({ length: 30 }, (_, i) => (i % 2 === 0 ? 40 : 15)), t),
+      ];
+    },
+    pasos: [
+      {
+        enMs: 0, titulo: 'Encuesta de ánimo de la mañana', narracion: 'Otro día con el ánimo bajo: ya son cinco en la última semana. Ahora las señales se suman.',
+        lecturas: (t, _h, p) => [L('animo', (p.lineaBase.animo ?? 7) - 2, t)],
+        esperado: [
+          { riesgoId: 'sueno.deficit', nivel: 'aviso' }, { riesgoId: 'mental.animoSostenido', nivel: 'aviso' },
+          { riesgoId: 'radiacion.dosis', nivel: 'info' }, { riesgoId: 'hueso.perdida', nivel: 'info' },
+          { riesgoId: 'sistema.senalesCombinadas', nivel: 'aviso' },
+        ],
+      },
+      {
+        enMs: 9_000, titulo: 'Se prepara para salir a EVA', narracion: 'Sale de la esclusa a pesar del aviso: Higia le recuerda que hoy no es recomendable.',
+        contexto: { ubicacion: 'eva', actividad: 'trabajo' },
+        esperado: [{ riesgoId: 'tarea.eva', nivel: 'aviso' }],
+      },
+    ],
   },
 ];

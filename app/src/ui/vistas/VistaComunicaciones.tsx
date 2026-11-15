@@ -36,7 +36,7 @@ export function VistaComunicaciones({ comunicaciones, destinos, onPedirAyuda }: 
 
       {comunicaciones.length === 0 ? (
         <Vacio icono="escalado" titulo="Sin comunicaciones todavía">
-          Prueba «Higia, dile a mi compañero que voy para allá» o ejecuta el escenario «Crisis sin respuesta» en la demo.
+          Prueba «Higia, dile a mi compañero que voy para allá» o ejecuta el escenario «Crisis sin respuesta» en el simulador.
         </Vacio>
       ) : (
         <ol className="lista-comunicaciones">

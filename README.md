@@ -540,23 +540,19 @@ El plan completo está en [`PLAN_RIESGOS_Y_SIMULADOR.md`](PLAN_RIESGOS_Y_SIMULAD
 | 7. Conversación e IA (síntomas como lecturas, números en palabras, contrato derivado del catálogo) | Hecha | `Fase 7: …` |
 | 8. Motor del simulador (modelo de escenario, reproductor, registro, tripulación, `useSimulador`) | Hecha | `Fase 8: …` |
 | 9. Escenarios nuevos (25, total 40) y `cobertura.test.ts` | Hecha | `Fase 9: …` |
-| **10. Interfaz del simulador (Parte F)** | **Pendiente** | — |
+| 10. Interfaz del simulador (Parte F, con la capa visual F5) | Hecha | `Fase 10: …` |
 | **11. Cierre** | **Pendiente** | — |
 
 ### Qué falta (para quien sigue)
 
-**Fase 10: interfaz del simulador** (Parte F del plan). El motor ya está listo y conectado; falta la UI:
+**Fase 10 (hecha): qué quedó.** `PanelDemo.tsx` se reemplazó por `ui/simulador/PanelSimulador.tsx` (seis pestañas: Escenarios, Datos, Contexto, Tripulación, Cobertura y Registro; compacto o amplio) y `BarraReproduccion.tsx` (fija abajo mientras hay un escenario). La capa visual para el video (F5):
 
-- Hoy `PanelDemo.tsx` sigue siendo la interfaz: lista los 40 escenarios y al tocar uno llama a `sim.ejecutarEscenario(e)`, que ya corre la línea de tiempo real (reinicia el núcleo, aplica perfil sugerido, contexto inicial y precarga). **No hay todavía barra de reproducción**: los pasos avanzan solos pero no se ve la narración.
-- Todo lo necesario está en el objeto `sim` que devuelve `useSimulador` (`app/src/ui/simulador/useSimulador.ts`), creado en `App.tsx`:
-  - `sim.reproductor`: `estado`, `escenario`, `indicePaso`, `paso`, `siguientePaso`, `msHastaSiguiente`, `esperando` (paso "no respondas"), `velocidad`, `cola`.
-  - `sim.control('pausar' | 'continuar' | 'siguiente' | 'reiniciar' | 'detener')`, `sim.cambiarVelocidad(1 | 2 | 4)`, `sim.ejecutarEscenario(e, { pausado: true })` (modo paso a paso), `sim.reproducirGuion()`.
-  - `sim.conducta` / `sim.cambiarConducta(...)` (pestaña Tripulación), `sim.iaEnSimulador` / `sim.setIaEnSimulador` (interruptor de IA), `sim.reproducidos` (marca "ya reproducido"), `sim.reiniciarSimulacion(perfilId?)` ("Limpiar todo").
-  - El registro de eventos es `registro` en `App.tsx` (`RegistroSimulacion`: `lista()`, `comoTexto()`, `limpiar()`).
-- Datos para las pestañas: `ESCENARIOS`, `GUION_DEMO`, `NOMBRE_CATEGORIA_ESCENARIO`, `duracionMs` y `diaNormal` (botón "Día normal") en `adaptadores/simulador/escenarios`; `INFO_SENSOR`, `CATEGORIAS_SENSOR`, `NOMBRE_CATEGORIA_SENSOR` (pestaña Datos, controles generados del catálogo); `RIESGOS_HRP`, `NOMBRE_PELIGRO` (filtros y pestaña Cobertura); `nucleo.estadoRiesgosHRP()` y `nucleo.aptitudTareas()` (semáforo de tareas y cobertura en vivo); `NOMBRE_TAREA`.
-- Contexto: faltan en la UI `diaMision` y `transicionGravedad` (pestaña Contexto y `VistaEntorno`), y el bloque "Iniciar EVA / Terminar EVA" (emitir `prerrespiracion` y luego `duracionEva`).
-- Cambios menores en la app del astronauta (F3): tarjeta "Aptitud para tareas" en `VistaResumen`, etiqueta del riesgo NASA (`hallazgo.hrp` → `RIESGO_HRP[id].nombre`) en `VistaMensajes`, renombrar "demo" → "simulador".
-- Atajos (F4): `Espacio`, `N`, `R` con el foco en el panel o la barra (respetando `escribiendo(e)`).
+- **Cobertura** (`CoberturaHRP.tsx`, datos en `cobertura.ts`): cuadrícula de los 18 riesgos en las cinco columnas de peligros, contador animado "18 / 18", mosaicos que laten al cambiar de estado y se resaltan si el escenario en curso los toca, vista de tabla y **pantalla completa** para proyectar.
+- **Señales que se suman**: nuevo hallazgo derivado en el núcleo (`sistema.senalesCombinadas`, `senalesQueSeSuman()` en `core/nucleo.ts`): cuatro o más señales leves en tres o más sistemas generan un aviso que desaconseja la EVA. Tarjeta propia en el Resumen, junto a "Día N de misión" y "Aptitud para tareas".
+- **Escenario `dia-200`** rehecho (Irene Novak, Luna): 14 noches cortas, ánimo bajo dos semanas, 60 % del límite de radiación y pérdida ósea; termina con la EVA desaconsejada y el aviso al salir.
+- **Minigráficos de tendencia** (`componentes/MiniTendencia.tsx`) en el detalle de los mensajes de reglas de largo plazo; la radiación, como barra de dosis acumulada con proyección.
+- **Movimiento**: color de la figura con transición, alerta que late dos veces, franja de alerta con barra de plazo, aviso de comunicación con etapas (enviando → entregado → respondió) y hora.
+- **Modo grabación (tecla `G`)**: oculta el panel, la barra, el botón Simulador y el cursor quieto.
 
 **Fase 11: cierre.** Revisar este README con la interfaz nueva (sección "Panel de demo" y "Guion para la demo"), y probar a mano con la app corriendo el guion completo. Prueba manual pendiente señalada por el plan: reproducir un escenario con escalada pendiente (p. ej. `crisis`), reiniciarlo y confirmar que no llega una escalada ni una respuesta fantasma (la app usa un contador de generación para descartar temporizadores del núcleo anterior).
 

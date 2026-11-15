@@ -36,6 +36,23 @@ export type AptitudTareas = Record<TareaCritica, { apto: boolean; motivos: Halla
 /** Hallazgos que no produce una regla: no se reevalúan, caducan por tiempo. */
 const esSuelto = (id: string) => id.startsWith('conversacion.') || id.startsWith('asistente.') || id.startsWith('tarea.');
 
+/** Hallazgo derivado: varias señales leves que, juntas, restan margen (los peligros se potencian, Anexo A). */
+export const ID_SENALES_COMBINADAS = 'sistema.senalesCombinadas';
+/** Cuántas señales leves y en cuántos sistemas distintos hacen falta para que se sumen. */
+export const UMBRAL_SENALES = { senales: 4, sistemas: 3 };
+
+/**
+ * Señales leves (info o aviso) que vienen de reglas, sin contar las sueltas ni la propia combinación.
+ * Devuelve las que se suman solo si alcanzan el umbral; si no, una lista vacía. Lo usa también la interfaz.
+ */
+export function senalesQueSeSuman(hallazgos: Iterable<Hallazgo>): Hallazgo[] {
+  const leves = [...hallazgos].filter((h) =>
+    !esSuelto(h.riesgoId) && h.riesgoId !== ID_SENALES_COMBINADAS && (h.nivel === 'info' || h.nivel === 'aviso'));
+  const sistemas = new Set(leves.map((h) => h.sistema));
+  if (leves.length < UMBRAL_SENALES.senales || sistemas.size < UMBRAL_SENALES.sistemas) return [];
+  return leves.sort((a, b) => ORDEN_NIVEL[b.nivel] - ORDEN_NIVEL[a.nivel]);
+}
+
 export class NucleoSalud {
   readonly historial = new Historial();
   private hallazgos = new Map<string, Hallazgo>();
@@ -76,6 +93,8 @@ export class NucleoSalud {
       this.hallazgos.set(h.riesgoId, h);
       this.emitido.set(h.riesgoId, { nivel: h.nivel, en: ahora });
     }
+    const combinada = this.combinarSenales(ahora);
+    if (combinada) this.emitido.set(combinada.riesgoId, { nivel: combinada.nivel, en: ahora });
   }
 
   /** Reevaluación periódica, para los recordatorios. */
@@ -296,7 +315,40 @@ export class NucleoSalud {
       const m = this.procesarHallazgo(h, ahora);
       if (m) salida.push(m);
     }
+    const combinada = this.combinarSenales(ahora);
+    if (combinada) {
+      const m = this.procesarHallazgo(combinada, ahora);
+      if (m) salida.push(m);
+    }
     return salida.sort((a, b) => ORDEN_NIVEL[b.hallazgo.nivel] - ORDEN_NIVEL[a.hallazgo.nivel]);
+  }
+
+  /**
+   * Muchas señales leves en sistemas distintos restan margen aunque ninguna sea grave: el cansancio,
+   * el ánimo bajo, la radiación y el hueso se potencian. Higia lo resume en un aviso que desaconseja
+   * la EVA. Si ya no se cumple, se borra. Devuelve el hallazgo vigente (o nada).
+   */
+  private combinarSenales(ahora: number): Hallazgo | undefined {
+    const senales = senalesQueSeSuman(this.hallazgos.values());
+    if (!senales.length) {
+      if (this.hallazgos.has(ID_SENALES_COMBINADAS)) this.olvidar(ID_SENALES_COMBINADAS);
+      return undefined;
+    }
+    const sistemas = new Set(senales.map((h) => h.sistema));
+    const h: Hallazgo = {
+      riesgoId: ID_SENALES_COMBINADAS, sistema: 'cuerpo', nivel: 'aviso',
+      titulo: 'Varias señales leves se suman',
+      resumenSimple: 'Ninguna señal es grave por sí sola, pero juntas indican que hoy tu cuerpo tiene menos margen.',
+      textoCalmado: 'Hoy conviene ir con calma: varias cosas pequeñas se juntan.',
+      detalleTecnico: `${senales.length} señales leves en ${sistemas.size} sistemas: ${senales.map((x) => `${x.titulo} (${x.nivel})`).join('; ')}`,
+      accion: 'Hoy no se recomienda salir a EVA. Prioriza el descanso y la hidratación, y repasa tu estado con el equipo.',
+      ruta: 'autogestion', sensible: senales.some((x) => x.sensible),
+      fuente: 'Anexo A: los peligros del vuelo espacial actúan juntos y se potencian · agrega los hallazgos activos',
+      // Sin `hrp` propio: cada riesgo de la NASA conserva el nivel de su propia señal en la matriz de cobertura.
+      timestamp: ahora, bloquea: ['eva'],
+    };
+    this.hallazgos.set(h.riesgoId, h);
+    return h;
   }
 
   /** Borra un hallazgo y todo lo que dependía de él (emitido, confirmaciones y mensajes retenidos). */

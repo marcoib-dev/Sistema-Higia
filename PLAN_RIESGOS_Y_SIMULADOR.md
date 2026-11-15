@@ -591,6 +591,54 @@ En la interfaz se llama **"Simulador"** (el botón de la barra superior y los te
 - Nada depende solo del color: las insignias de nivel llevan texto.
 - Cargar el skill `impeccable` (o `design-taste-frontend`) antes de escribir la interfaz, para mantener el nivel visual de la app actual.
 
+### F5. Capa visual para la presentación y el video
+
+La Fase 10 no solo tiene que funcionar: de ella salen las capturas del video de la presentación local (`D:\Proyectos de python\videos hyperframes\resultados\Higia\GUION-V3.md`, secciones 4 y 5). Lo de esta sección tiene **prioridad sobre las pestañas Datos y Registro** si falta tiempo.
+
+**1. Cobertura como pantalla de impacto** (escena 7 del video)
+- Además de la tabla de F2, una **vista en cuadrícula**, que es la que se abre por defecto: 18 mosaicos agrupados en 5 columnas, una por cada peligro de la NASA, con el nombre del peligro arriba. Cada mosaico lleva ícono, nombre corto del riesgo y su estado en vivo (`estadoRiesgosHRP()`) con color **y** texto.
+- Encabezado con un contador grande, **"18 / 18 riesgos con detección"**, que cuenta de 0 a 18 al abrir la pestaña (unos 1,2 s, escalonando los mosaicos al encenderse).
+- **Mientras corre un escenario**, los mosaicos de los riesgos que tocan sus hallazgos laten una vez y quedan resaltados. Así se ve qué riesgos demuestra cada escenario.
+- La tabla de F2 queda como vista secundaria, con un interruptor "Cuadrícula / Tabla". Al tocar un mosaico se abre su detalle (reglas, escenarios y botón para reproducirlos).
+- Botón **"Pantalla completa"**: la cuadrícula ocupa toda la ventana, sin la app detrás, para proyectar o grabar.
+
+**2. Día 200 legible de un vistazo** (escena 8 del video)
+- Ajustar el escenario `dia-200` para que cuente una historia clara y coincida con el video:
+  - día de misión 200;
+  - 14 noches de sueño corto;
+  - ánimo bajo sostenido durante 2 semanas;
+  - radiación acumulada cerca del 60 % del límite;
+  - pérdida ósea estimada.
+  
+  El resultado tiene que ser **la EVA bloqueada** en "Aptitud para tareas". Actualizar su `esperado` y su descripción.
+- En `VistaResumen`, cuando hay dos o más hallazgos leves de sistemas distintos, mostrar una tarjeta **"Señales que se suman"**. Lista cada señal en una línea, con su sistema y su riesgo NASA, y debajo la conclusión, por ejemplo "Hoy no se recomienda salir a EVA". Es la pantalla que explica el diferenciador: muchas señales leves que, juntas, significan algo.
+- Indicador **"Día N de misión"** visible en el Resumen (no solo en Entorno), junto con la transición de gravedad si está activa.
+- **Minigráficos de tendencia.** En el detalle de un hallazgo que viene de una regla de tendencia (sueño, ánimo, hueso, radiación, nutrición), una línea simple de los últimos 14–30 valores, con la línea base marcada. Es una excepción acotada a "fuera de alcance: gráficos históricos": solo va en el detalle del hallazgo, sin una sección nueva. Para la radiación, una barra de dosis acumulada respecto del límite, con la proyección punteada.
+
+**3. Movimiento con propósito** (escenas 6 y 8)
+- Figura anatómica: cuando una zona cambia de estado, el color cambia con una transición corta (unos 300 ms) y la zona de una alerta nueva late dos veces. Nada de animaciones en bucle.
+- Tarjetas nuevas en Resumen y Mensajes: entrada con un desplazamiento corto y fundido.
+- Aviso de comunicación de la escalada: el estado avanza de forma visible (enviando → entregado → respondió), con la hora de cada paso. Es el momento más dramático de la escena 6.
+- Franja de alerta: la cuenta regresiva como una barra que se vacía, además del número.
+- Todo respeta `prefers-reduced-motion`: con esa preferencia, los cambios son instantáneos.
+
+**4. Modo grabación**
+- Atajo `G` (o un botón en el simulador) que oculta el panel, la barra de reproducción, el botón Simulador y el cursor cuando no se mueve. Los escenarios siguen corriendo. El objetivo son capturas limpias, en las que solo se vea la app del astronauta.
+- En modo grabación, un indicador mínimo y discreto en una esquina (por ejemplo, un punto que desaparece a los 2 s), para saber que está activo.
+- Revisar que todas las pantallas que van al video se vean bien en **1920 × 1080** sin desplazamiento: Resumen, Asistente, Mensajes, la franja de alerta, el aviso de comunicación y Cobertura.
+
+**5. Lista de capturas que tiene que permitir** (de `GUION-V3.md`, sección 5)
+
+| Captura | Qué tiene que verse bien |
+|---|---|
+| `resumen.mp4` | Figura en verde y signos en vivo con "Día normal" |
+| `asistente.mp4` | "Higia, ¿cómo estoy?" y la respuesta de la IA |
+| `ejercicio.mp4` | 125 lpm sin alarma, con el contexto "entrenando" visible |
+| `eva.mp4` | Mensaje breve por auricular durante la EVA |
+| `crisis.mp4` | Franja roja → cuenta regresiva → aviso al compañero con su respuesta en vivo |
+| `cobertura.mp4` | Cuadrícula de los 18 riesgos con el contador animado |
+| `dia-200.mp4` | "Señales que se suman" y la EVA bloqueada en "Aptitud para tareas" |
+
 ---
 
 ## 10. Parte G: catálogo de escenarios
@@ -659,7 +707,7 @@ Cada fase deja el proyecto compilando y con tests en verde. Un commit por fase.
 | **7. Conversación e IA** | Parte D | 2 a 6 |
 | **8. Motor del simulador** | Parte E + migración de los 15 escenarios + `escenarios.test.ts` | 1 |
 | **9. Escenarios nuevos** | Parte G, con `esperado`; `cobertura.test.ts` | 3 a 8 |
-| **10. Interfaz del simulador** | Parte F | 8 |
+| **10. Interfaz del simulador** | Parte F, incluida **F5 (capa visual para el video)**. Orden sugerido dentro de la fase: estructura y barra (F1) → Escenarios → **Cobertura en cuadrícula** → **Día 200 y "Señales que se suman"** → F3 → movimiento y modo grabación → Contexto y Tripulación → Datos → Registro | 8 |
 | **11. Cierre** | Actualizar `README.md` (tabla de reglas, escenarios, panel, cantidad de tests, "Cómo extenderlo"), quitar el TODO de `musculoesqueletico.ts`, revisar con la app corriendo el guion completo | todo |
 
 Las fases 8 y 10 se pueden adelantar si se prioriza la demo: no dependen de las reglas nuevas.

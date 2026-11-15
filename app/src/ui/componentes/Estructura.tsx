@@ -59,8 +59,8 @@ export function BarraSuperior({ contexto: c, nombreAstronauta, iaActiva, iaConfi
 
       <div className="barra-acciones">
         <ControlVoz vozActiva={vozActiva} onVozActiva={onVozActiva} />
-        <button className={`boton ${demoAbierta ? 'boton-activo' : ''}`} onClick={onDemo} aria-expanded={demoAbierta} aria-controls="panel-demo" title="Controles de la demo (D)">
-          <Icono nombre="demo" /> <span className="ocultar-movil">Demo</span>
+        <button className={`boton boton-simulador ${demoAbierta ? 'boton-activo' : ''}`} onClick={onDemo} aria-expanded={demoAbierta} aria-controls="panel-simulador" title="Simulador (D)">
+          <Icono nombre="demo" /> <span className="ocultar-movil">Simulador</span>
         </button>
       </div>
     </header>
@@ -107,7 +107,7 @@ interface PropsBanner {
 export function BannerAlerta({ pendientes, ahora, onConfirmar, onVer }: PropsBanner) {
   const ref = useRef<HTMLDivElement>(null);
   const visible = pendientes.length > 0;
-  // Publica su alto (--alto-banner) para que el panel de demo y la navegación se acomoden debajo y nunca lo tapen.
+  // Publica su alto (--alto-banner) para que el panel del simulador y la navegación se acomoden debajo y nunca lo tapen.
   useEffect(() => {
     const raiz = document.documentElement;
     if (!visible || !ref.current) { raiz.style.setProperty('--alto-banner', '0px'); return; }
@@ -118,6 +118,8 @@ export function BannerAlerta({ pendientes, ahora, onConfirmar, onVer }: PropsBan
   if (!visible) return null;
   const [primera, ...resto] = [...pendientes].sort((a, b) => a.vence - b.vence);
   const segundos = Math.max(0, Math.ceil((primera.vence - ahora) / 1000));
+  const plazo = Math.max(1, primera.vence - primera.mensaje.timestamp);
+  const resta = Math.max(0, Math.min(1, (primera.vence - ahora) / plazo));
   return (
     <div ref={ref} className="banner-alerta" role="alert">
       <Icono nombre="alerta" tamano={22} />
@@ -132,15 +134,24 @@ export function BannerAlerta({ pendientes, ahora, onConfirmar, onVer }: PropsBan
         <Icono nombre="check" /> Estoy bien
       </button>
       <button className="boton boton-fantasma" onClick={onVer}>Ver detalle</button>
+      <span className="banner-plazo" aria-hidden><span style={{ transform: `scaleX(${resta})` }} /></span>
     </div>
   );
 }
 
-const ESTADO_COMUNICACION: Record<Comunicacion['estado'], string> = { enviado: 'Enviado', enCola: 'En cola', respondido: 'Respondió' };
+const hora = (t: number) => new Date(t).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+/** Lo que tarda en verse "entregado" tras enviar: el estado avanza a la vista. */
+const MS_ENVIANDO = 1200;
+type Etapa = 'enCola' | 'enviando' | 'entregado' | 'respondio';
+const etapaDe = (x: Comunicacion, ahora: number): Etapa =>
+  x.estado === 'enCola' ? 'enCola' : x.respuesta ? 'respondio' : ahora - x.timestamp < MS_ENVIANDO ? 'enviando' : 'entregado';
+const ETAPAS: Exclude<Etapa, 'enCola'>[] = ['enviando', 'entregado', 'respondio'];
+const NOMBRE_ETAPA: Record<Etapa, string> = { enCola: 'En cola: sale al reconectar', enviando: 'Enviando…', entregado: 'Entregado', respondio: 'Respondió' };
 
 interface PropsComunicacion {
   mensaje: Mensaje;
   comunicaciones: Comunicacion[];
+  ahora: number;
   onVer: () => void;
   onCerrar: () => void;
 }
@@ -149,7 +160,7 @@ interface PropsComunicacion {
  * Aviso global de comunicación con otros: aparece cuando Higia avisó a alguien (alerta sin respuesta
  * o pedido de ayuda) y muestra, en vivo, a quién y si ya respondió.
  */
-export function BannerComunicacion({ mensaje, comunicaciones, onVer, onCerrar }: PropsComunicacion) {
+export function BannerComunicacion({ mensaje, comunicaciones, ahora, onVer, onCerrar }: PropsComunicacion) {
   const porEscalada = mensaje.escalamiento?.origen !== 'asistente';
   return (
     <div className="banner-comunicacion" role="status" aria-live="polite">
@@ -157,12 +168,24 @@ export function BannerComunicacion({ mensaje, comunicaciones, onVer, onCerrar }:
       <div className="banner-texto">
         <strong>{porEscalada ? `Sin respuesta a «${mensaje.hallazgo.titulo}»: Higia avisó a otros` : 'Pedido de ayuda enviado'}</strong>
         <ul className="banner-destinos">
-          {comunicaciones.map((x) => (
-            <li key={x.id} className={`com-${x.estado}`}>
-              <span className="com-destino">{x.destinatario}</span>
-              <span className="com-estado">{x.respuesta ? x.respuesta.texto : ESTADO_COMUNICACION[x.estado]}{x.retardo && x.estado === 'enviado' ? ` · retardo ${x.retardo}` : ''}</span>
-            </li>
-          ))}
+          {comunicaciones.map((x) => {
+            const etapa = etapaDe(x, ahora);
+            const i = ETAPAS.indexOf(etapa as Exclude<Etapa, 'enCola'>);
+            return (
+              <li key={x.id} className={`com-${x.estado} etapa-${etapa}`}>
+                <span className="com-destino">{x.destinatario}</span>
+                {etapa !== 'enCola' && (
+                  <ol className="com-etapas" aria-hidden>
+                    {ETAPAS.map((e, j) => <li key={e} className={j < i ? 'hecha' : j === i ? 'actual' : ''} />)}
+                  </ol>
+                )}
+                <span className="com-estado">
+                  {x.respuesta ? x.respuesta.texto : NOMBRE_ETAPA[etapa]}
+                  <span className="com-hora"> · {hora(x.respuesta?.timestamp ?? x.timestamp)}{x.retardo && x.estado === 'enviado' ? ` · retardo ${x.retardo}` : ''}</span>
+                </span>
+              </li>
+            );
+          })}
         </ul>
       </div>
       <button className="boton boton-fantasma" onClick={onVer}>Ver comunicaciones</button>

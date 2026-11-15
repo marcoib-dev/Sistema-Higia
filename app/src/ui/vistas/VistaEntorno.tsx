@@ -47,13 +47,14 @@ export function VistaEntorno({ contexto: c, iaActiva, onAnalizar, onAplicar, onA
       <EncabezadoSeccion
         titulo="Entorno"
         descripcion="El contexto cambia cómo Higia interpreta los datos y por dónde comunica."
-        acciones={<button className="boton" onClick={onAbrirDemo}><Icono nombre="demo" /> Cambiar en la demo</button>}
+        acciones={<button className="boton" onClick={onAbrirDemo}><Icono nombre="demo" /> Cambiar en el simulador</button>}
       />
       <div className="datos-entorno">
         <Dato icono="ubicacion" titulo="Ubicación" valor={UBICACION[c.ubicacion]} detalle={`Destino: ${NOMBRE_DESTINO[c.destino]}`} />
         <Dato icono="actividad" titulo="Actividad" valor={ACTIVIDAD[c.actividad]} detalle={c.actividad === 'ejercicio' ? 'Se tolera un pulso más alto' : undefined} />
         <Dato icono="sol" titulo="Clima espacial" valor={c.climaEspacial === 'tormentaSolar' ? 'Tormenta solar' : 'En calma'} alerta={c.climaEspacial === 'tormentaSolar'} />
         <Dato icono="reloj" titulo="Hora del hábitat" valor={`${String(c.hora).padStart(2, '0')}:00`} />
+        <Dato icono="reloj" titulo="Día de misión" valor={`Día ${c.diaMision}`} detalle={c.transicionGravedad ? 'Transición de gravedad en las últimas 72 h' : undefined} alerta={c.transicionGravedad} />
         <Dato icono="personas" titulo="A quién se puede avisar" valor={enlaces.length ? enlaces.join(', ') : 'Nadie al alcance'} detalle={c.conexionTierra ? `Retardo con Tierra: ${RETARDO_TIERRA[c.destino]}` : undefined} alerta={!enlaces.length} />
         <Dato icono="auricular" titulo="Canales de salida" valor={salidas.length ? salidas.join(', ') : 'Ninguno'} alerta={!salidas.length} />
       </div>

@@ -43,12 +43,24 @@ const P: Record<string, ReactElement> = {
   actividad: <path d="M3 12h4l3-7 4 14 3-7h4" />,
   personas: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6" /></>,
   documento: <><path d="M6 3h8l4 4v14H6z" /><path d="M14 3v4h4M9 12h6M9 16h6" /></>,
+  siguiente: <><path d="M6 5v14l9-7z" /><path d="M18 5v14" /></>,
+  reiniciar: <><path d="M4 12a8 8 0 1 0 2.3-5.7" /><path d="M4 4v5h5" /></>,
+  expandir: <path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" />,
+  contraer: <path d="M20 10h-6V4M4 14h6v6M14 10l7-7M10 14l-7 7" />,
+  buscar: <><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4.5 4.5" /></>,
+  copiar: <><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" /></>,
+  grabar: <><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="3.5" /></>,
+  cuadricula: <><rect x="4" y="4" width="6.5" height="6.5" rx="1.5" /><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" /><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" /><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" /></>,
+  tabla: <path d="M4 5h16v14H4zM4 10h16M4 15h16M10 5v14" />,
+  escudo: <><path d="M12 3 5 6v5c0 4.5 3 8.5 7 10 4-1.5 7-5.5 7-10V6z" /><path d="m9 12 2 2 4-4" /></>,
+  traje: <><circle cx="12" cy="7" r="4" /><path d="M10.5 7h3" /><path d="M6 21v-4a6 6 0 0 1 12 0v4" /><path d="M9 21v-3h6v3" /></>,
+  externo: <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />,
 };
 
 export type NombreIcono = keyof typeof P;
 
 export function Icono({ nombre, tamano = 18, titulo }: { nombre: NombreIcono; tamano?: number; titulo?: string }) {
-  const relleno = nombre === 'reproducir';
+  const relleno = nombre === 'reproducir' || nombre === 'siguiente';
   return (
     <svg
       width={tamano} height={tamano} viewBox="0 0 24 24" fill={relleno ? 'currentColor' : 'none'}

@@ -3,7 +3,7 @@ import { analizarEntornoIA, consultarEstadoIA, conversarIA, estadoParaIA, evalua
 import type { EstadoIA, EstadoParaIA, RespuestaConversacion, TurnoConversacion } from '../adaptadores/ia/contrato';
 import { AdaptadorEjemplo } from '../adaptadores/interop/ejemploNasa';
 import { nuevoNucleo } from '../adaptadores/simulador/ejecutor';
-import { buscarEscenario, CONTEXTO_BASE, ESCENARIOS } from '../adaptadores/simulador/escenarios';
+import { buscarEscenario, CONTEXTO_BASE, diaNormal, ESCENARIOS } from '../adaptadores/simulador/escenarios';
 import { PERFILES } from '../adaptadores/simulador/perfiles';
 import { RegistroSimulacion } from '../adaptadores/simulador/registro';
 import { respuestaSimulada } from '../adaptadores/simulador/tripulacion';
@@ -16,8 +16,10 @@ import { enRango, esSensor, NOMBRE_SISTEMA, type Comunicacion, type Contexto, ty
 import { useAsistente, type ResultadoConversacion } from './asistente';
 import { AccesoHigia } from './componentes/AccesoHigia';
 import { BannerAlerta, BannerComunicacion, BarraSuperior, Navegacion } from './componentes/Estructura';
-import { PanelDemo } from './componentes/PanelDemo';
 import { SECCIONES, useSeccion } from './navegacion';
+import { BarraReproduccion } from './simulador/BarraReproduccion';
+import { CoberturaPantallaCompleta } from './simulador/CoberturaHRP';
+import { PanelSimulador } from './simulador/PanelSimulador';
 import { useSimulador } from './simulador/useSimulador';
 import { VistaAsistente } from './vistas/VistaAsistente';
 import { VistaComunicaciones } from './vistas/VistaComunicaciones';
@@ -35,6 +37,9 @@ const PREAVISO_ESCALADA_MS = 10_000;
 const CLAVE_DEMO = 'higia.panelDemo';
 const leerDemo = () => { try { return localStorage.getItem(CLAVE_DEMO) === 'abierto'; } catch { return false; } };
 const guardarDemo = (v: boolean) => { try { localStorage.setItem(CLAVE_DEMO, v ? 'abierto' : 'cerrado'); } catch { /* sin almacenamiento */ } };
+const CLAVE_AMPLIO = 'higia.simulador.amplio';
+const leerAmplio = () => { try { return localStorage.getItem(CLAVE_AMPLIO) === 'si'; } catch { return false; } };
+const guardarAmplio = (v: boolean) => { try { localStorage.setItem(CLAVE_AMPLIO, v ? 'si' : 'no'); } catch { /* sin almacenamiento */ } };
 
 // La historia clínica editada se guarda en este dispositivo, por astronauta.
 const claveHistoria = (id: string) => `higia.historia.${id}`;
@@ -73,6 +78,15 @@ export function App() {
   const [seleccion, setSeleccion] = useState<SistemaCorporal[] | null>(null);
   const [vozActiva, setVozActiva] = useState(true);
   const [demoAbierta, setDemoAbierta] = useState(leerDemo);
+  const [simAmplio, setSimAmplio] = useState(leerAmplio);
+  /** Inicio de la EVA en curso iniciada desde el simulador (emite la duración cada minuto). */
+  const [evaDesde, setEvaDesde] = useState<number | null>(null);
+  const evaRef = useRef<number | null>(null);
+  evaRef.current = evaDesde;
+  const [coberturaCompleta, setCoberturaCompleta] = useState(false);
+  /** Modo grabación: solo la app del astronauta, sin controles del simulador ni cursor quieto. */
+  const [grabando, setGrabando] = useState(false);
+  const [cursorQuieto, setCursorQuieto] = useState(false);
   const [ia, setIa] = useState<EstadoIA>({ configurada: false, modelo: '' });
   const [evaluaciones, setEvaluaciones] = useState<Record<string, EvaluacionMensaje>>({});
   /** Comunicación de emergencia a destacar en el aviso global (hasta que se cierre). */
@@ -110,7 +124,7 @@ export function App() {
     });
   }, []);
 
-  // Atajos: D abre/cierra la demo; Esc cierra la demo o detiene la voz.
+  // Atajos: D abre/cierra el simulador; G, modo grabación; Esc cierra el simulador o detiene la voz.
   useEffect(() => {
     const alTeclear = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -118,11 +132,22 @@ export function App() {
         else detener();
       } else if (e.key.toLowerCase() === 'd' && !e.metaKey && !e.ctrlKey && !e.altKey && !escribiendo(e)) {
         alternarDemo();
+      } else if (e.key.toLowerCase() === 'g' && !e.metaKey && !e.ctrlKey && !e.altKey && !escribiendo(e)) {
+        setGrabando((g) => !g);
       }
     };
     window.addEventListener('keydown', alTeclear);
     return () => window.removeEventListener('keydown', alTeclear);
   }, [demoAbierta, alternarDemo]);
+
+  // En modo grabación el cursor se oculta a los 2 s sin moverse.
+  useEffect(() => {
+    if (!grabando) { setCursorQuieto(false); return; }
+    let id = setTimeout(() => setCursorQuieto(true), 2000);
+    const mover = () => { setCursorQuieto(false); clearTimeout(id); id = setTimeout(() => setCursorQuieto(true), 2000); };
+    window.addEventListener('pointermove', mover);
+    return () => { clearTimeout(id); window.removeEventListener('pointermove', mover); };
+  }, [grabando]);
 
   /**
    * Evaluación de la IA para cada hallazgo nuevo. El mensaje local ya salió (la seguridad no espera a la red);
@@ -217,7 +242,11 @@ export function App() {
         }
       }
       const nuevos = nucleo.verificarConfirmaciones(t);
-      if (++segundos % 60 === 0) nuevos.push(...nucleo.tick(t));
+      if (++segundos % 60 === 0) {
+        // EVA en curso: el traje informa cuánto lleva fuera.
+        if (evaRef.current) nuevos.push(...nucleo.registrar({ sensor: 'duracionEva', valor: Math.floor((t - evaRef.current) / 60_000), timestamp: t, fuente: 'simulador' }, t));
+        nuevos.push(...nucleo.tick(t));
+      }
       if (nuevos.length) void procesar(nuevos);
     }, 1000);
     return () => clearInterval(id);
@@ -240,6 +269,7 @@ export function App() {
     setEvaluaciones({});
     setAvisoComunicacion(null);
     setSeleccion(null);
+    setEvaDesde(null);
     turnos.current = [];
     preavisados.current.clear();
     chequeo.current = null;
@@ -446,6 +476,30 @@ export function App() {
   });
   simRef.current = sim;
 
+  // ── Acciones del simulador ──
+  const inyectar = (ls: Lectura[]) => {
+    registro.agregar({ tipo: 'lecturas', texto: `Manual: ${ls.map((l) => `${l.sensor} ${l.valor}`).join(', ')}` });
+    void procesar(nucleo.registrar(ls));
+  };
+  const cargarDiaNormal = () => {
+    registro.agregar({ tipo: 'lecturas', texto: 'Día normal: todos los datos en rango' });
+    void procesar(nucleo.registrar(diaNormal(Date.now(), nucleo.perfil, nucleo.historial)));
+  };
+  const iniciarEva = (minutosPrerrespiracion: number) => {
+    const t = Date.now();
+    void procesar(nucleo.registrar([
+      { sensor: 'prerrespiracion', valor: minutosPrerrespiracion, timestamp: t, fuente: 'simulador' },
+      { sensor: 'duracionEva', valor: 0, timestamp: t, fuente: 'simulador' },
+    ]));
+    setEvaDesde(t);
+    cambiarContexto({ ubicacion: 'eva' });
+  };
+  const terminarEva = () => {
+    setEvaDesde(null);
+    cambiarContexto({ ubicacion: 'habitat' });
+  };
+  const cambiarAmplio = (v: boolean) => { setSimAmplio(v); guardarAmplio(v); };
+
   const vencimientos = nucleo.confirmacionesPendientes();
   const pendientes = mensajes.filter((m) => vencimientos.has(m.id)).map((m) => ({ mensaje: m, vence: vencimientos.get(m.id)! }));
   const nuevos = seccion === 'mensajes' ? 0 : mensajes.filter((m) => m.timestamp > vistoHasta && !m.diferido).length;
@@ -453,7 +507,10 @@ export function App() {
   const comunicaciones = nucleo.comunicaciones();
 
   return (
-    <div className={`app ${demoAbierta ? 'con-demo' : ''}`}>
+    <div className={[
+      'app', demoAbierta && !grabando && 'con-demo', demoAbierta && simAmplio && 'sim-amplio', sim.activo && !grabando && 'con-reproductor',
+      grabando && 'modo-grabacion', cursorQuieto && 'cursor-oculto',
+    ].filter(Boolean).join(' ')}>
       <a href="#contenido" className="saltar">Saltar al contenido</a>
       <BarraSuperior
         contexto={c} nombreAstronauta={nucleo.perfil.nombre} iaActiva={iaActiva} iaConfigurada={ia.configurada}
@@ -463,7 +520,7 @@ export function App() {
       {avisoComunicacion && (
         <BannerComunicacion
           mensaje={avisoComunicacion.mensaje} comunicaciones={comunicaciones.filter((x) => avisoComunicacion.ids.includes(x.id))}
-          onVer={() => ir('comunicaciones')} onCerrar={() => setAvisoComunicacion(null)}
+          ahora={ahora} onVer={() => ir('comunicaciones')} onCerrar={() => setAvisoComunicacion(null)}
         />
       )}
 
@@ -480,12 +537,13 @@ export function App() {
           {seccion === 'resumen' && (
             <VistaResumen
               perfil={nucleo.perfil} contexto={c} estado={nucleo.estadoCorporal()} regiones={nucleo.estadoRegiones()} hallazgos={nucleo.hallazgosActuales()}
+              aptitud={nucleo.aptitudTareas()}
               seleccion={seleccion} onSeleccionar={setSeleccion} onIrMensajes={() => ir('mensajes')}
             />
           )}
           {seccion === 'mensajes' && (
             <VistaMensajes
-              mensajes={mensajes} evaluaciones={evaluaciones} pendientes={vencimientos} ahora={ahora} contexto={c}
+              mensajes={mensajes} evaluaciones={evaluaciones} pendientes={vencimientos} ahora={ahora} contexto={c} historial={nucleo.historial}
               historia={nucleo.perfil.historiaClinica} onConfirmar={confirmar} onAbrirDemo={() => alternarDemo(true)}
             />
           )}
@@ -509,10 +567,19 @@ export function App() {
 
       {seccion !== 'asistente' && <AccesoHigia asistente={asistente} onAbrir={() => ir('asistente')} />}
 
-      <PanelDemo
-        abierto={demoAbierta} onCerrar={() => alternarDemo(false)} perfil={nucleo.perfil} contexto={c}
-        onPerfil={cambiarPerfil} onContexto={cambiarContexto} onEscenario={(e) => sim.ejecutarEscenario(e)}
-      />
+      {!grabando && (
+        <PanelSimulador
+          abierto={demoAbierta} amplio={simAmplio} onAmplio={cambiarAmplio} onCerrar={() => alternarDemo(false)}
+          sim={sim} nucleo={nucleo} registro={registro} iaConfigurada={ia.configurada} evaDesde={evaDesde} ahora={ahora}
+          onPerfil={cambiarPerfil} onContexto={cambiarContexto} onInyectar={inyectar} onDiaNormal={cargarDiaNormal}
+          onIniciarEva={iniciarEva} onTerminarEva={terminarEva} onPantallaCompleta={() => setCoberturaCompleta(true)}
+        />
+      )}
+      {!grabando && <BarraReproduccion sim={sim} />}
+      {coberturaCompleta && (
+        <CoberturaPantallaCompleta estado={nucleo.estadoRiesgosHRP()} enEscenario={sim.reproductor.escenario?.hrp ?? []} onCerrar={() => setCoberturaCompleta(false)} />
+      )}
+      {grabando && <span className="indicador-grabacion" role="status" aria-label="Modo grabación activo (G para salir)" />}
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { PERFILES } from '../adaptadores/simulador/perfiles';
 import { validarAcciones } from './acciones';
 import { interpretar } from './conversacion';
-import { NucleoSalud, PLAZO_CONFIRMACION_INCAPACIDAD_MS, PLAZO_CONFIRMACION_MS } from './nucleo';
+import { ID_SENALES_COMBINADAS, NucleoSalud, PLAZO_CONFIRMACION_INCAPACIDAD_MS, PLAZO_CONFIRMACION_MS } from './nucleo';
 import { REGLAS } from './reglas';
 import type { Contexto, Lectura, TipoSensor } from './tipos';
 
@@ -224,6 +224,39 @@ describe('aptitud para tareas críticas', () => {
   it('salir a EVA apto no genera aviso', () => {
     const n = nuevo(NOVATO_PANICO);
     expect(n.actualizarContexto({ ubicacion: 'eva' }, T).some((m) => m.hallazgo.riesgoId.startsWith('tarea.'))).toBe(false);
+  });
+});
+
+describe('señales que se suman', () => {
+  const leves = (t = T) => [
+    L('spo2', 94, t), L('temperatura', 37.6, t), L('fuerza', 82, t),
+    L('horasSueno', 6.5, t - 2), L('horasSueno', 6.5, t - 1), L('horasSueno', 6.5, t),
+  ];
+
+  it('tres señales leves no alcanzan; la cuarta en otro sistema genera el aviso que desaconseja la EVA', () => {
+    const n = nuevo();
+    n.registrar(leves().slice(0, 3), T);
+    expect(n.hallazgo(ID_SENALES_COMBINADAS)).toBeUndefined();
+    const ms = n.registrar(leves().slice(3), T + 1);
+    const m = ms.find((x) => x.hallazgo.riesgoId === ID_SENALES_COMBINADAS);
+    expect(m?.hallazgo.nivel).toBe('aviso');
+    expect(m?.hallazgo.bloquea).toEqual(['eva']);
+    expect(n.aptitudTareas().eva.apto).toBe(false);
+    expect(n.aptitudTareas().pilotaje.apto).toBe(true);
+  });
+
+  it('si una señal es privada, la combinación también lo es', () => {
+    const n = nuevo();
+    n.registrar([...leves().slice(0, 2), L('animo', 5), L('fuerza', 82)], T);
+    expect(n.hallazgo(ID_SENALES_COMBINADAS)?.sensible).toBe(true);
+  });
+
+  it('cuando las señales vuelven a la normalidad, el aviso se borra', () => {
+    const n = nuevo();
+    n.registrar(leves(), T);
+    expect(n.hallazgo(ID_SENALES_COMBINADAS)).toBeDefined();
+    n.registrar([L('spo2', 98, T + 10), L('temperatura', 36.7, T + 10)], T + 10);
+    expect(n.hallazgo(ID_SENALES_COMBINADAS)).toBeUndefined();
   });
 });
 

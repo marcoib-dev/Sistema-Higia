@@ -188,33 +188,11 @@ select, input[type='text'], input[type='number'], input:not([type]) {
 .interruptor[aria-checked='true'] .interruptor-pista { background: var(--acento); border-color: var(--acento); }
 .interruptor[aria-checked='true'] .interruptor-perilla { transform: translateX(16px); background: var(--sobre-acento); }
 
-/* ── Panel de demo ───────────────────────────────────────────────────── */
-.panel-demo {
-  position: fixed; top: var(--tope); right: 0; bottom: 0; z-index: 40; width: var(--ancho-demo);
-  display: flex; flex-direction: column; background: var(--superficie); border-left: 1px solid var(--borde); box-shadow: var(--sombra);
-  transform: translateX(100%); transition: transform .22s ease; visibility: hidden;
-}
-.panel-demo.abierto { transform: none; visibility: visible; }
-.panel-demo:focus { outline: none; }
-.panel-demo-cab { display: flex; justify-content: space-between; gap: 12px; padding: 18px 18px 12px; }
-.panel-demo-cab h2 { font-size: 16px; }
-.panel-demo-cab p { color: var(--texto-3); font-size: 13px; margin-top: 2px; }
+/* ── Piezas del simulador compartidas (pestañas, perfiles, contexto) ── */
 .pestanas { display: flex; gap: 4px; padding: 0 18px; border-bottom: 1px solid var(--borde); }
 .pestanas button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 8px; color: var(--texto-2); cursor: pointer; font-weight: 500; margin-bottom: -1px; }
+.pestanas button:hover { color: var(--texto); }
 .pestanas button[aria-selected='true'] { color: var(--texto); border-bottom-color: var(--acento); }
-.panel-demo-cuerpo { flex: 1; overflow-y: auto; padding: 14px 18px 24px; }
-
-.lista-escenarios { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.lista-escenarios button {
-  display: grid; grid-template-columns: 1fr auto; grid-template-areas: 'n i' 'd i'; align-items: center; gap: 2px 12px;
-  width: 100%; text-align: left; padding: 11px 12px; border-radius: 10px; background: var(--superficie-2); border: 1px solid var(--borde); cursor: pointer;
-}
-.lista-escenarios button:hover { border-color: var(--borde-fuerte); background: var(--superficie-3); }
-.lista-escenarios button.reciente { border-color: var(--acento); }
-.lista-escenarios .icono { grid-area: i; color: var(--texto-3); }
-.lista-escenarios button.reciente .icono { color: var(--acento); }
-.escenario-nombre { grid-area: n; font-weight: 600; }
-.escenario-desc { grid-area: d; font-size: 13px; color: var(--texto-2); }
 
 .lista-perfiles { display: grid; gap: 8px; }
 .tarjeta-perfil { display: flex; gap: 12px; align-items: flex-start; text-align: left; padding: 12px; border-radius: 10px; background: var(--superficie-2); border: 1px solid var(--borde); cursor: pointer; }
@@ -367,6 +345,9 @@ select, input[type='text'], input[type='number'], input:not([type]) {
 .figura-selector button[aria-pressed='true'] { background: var(--acento-suave); color: var(--acento); font-weight: 600; }
 .figura-svg { max-height: 640px; margin: 0 auto; }
 .sistema-svg { cursor: pointer; outline: none; --c: var(--sin-datos); }
+/* El color de cada sistema cambia con una transición corta (registrado para poder interpolarlo). */
+@property --c { syntax: '<color>'; inherits: true; initial-value: #7d8bb5; }
+.sistema-svg { transition: --c .3s ease-out; }
 .sistema-svg.nivel-normal { --c: var(--ok); }
 .sistema-svg.nivel-info { --c: var(--info); }
 .sistema-svg.nivel-aviso { --c: var(--aviso); }
@@ -380,11 +361,11 @@ select, input[type='text'], input[type='number'], input:not([type]) {
 
 /* Tintes por sistema, recortados con la figura (máscara) */
 .tintes { pointer-events: none; }
-.tinte path { fill: var(--c); opacity: .45; transition: opacity .15s; }
+.tinte path { fill: var(--c); opacity: .45; transition: opacity .3s, fill .3s; }
 .tinte.nivel-sinDatos path { opacity: 0; }
 .tinte.seleccionado path { opacity: .72; }
 .tinte.nivel-sinDatos.seleccionado path { opacity: .35; }
-.tinte.nivel-alerta { animation: pulso-alerta 1.6s ease-in-out infinite; }
+.tinte.nivel-alerta { animation: pulso-alerta 1.1s ease-in-out 2; }
 @keyframes pulso-alerta { 50% { opacity: .55; } }
 
 /* Zonas interactivas: invisibles; contorno al pasar o seleccionar */
@@ -503,6 +484,70 @@ select, input[type='text'], input[type='number'], input:not([type]) {
 .mensaje-antecedente { display: flex; align-items: flex-start; gap: 6px; font-size: 13px; color: var(--ia); }
 .mensaje-antecedente .icono { margin-top: 2px; }
 
+/* ── Fase 10: capa visual del astronauta ─────────────────────────────── */
+.dia-mision { display: flex; align-items: baseline; gap: 8px; padding: 6px 14px; border-radius: 999px; background: var(--superficie); border: 1px solid var(--borde-fuerte); }
+.dia-mision-n { font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.dia-mision-texto { color: var(--texto-2); font-size: 13px; }
+
+.lista-atencion li, .lista-mensajes > .mensaje { animation: entrar .45s cubic-bezier(.16, 1, .3, 1) both; }
+@keyframes entrar { from { opacity: 0; transform: translateY(8px); } }
+
+.tarjeta-senales { border-color: color-mix(in srgb, var(--aviso) 45%, var(--borde)); background: linear-gradient(170deg, color-mix(in srgb, var(--aviso) 9%, var(--superficie)), var(--superficie) 65%); }
+.senales-intro { color: var(--texto-2); font-size: 14px; margin: -4px 0 12px; }
+.lista-senales { list-style: none; margin: 0; padding: 0 0 0 4px; display: grid; gap: 0; position: relative; }
+.lista-senales::before { content: ''; position: absolute; left: 8px; top: 12px; bottom: 12px; width: 1px; background: linear-gradient(var(--borde-fuerte), color-mix(in srgb, var(--aviso) 60%, transparent)); }
+.lista-senales li { animation: entrar .5s cubic-bezier(.16, 1, .3, 1) both; animation-delay: calc(var(--i) * 120ms); }
+.lista-senales button { display: grid; grid-template-columns: 10px 1fr; grid-template-areas: 'p t' '. m'; align-items: center; gap: 0 12px; width: 100%; padding: 7px 4px; text-align: left; background: none; border: 0; cursor: pointer; border-radius: var(--radio-s); }
+.lista-senales button:hover { background: var(--superficie-2); }
+.lista-senales .punto { grid-area: p; position: relative; z-index: 1; box-shadow: 0 0 0 3px var(--superficie); }
+.senal-titulo { grid-area: t; font-weight: 500; }
+.senal-meta { grid-area: m; font-size: 12px; color: var(--texto-3); }
+.senales-conclusion {
+  display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; padding: 12px 14px; border-radius: var(--radio-s);
+  background: color-mix(in srgb, var(--aviso) 14%, var(--superficie-2)); border: 1px solid color-mix(in srgb, var(--aviso) 45%, transparent);
+  color: var(--texto-2); font-size: 14px; animation: entrar .5s cubic-bezier(.16, 1, .3, 1) both; animation-delay: calc(var(--i) * 120ms + 120ms);
+}
+.senales-conclusion strong { color: var(--texto); }
+.senales-conclusion .icono { color: var(--aviso); margin-top: 1px; }
+
+.banner-alerta { position: sticky; overflow: hidden; }
+.banner-plazo { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: color-mix(in srgb, var(--alerta) 25%, transparent); }
+.banner-plazo span { display: block; height: 100%; background: #ff7a77; transform-origin: 0 50%; transition: transform 1s linear; }
+
+.com-etapas { list-style: none; margin: 0; padding: 0; display: inline-flex; align-items: center; gap: 3px; }
+.com-etapas li { width: 14px; height: 3px; border-radius: 2px; background: var(--borde-fuerte); transition: background .4s; }
+.com-etapas li.hecha { background: var(--texto-2); }
+.com-etapas li.actual { background: var(--aviso); }
+.etapa-respondio .com-etapas li { background: var(--ok); }
+.com-hora { color: var(--texto-3); font-variant-numeric: tabular-nums; }
+.banner-destinos li { align-items: center; }
+.banner-destinos .etapa-enviando .com-estado { color: var(--aviso); }
+
+.etiqueta-nasa { color: #a9c8ff; border-color: color-mix(in srgb, var(--acento) 40%, transparent); background: color-mix(in srgb, var(--acento) 10%, transparent); }
+
+.tendencias { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-top: 12px; }
+.mini-tendencia, .barra-dosis { margin: 0; padding: 10px 12px; border-radius: var(--radio-s); background: var(--superficie-2); border: 1px solid var(--borde); display: grid; gap: 6px; }
+.mini-tendencia figcaption, .barra-dosis figcaption { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--texto-2); }
+.mini-valores { color: var(--texto-3); font-variant-numeric: tabular-nums; }
+.mini-valores b { color: var(--texto); font-weight: 600; }
+.mini-tendencia svg { width: 100%; height: 48px; display: block; overflow: visible; }
+.mini-linea { fill: none; stroke: var(--acento); stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.mini-base { stroke: var(--texto-3); stroke-width: 1; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
+.mini-ultimo { fill: var(--acento); stroke: var(--superficie-2); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.mini-leyenda { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--texto-3); }
+.mini-leyenda i { width: 14px; border-top: 1px dashed var(--texto-3); }
+.dosis-pista { position: relative; height: 8px; border-radius: 4px; background: var(--superficie-3); overflow: hidden; }
+.dosis-actual { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: linear-gradient(90deg, var(--info), var(--aviso)); }
+.dosis-proyeccion { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--aviso) 55%, transparent) 0 4px, transparent 4px 7px); }
+
+/* Modo grabación (tecla G): solo la app del astronauta */
+.app.modo-grabacion .boton-simulador { display: none; }
+.app.cursor-oculto, .app.cursor-oculto * { cursor: none !important; }
+.indicador-grabacion { position: fixed; right: 14px; bottom: 14px; z-index: 90; width: 8px; height: 8px; border-radius: 50%; background: var(--alerta); animation: desvanecer 2.4s ease-out forwards; pointer-events: none; }
+@keyframes desvanecer { 0%, 60% { opacity: .9; } to { opacity: 0; } }
+
+::selection { background: color-mix(in srgb, var(--acento) 40%, transparent); color: var(--texto); }
+
 /* ── Responsivo ──────────────────────────────────────────────────────── */
 @media (min-width: 1400px) {
   .app.con-demo .contenido { padding-right: calc(var(--ancho-demo) + 32px); }
@@ -535,7 +580,6 @@ select, input[type='text'], input[type='number'], input:not([type]) {
   .contador { top: 0; right: calc(50% - 22px); }
   .contenido { padding: 20px 16px 96px; }
   .encabezado-seccion h1 { font-size: 22px; }
-  .panel-demo { width: 100%; }
   .camara-cuerpo { grid-template-columns: 1fr; }
   .burbuja { max-width: 90%; }
   .chat-historial { max-height: calc(100vh - 380px); }

@@ -26,7 +26,7 @@ export function InsigniaNivel({ nivel }: { nivel: EstadoVisual }) {
   return <span className={`insignia nivel-${nivel}`}>{NOMBRE_NIVEL[nivel]}</span>;
 }
 
-export function Etiqueta({ icono, children, tono }: { icono?: NombreIcono; children: ReactNode; tono?: 'alerta' | 'ia' }) {
+export function Etiqueta({ icono, children, tono }: { icono?: NombreIcono; children: ReactNode; tono?: 'alerta' | 'ia' | 'nasa' }) {
   return (
     <span className={`etiqueta ${tono ? `etiqueta-${tono}` : ''}`}>
       {icono && <Icono nombre={icono} tamano={14} />}
