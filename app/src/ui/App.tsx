@@ -7,6 +7,7 @@ import { buscarEscenario, CONTEXTO_BASE, diaNormal, ESCENARIOS } from '../adapta
 import { PERFILES } from '../adaptadores/simulador/perfiles';
 import { RegistroSimulacion } from '../adaptadores/simulador/registro';
 import { respuestaSimulada } from '../adaptadores/simulador/tripulacion';
+import { prepararPiper } from '../adaptadores/voz/piper';
 import { aceptarRespuestaSinNombre, detener, hablar } from '../adaptadores/voz/voz';
 import type { Accion } from '../core/acciones';
 import { interpretar } from '../core/conversacion';
@@ -109,6 +110,8 @@ export function App() {
   iaRef.current = iaActiva;
 
   useEffect(() => { void consultarEstadoIA().then(setIa); }, []);
+  // Voz neuronal local: se prepara al abrir; mientras tanto (o si falla) habla la voz del navegador.
+  useEffect(() => { void prepararPiper(); }, []);
 
   // Título de la pestaña según la sección.
   useEffect(() => {

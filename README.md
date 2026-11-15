@@ -55,11 +55,13 @@ Higia vigila la salud de astronautas que viven en hábitats permanentes (base lu
 
 - **Google Chrome o Microsoft Edge:** usan el reconocimiento de voz del navegador (necesita internet).
 - **Brave, Firefox o Chromium:** usan **Vosk local** (funciona sin conexión). Hay que descargar el modelo español una vez con `npm run voz:modelo` (39 MB).
+- **Voz de Higia:** una **voz neuronal local (Piper)**, natural y sin conexión. Se descarga una vez con `npm run voz:piper` (~80 MB). Sin ella, Higia habla con la voz del navegador.
 
 ```bash
 cd app
 npm install
-npm run voz:modelo  # modelo de voz local en español (39 MB, una sola vez; no se sube a git)
+npm run voz:modelo  # reconocimiento de voz local en español (39 MB, una sola vez; no se sube a git)
+npm run voz:piper   # voz neuronal de Higia (~80 MB, una sola vez; no se sube a git)
 npm run dev         # abre http://localhost:5173
 npm test            # tests del núcleo
 npm run build       # chequeo de tipos y build de producción
@@ -377,7 +379,9 @@ Lo urgente (pedir ayuda, "estoy bien", un síntoma grave) lo ejecuta primero el 
 En la barra superior: **silenciar o activar** la voz, **pausar y reanudar**, **detener** (también con **Esc**) y **volumen** (se aplica al siguiente mensaje).
 
 - Higia lee en voz alta los mensajes que van al auricular y las respuestas del asistente.
-- La síntesis de voz funciona sin conexión, con las voces del sistema.
+- **Higia habla con una voz neuronal local (Piper)**, generada en el dispositivo y sin conexión: `npm run voz:piper` descarga la voz (`es_MX-claude-high`), el fonemizador y el motor ONNX en `app/public/voz/piper/`. Para empezar a sonar rápido, el texto se parte en oraciones: la primera suena en menos de un segundo y las siguientes se generan mientras tanto.
+- Mientras la voz neuronal carga, o si falta o falla, habla la **voz del navegador** (también sin conexión): un mensaje nunca se pierde. Pasando el mouse por el control de voz se ve qué voz está activa.
+- Otra voz: `npm run voz:piper -- es_ES-davefx-medium` y `VITE_PIPER_VOZ=es_ES-davefx-medium` en `app/.env.local` (voces en español: `es_MX-claude-high`, `es_MX-ald-medium`, `es_ES-davefx-medium`, `es_ES-sharvard-medium`). `VITE_PIPER=0` la desactiva.
 - El reconocimiento de voz tiene **dos motores** y la app elige sola:
   - **Navegador (Web Speech API)**: Chrome y Edge. Es más preciso, pero en Chrome usa servidores de Google y **necesita internet**.
   - **Local (Vosk + WebAssembly)**: Brave, Firefox, Chromium y cualquier navegador compatible. Transcribe **en el dispositivo**, sin enviar el audio a nadie y **sin conexión**. Usa el modelo español pequeño (`vosk-model-small-es-0.42`, 39 MB, licencia Apache 2.0).
@@ -486,7 +490,7 @@ app/
 │   │   └── nucleo.test.ts     Tests
 │   ├── adaptadores/
 │   │   ├── simulador/         Escenarios (escenarios/), reproductor, registro, tripulación y astronautas
-│   │   ├── voz/               Síntesis, Web Speech y Vosk local (WASM)
+│   │   ├── voz/               Voz neuronal Piper, síntesis del navegador, Web Speech y Vosk local (WASM)
 │   │   ├── camara/            Captura de imagen
 │   │   ├── ia/                Cliente de la IA y contrato con el servidor
 │   │   └── interop/           Exportación FHIR (ejemplo)
@@ -601,6 +605,7 @@ El plan completo está en [`PLAN_RIESGOS_Y_SIMULADOR.md`](PLAN_RIESGOS_Y_SIMULAD
 | La voz local no funciona después de `npm run build` | Falta el modelo en `dist/` | El build copia `public/voz`; si se borró, volver a ejecutar `npm run voz:modelo` y `npm run build` |
 | No se escucha la voz | Voz silenciada o volumen en 0 | Revisar el control de voz de la barra superior |
 | "No se pudo acceder a la cámara" | Permiso denegado en el navegador | Habilitar la cámara para `localhost` en la configuración del navegador |
+| Higia habla con voz robótica | Falta la voz neuronal o el navegador no permite guardarla | Ejecutar `npm run voz:piper` en `app/` y recargar. El motivo aparece en la consola ("Voz neuronal no disponible…") |
 
 ---
 
@@ -611,6 +616,6 @@ El plan completo está en [`PLAN_RIESGOS_Y_SIMULADOR.md`](PLAN_RIESGOS_Y_SIMULAD
 - La integración con sistemas médicos es una **interfaz de ejemplo**, no una API real de la NASA.
 - Los plazos de escalada (30 s y 15 s) son cortos para la demo; en un sistema real se definirían con criterio médico.
 - La IA envía a la API de DeepSeek el estado de salud (sin nombre) y las fotos que se analizan. Cada consulta tiene costo según el uso de la clave.
-- El reconocimiento de voz del navegador (Chrome/Edge) usa servidores externos; el motor **Vosk local no envía el audio a ningún lado**. La síntesis de voz usa las voces del sistema.
+- El reconocimiento de voz del navegador (Chrome/Edge) usa servidores externos; el motor **Vosk local no envía el audio a ningún lado**. La voz de Higia (Piper) se genera en el dispositivo; la de respaldo usa las voces del sistema.
 - El modelo de Vosk (39 MB) **no se sube a git**: se descarga con `npm run voz:modelo`. Vosk local ocupa unos 300 MB de memoria mientras escucha.
 - Vosk es Apache 2.0 y el modelo español también; se puede usar en la demo sin restricciones.

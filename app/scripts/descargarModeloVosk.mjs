@@ -59,7 +59,8 @@ try {
 
   await mkdir(path.dirname(DESTINO), { recursive: true });
   console.log('Empaquetando como tar.gz…');
-  execFileSync('tar', ['-czf', DESTINO, '-C', temporal, MODELO]);
+  // Ruta relativa al archivo: el tar de GNU (el de Git para Windows) toma "D:" como un servidor remoto.
+  execFileSync('tar', ['-czf', path.basename(DESTINO), '-C', temporal, MODELO], { cwd: path.dirname(DESTINO) });
 
   const { size } = await stat(DESTINO);
   console.log(`Listo: ${path.relative(process.cwd(), DESTINO)} (${(size / 1024 / 1024).toFixed(1)} MB)`);

@@ -1,9 +1,11 @@
 /**
  * ADAPTADOR DE VOZ — Web Speech API del navegador.
- * - Síntesis (hablar): funciona sin conexión con las voces del sistema. Se puede pausar, detener y ajustar el volumen.
+ * - Síntesis (hablar): voz neuronal local (Piper, sin conexión) y, de respaldo, las voces del sistema. Se puede pausar, detener y ajustar el volumen.
  * - Reconocimiento (escuchar): en Chrome usa servidores de Google, así que NO es autónomo.
  *   TODO (línea D): reemplazar por un motor local (p. ej. Vosk o whisper.cpp) para la versión final.
  */
+
+import { estadoPiper, sintetizar } from './piper';
 
 let volumen = 1;
 
@@ -11,16 +13,84 @@ export function sintesisDisponible(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window;
 }
 
-/** Volumen de 0 a 1. Se aplica a los mensajes siguientes (la Web Speech API no cambia el que está sonando). */
-export function fijarVolumen(v: number): void {
-  volumen = Math.min(1, Math.max(0, v));
+/** Qué voz está hablando: la neuronal local (Piper) o la del navegador (respaldo). */
+export function motorSintesis(): 'neuronal' | 'navegador' | 'cargando' {
+  const e = estadoPiper();
+  return e === 'lista' ? 'neuronal' : e === 'error' ? 'navegador' : 'cargando';
 }
 
-export function hablar(texto: string, alTerminar?: () => void): void {
-  if (!sintesisDisponible() || volumen === 0) {
-    alTerminar?.();
-    return;
+/** Volumen de 0 a 1. Con la voz neuronal se aplica también a lo que está sonando. */
+export function fijarVolumen(v: number): void {
+  volumen = Math.min(1, Math.max(0, v));
+  if (actual?.audio) actual.audio.volume = volumen;
+}
+
+// ── Voz neuronal: cola propia (genera el audio del siguiente mientras suena el actual) ──
+interface Pendiente { texto: string; alTerminar?: () => void; wav: Promise<Blob> }
+const cola: Pendiente[] = [];
+let actual: { p: Pendiente; audio?: HTMLAudioElement; url?: string } | null = null;
+let pausada = false;
+/** Cambia al detener: lo que se estaba generando para la cola anterior se descarta. */
+let generacion = 0;
+/** La inferencia es de a una: cada texto espera al anterior. */
+let ultimaSintesis: Promise<unknown> = Promise.resolve();
+
+/**
+ * Parte el texto en oraciones: la primera empieza a sonar enseguida y las siguientes se generan
+ * mientras tanto, así la demora inicial es la de una oración. Los fragmentos muy cortos ("Sí.")
+ * se pegan al anterior para no cortar la entonación.
+ */
+export function partirEnOraciones(texto: string, minimo = 20): string[] {
+  const partes = texto.match(/[^.!?…:;]+[.!?…:;]*\s*/g)?.map((x) => x.trim()).filter(Boolean) ?? [texto.trim()];
+  const salida: string[] = [];
+  for (const parte of partes) {
+    if (salida.length && parte.length < minimo) salida[salida.length - 1] += ` ${parte}`;
+    else salida.push(parte);
   }
+  return salida;
+}
+
+function encolarNeuronal(texto: string, alTerminar?: () => void): void {
+  const oraciones = partirEnOraciones(texto);
+  oraciones.forEach((o, i) => {
+    const wav = ultimaSintesis.then(() => sintetizar(o));
+    ultimaSintesis = wav.catch(() => undefined);
+    // Quien espera el final se entera con la última oración.
+    cola.push({ texto: o, alTerminar: i === oraciones.length - 1 ? alTerminar : undefined, wav });
+  });
+  if (!actual) siguiente();
+}
+
+function siguiente(): void {
+  const p = cola.shift();
+  if (!p) { actual = null; return; }
+  const g = generacion;
+  actual = { p };
+  const terminar = () => {
+    if (g !== generacion) return;
+    if (actual?.url) URL.revokeObjectURL(actual.url);
+    actual = null;
+    p.alTerminar?.();
+    siguiente();
+  };
+  p.wav.then((blob) => {
+    if (g !== generacion) return;
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    audio.volume = volumen;
+    audio.onended = terminar;
+    audio.onerror = terminar;
+    actual = { p, audio, url };
+    if (!pausada) audio.play().catch(terminar);
+  }, () => {
+    // Si la voz neuronal falla con este texto, lo dice la del navegador: el mensaje nunca se pierde.
+    if (g !== generacion) return;
+    hablarNavegador(p.texto, terminar);
+  });
+}
+
+function hablarNavegador(texto: string, alTerminar?: () => void): void {
+  if (!sintesisDisponible()) { alTerminar?.(); return; }
   const u = new SpeechSynthesisUtterance(texto);
   u.lang = 'es-ES';
   u.volume = volumen;
@@ -31,20 +101,43 @@ export function hablar(texto: string, alTerminar?: () => void): void {
   window.speechSynthesis.speak(u);
 }
 
+export function hablar(texto: string, alTerminar?: () => void): void {
+  if (volumen === 0 || !texto.trim()) {
+    alTerminar?.();
+    return;
+  }
+  if (estadoPiper() === 'lista') encolarNeuronal(texto, alTerminar);
+  else hablarNavegador(texto, alTerminar);
+}
+
 export function pausar(): void {
+  pausada = true;
+  actual?.audio?.pause();
   if (sintesisDisponible()) window.speechSynthesis.pause();
 }
 
 export function reanudar(): void {
+  pausada = false;
+  void actual?.audio?.play().catch(() => undefined);
   if (sintesisDisponible()) window.speechSynthesis.resume();
 }
 
 /** Corta lo que está diciendo y vacía la cola. */
 export function detener(): void {
+  generacion++;
+  const avisar = [actual?.p, ...cola].filter((x): x is Pendiente => !!x);
+  if (actual?.audio) actual.audio.pause();
+  if (actual?.url) URL.revokeObjectURL(actual.url);
+  actual = null;
+  cola.length = 0;
+  pausada = false;
+  // Como la voz del navegador al cancelar: quien esperaba el final se entera.
+  avisar.forEach((x) => x.alTerminar?.());
   if (sintesisDisponible()) window.speechSynthesis.cancel();
 }
 
 export function estadoVoz(): 'hablando' | 'pausada' | 'callada' {
+  if (actual || cola.length) return pausada ? 'pausada' : 'hablando';
   if (!sintesisDisponible()) return 'callada';
   const s = window.speechSynthesis;
   if (s.paused && (s.speaking || s.pending)) return 'pausada';

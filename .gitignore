@@ -31,3 +31,6 @@ npm-debug.log*
 
 # Modelo de voz local (39 MB): se descarga con `npm run voz:modelo`
 app/public/voz/*.tar.gz
+
+# Voz neuronal de Piper (~70 MB): se descarga con `npm run voz:piper`
+app/public/voz/piper/

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aceptarRespuestaSinNombre, detectarLlamado, diagnosticoReconocimiento, mensajeErrorReconocimiento, respuestaSinNombreActiva } from './voz';
+import { aceptarRespuestaSinNombre, detectarLlamado, diagnosticoReconocimiento, mensajeErrorReconocimiento, partirEnOraciones, respuestaSinNombreActiva } from './voz';
 
 describe('palabra clave «Higia»', () => {
   it('separa el pedido del nombre', () => {
@@ -63,5 +63,15 @@ describe('errores del reconocedor', () => {
     expect(mensajeErrorReconocimiento('audio-capture')).toMatch(/micrófono/i);
     expect(mensajeErrorReconocimiento('network')).toMatch(/Brave|Chrome|internet/i);
     expect(mensajeErrorReconocimiento('otro')).toMatch(/falló.*otro/i);
+  });
+});
+
+describe('voz neuronal: partir en oraciones', () => {
+  it('separa las oraciones y pega los fragmentos muy cortos al anterior', () => {
+    expect(partirEnOraciones('Varias señales leves se suman. Hoy no se recomienda salir a EVA. Sí, hoy. Prioriza el descanso.'))
+      .toEqual(['Varias señales leves se suman.', 'Hoy no se recomienda salir a EVA. Sí, hoy.', 'Prioriza el descanso.']);
+  });
+  it('un texto sin puntuación queda entero', () => {
+    expect(partirEnOraciones('Estás bien')).toEqual(['Estás bien']);
   });
 });
