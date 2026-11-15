@@ -59,6 +59,13 @@ export const reglaAnimo = definirRegla(
         resumenSimple: 'Tu ánimo está bastante más bajo que de costumbre.',
         textoCalmado: 'Parece que estos días están siendo pesados.',
         accion: 'Considera hablar con el psicólogo de la misión o con alguien de confianza. Tú decides cuándo.',
+        pasos: [
+          'Busca un momento tranquilo y un lugar con privacidad.',
+          'Habla con alguien de confianza de la tripulación, o pide a Higia una conversación con el psicólogo de la misión.',
+          'Escribe en tu diario cómo te sientes hoy.',
+          'Mantén tus horarios de sueño, comida y ejercicio.',
+          'Si aparecen ideas de hacerte daño, díselo a Higia o a un compañero de inmediato.',
+        ],
         ruta: 'reporte', sensible: true,
       };
     }

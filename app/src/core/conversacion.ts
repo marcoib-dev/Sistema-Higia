@@ -193,6 +193,16 @@ export function interpretar(frase: string, nucleo: NucleoSalud, ahora = Date.now
   }
 
   // ── Control de la app ──
+  // ── Control del simulador (demo) ──
+  if (/simulador|escenario|demo/.test(f)) {
+    const orden = /pausa|deten un momento|espera/.test(f) ? 'pausar'
+      : /siguiente|proximo paso|avanza/.test(f) ? 'siguiente'
+      : /continua|reanuda|sigue/.test(f) ? 'continuar'
+      : /reinicia|de nuevo|desde el principio/.test(f) ? 'reiniciar'
+      : /deten|para|termina|cierra/.test(f) ? 'detener' : null;
+    if (orden) return r('Listo.', [{ tipo: 'control_simulador', orden }]);
+  }
+
   if (/silencia|callate|sin voz|silencio/.test(f)) return r('Silencio la voz.', [{ tipo: 'voz', estado: 'silenciar' }]);
   if (/activa la voz|habla de nuevo/.test(f)) return r('Vuelvo a hablar.', [{ tipo: 'voz', estado: 'activar' }]);
   if (/^(ve|ir|abre|abrir|muestra|muestrame|llevame|pasa|cambia)\b/.test(f)) {

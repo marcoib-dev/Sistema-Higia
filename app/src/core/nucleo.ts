@@ -63,6 +63,21 @@ export class NucleoSalud {
     return this.evaluar(this.reglas.filter((r) => r.sensores.some((s) => sensores.has(s))), ahora);
   }
 
+  /**
+   * Carga historia sin hablar: registra las lecturas, evalúa todas las reglas y deja los hallazgos
+   * como ya comunicados, sin mensajes ni confirmaciones pendientes. Lo usa el simulador para que un
+   * escenario empiece con la figura ya coloreada y sin una ráfaga de avisos.
+   */
+  precargar(lecturas: Lectura[], ahora = Date.now()): void {
+    lecturas.forEach((l) => this.historial.agregar(l));
+    for (const regla of this.reglas) {
+      const h = regla.evaluar(this.historial, this.perfil, ahora, this.contexto);
+      if (!h) continue;
+      this.hallazgos.set(h.riesgoId, h);
+      this.emitido.set(h.riesgoId, { nivel: h.nivel, en: ahora });
+    }
+  }
+
   /** Reevaluación periódica, para los recordatorios. */
   tick(ahora = Date.now()): Mensaje[] {
     for (const h of [...this.hallazgos.values()]) {

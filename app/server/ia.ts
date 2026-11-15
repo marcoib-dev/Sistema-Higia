@@ -194,6 +194,7 @@ Acciones: eres el centro de la app y puedes controlarla. Si la frase lo pide, in
 - voz {estado}: "silenciar" | "activar" | "detener".
 - actualizar_historia {campo, valor}: cuenta un dato médico propio para su historia clínica ("soy alérgico al látex", "empecé a tomar…"). campo: "alergias" | "medicacion" | "antecedentes" | "notas".
 - ejecutar_escenario {escenario} y cambiar_astronauta {astronauta}: solo si lo pide explícitamente para la demo; usa los id de <estado>.app.
+- control_simulador {orden}: controla el escenario del simulador en curso. orden: "pausar" | "continuar" | "siguiente" | "reiniciar" | "detener". Solo si lo pide explícitamente.
 Nunca inventes una emergencia: pedir_ayuda y emitir_alerta solo cuando la frase lo justifica.
 
 Formato de salida: entrega la respuesta llamando a la herramienta "responder", con esta forma:
@@ -202,7 +203,8 @@ Valores permitidos para "sensor": ${SENSORES_CONVERSACION.map((s) => `"${s}"`).j
 
 /** Acción del asistente. Esquema plano (más fácil para el modelo); la validación estricta la hace validarAcciones. */
 const EsquemaAccion = z.object({
-  tipo: z.string().describe('pedir_ayuda | enviar_mensaje | emitir_alerta | confirmar_bien | ir_a | mostrar_sistema | cambiar_contexto | voz | actualizar_historia | ejecutar_escenario | cambiar_astronauta'),
+  tipo: z.string().describe('pedir_ayuda | enviar_mensaje | emitir_alerta | confirmar_bien | ir_a | mostrar_sistema | cambiar_contexto | voz | actualizar_historia | ejecutar_escenario | control_simulador | cambiar_astronauta'),
+  orden: z.string().optional().describe('pausar | continuar | siguiente | reiniciar | detener'),
   destino: z.string().optional().describe('companero | medico | base | tierra | todos'),
   motivo: z.string().optional(),
   mensaje: z.string().optional(),

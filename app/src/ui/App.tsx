@@ -2,21 +2,23 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { analizarEntornoIA, consultarEstadoIA, conversarIA, estadoParaIA, evaluarIA, peticionEvaluacion } from '../adaptadores/ia/cliente';
 import type { EstadoIA, EstadoParaIA, RespuestaConversacion, TurnoConversacion } from '../adaptadores/ia/contrato';
 import { AdaptadorEjemplo } from '../adaptadores/interop/ejemploNasa';
-import { ESCENARIOS, type Escenario } from '../adaptadores/simulador/escenarios';
+import { nuevoNucleo } from '../adaptadores/simulador/ejecutor';
+import { buscarEscenario, CONTEXTO_BASE, ESCENARIOS } from '../adaptadores/simulador/escenarios';
 import { PERFILES } from '../adaptadores/simulador/perfiles';
+import { RegistroSimulacion } from '../adaptadores/simulador/registro';
 import { respuestaSimulada } from '../adaptadores/simulador/tripulacion';
 import { aceptarRespuestaSinNombre, detener, hablar } from '../adaptadores/voz/voz';
 import type { Accion } from '../core/acciones';
 import { interpretar } from '../core/conversacion';
-import { NucleoSalud } from '../core/nucleo';
+import type { NucleoSalud } from '../core/nucleo';
 import { ChequeoOrientacion } from '../core/orientacion';
-import { REGLAS } from '../core/reglas';
 import { enRango, esSensor, NOMBRE_SISTEMA, type Comunicacion, type Contexto, type HistoriaClinica, type Lectura, type Mensaje, type Perfil, type SistemaCorporal } from '../core/tipos';
 import { useAsistente, type ResultadoConversacion } from './asistente';
 import { AccesoHigia } from './componentes/AccesoHigia';
 import { BannerAlerta, BannerComunicacion, BarraSuperior, Navegacion } from './componentes/Estructura';
 import { PanelDemo } from './componentes/PanelDemo';
 import { SECCIONES, useSeccion } from './navegacion';
+import { useSimulador } from './simulador/useSimulador';
 import { VistaAsistente } from './vistas/VistaAsistente';
 import { VistaComunicaciones } from './vistas/VistaComunicaciones';
 import { VistaEntorno } from './vistas/VistaEntorno';
@@ -25,13 +27,7 @@ import { VistaPerfil } from './vistas/VistaPerfil';
 import { VistaReportes } from './vistas/VistaReportes';
 import { VistaResumen } from './vistas/VistaResumen';
 
-const CONTEXTO_INICIAL: Contexto = {
-  ubicacion: 'habitat', destino: 'luna', actividad: 'trabajo', climaEspacial: 'calmo', hora: 10,
-  pantallaHabitat: true, pantallaPersonal: true, auricular: true,
-  companeroCercano: true, medicoABordo: false,
-  conexionHabitat: false, conexionTierra: false,
-  diaMision: 45, transicionGravedad: false,
-};
+const CONTEXTO_INICIAL: Contexto = CONTEXTO_BASE;
 
 /** Segundos antes de escalar en que Higia avisa por voz que va a comunicarse con otros. */
 const PREAVISO_ESCALADA_MS = 10_000;
@@ -56,16 +52,18 @@ const escribiendo = (e: KeyboardEvent) => {
 };
 
 const normal = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const ORDEN = { normal: 0, info: 1, aviso: 2, alerta: 3 } as const;
 
 /** Acciones que no esperan a la IA: la seguridad no depende de la red. */
 const esUrgente = (a: Accion) => a.tipo === 'pedir_ayuda' || a.tipo === 'confirmar_bien' || (a.tipo === 'emitir_alerta' && a.nivel === 'alerta');
 
 export function App() {
-  const [nucleo] = useState(() => {
-    const n = new NucleoSalud(REGLAS, conHistoriaGuardada(PERFILES[0]), CONTEXTO_INICIAL);
-    n.companeros = PERFILES.filter((p) => p.id !== PERFILES[0].id).map((p) => p.nombre);
-    return n;
-  });
+  // El núcleo se puede reemplazar: el simulador reinicia con uno limpio entre escenarios.
+  const [nucleo, setNucleo] = useState<NucleoSalud>(() => nuevoNucleo(conHistoriaGuardada(PERFILES[0]), CONTEXTO_INICIAL));
+  /** Cambia en cada reinicio: los temporizadores de un núcleo anterior no deben actuar sobre el nuevo. */
+  const generacion = useRef(0);
+  const [registro] = useState(() => new RegistroSimulacion());
+  const simRef = useRef<ReturnType<typeof useSimulador> | null>(null);
   const [interop] = useState(() => new AdaptadorEjemplo());
   const [seccion, ir] = useSeccion();
   const [, setVersion] = useState(0);
@@ -132,6 +130,9 @@ export function App() {
    */
   const evaluarConIA = useCallback((nuevos: Mensaje[]) => {
     if (!iaRef.current) return;
+    // Durante un escenario, cada mensaje sería una llamada con costo: solo si se activa a propósito.
+    const sim = simRef.current;
+    if (sim?.activo && !sim.iaEnSimulador) return;
     for (const m of nuevos) {
       if (m.escalamiento || m.esRecordatorio || m.hallazgo.nivel === 'normal') continue;
       setEvaluaciones((prev) => ({ ...prev, [m.id]: { estado: 'cargando' } }));
@@ -144,16 +145,19 @@ export function App() {
 
   /** Simula la respuesta de cada destinatario (en la realidad llega por radio o por la red del hábitat). */
   const programarRespuestas = useCallback((coms: Comunicacion[]) => {
+    const gen = generacion.current;
     for (const com of coms) {
-      const r = respuestaSimulada(com, nucleo.companeros[0]);
+      const r = respuestaSimulada(com, nucleo.companeros[0], simRef.current?.conductaRef.current);
       if (!r) continue;
       setTimeout(() => {
+        if (gen !== generacion.current) return; // el núcleo se reinició: esta respuesta ya no aplica
         nucleo.registrarRespuesta(com.id, r.texto);
+        registro.agregar({ tipo: 'respuesta', texto: r.texto });
         if (vozRef.current && com.tipo === 'emergencia') hablar(r.texto);
         setVersion((v) => v + 1);
       }, r.enMs);
     }
-  }, [nucleo]);
+  }, [nucleo, registro]);
 
   /** Empieza el chequeo de orientación y devuelve la primera pregunta (con su presentación). */
   const iniciarChequeo = useCallback((): string => {
@@ -163,7 +167,15 @@ export function App() {
   }, [nucleo]);
 
   const procesar = useCallback(async (nuevos: Mensaje[]) => {
-    if (vozRef.current) nuevos.filter((m) => m.voz).forEach((m) => hablar(m.texto));
+    const enSimulador = !!simRef.current?.activo;
+    // En el simulador varios hallazgos de un mismo paso no se leen seguidos: se lee el de mayor nivel.
+    const aLeer = nuevos.filter((m) => m.voz).sort((a, b) => ORDEN[b.hallazgo.nivel] - ORDEN[a.hallazgo.nivel]);
+    if (vozRef.current) (enSimulador ? aLeer.slice(0, 1) : aLeer).forEach((m) => hablar(m.texto));
+    for (const m of nuevos) {
+      if (m.escalamiento) registro.agregar({ tipo: 'escalada', texto: m.texto, nivel: m.hallazgo.nivel, detalle: m.escalamiento.motivo });
+      else registro.agregar({ tipo: 'mensaje', texto: `${m.hallazgo.titulo}${m.diferido ? ' (retenido)' : ''}`, nivel: m.hallazgo.nivel, detalle: `${m.motivo} [${m.hallazgo.riesgoId}]` });
+    }
+    if (nuevos.some((m) => m.escalamiento?.origen === 'escalada')) simRef.current?.notificarEscalada();
     if (nuevos.length) setMensajes((prev) => [...nuevos, ...prev].slice(0, 100));
     // Tras un golpe en la cabeza medido por el casco, Higia evalúa la orientación por su cuenta.
     for (const m of nuevos) {
@@ -187,7 +199,7 @@ export function App() {
       await interop.enviar(nucleo.tomarPendientesReporte(), nucleo.perfil);
     }
     refrescar();
-  }, [nucleo, interop, evaluarConIA, programarRespuestas, iniciarChequeo]);
+  }, [nucleo, interop, evaluarConIA, programarRespuestas, iniciarChequeo, registro]);
 
   // Cada segundo: preaviso y escalada de alertas sin respuesta. Cada minuto: recordatorios.
   useEffect(() => {
@@ -212,15 +224,27 @@ export function App() {
   }, [nucleo, procesar]);
 
   const cambiarContexto = (cambios: Partial<Contexto>) => {
+    registro.agregar({ tipo: 'contexto', texto: Object.entries(cambios).map(([k, v]) => `${k}: ${String(v)}`).join(', ') });
     void procesar(nucleo.actualizarContexto(cambios));
     // Al recuperar enlace, sale lo que estaba en cola.
     if (cambios.conexionHabitat || cambios.conexionTierra || cambios.companeroCercano) programarRespuestas(nucleo.reintentarCola());
   };
 
-  const ejecutarEscenario = (e: Escenario) => {
-    const deContexto = e.contexto ? nucleo.actualizarContexto(e.contexto) : [];
-    const t = Date.now();
-    void procesar([...deContexto, ...nucleo.registrar(e.lecturas(t, nucleo.historial), t)]);
+  /** Núcleo limpio (lo pide el simulador): se borra todo lo que dependía del anterior. */
+  const reiniciarNucleo = (perfil: Perfil, contexto: Contexto): NucleoSalud => {
+    detener();
+    generacion.current++;
+    const n = nuevoNucleo(conHistoriaGuardada(perfil), contexto);
+    setNucleo(n);
+    setMensajes([]);
+    setEvaluaciones({});
+    setAvisoComunicacion(null);
+    setSeleccion(null);
+    turnos.current = [];
+    preavisados.current.clear();
+    chequeo.current = null;
+    impactosChequeados.current.clear();
+    return n;
   };
 
   const cambiarPerfil = (id: string) => {
@@ -314,10 +338,13 @@ export function App() {
           if (!chequeo.current) { chequeoPendiente = iniciarChequeo(); hechos.push('Inicié un chequeo de orientación'); }
           break;
         case 'ejecutar_escenario': {
-          const e = ESCENARIOS.find((x) => x.id === a.escenario || normal(x.nombre) === normal(a.escenario));
-          if (e) { ejecutarEscenario(e); hechos.push(`Escenario de la demo: ${e.nombre}`); }
+          const e = buscarEscenario(a.escenario);
+          if (e) { sim.ejecutarEscenario(e); hechos.push(`Escenario del simulador: ${e.nombre}`); }
           break;
         }
+        case 'control_simulador':
+          if (sim.activo) { sim.control(a.orden); hechos.push(`Simulador: ${a.orden}`); }
+          break;
         case 'cambiar_astronauta': {
           const p = PERFILES.find((x) => x.id === a.astronauta || normal(x.nombre).includes(normal(a.astronauta)));
           if (p) { cambiarPerfil(p.id); hechos.push(`Astronauta: ${p.nombre}`); }
@@ -413,6 +440,12 @@ export function App() {
   const asistente = useAsistente(conversar, vozActiva);
   decirRef.current = asistente.decir;
 
+  const sim = useSimulador({
+    nucleo, registro, reiniciarNucleo, procesar: (ms) => void procesar(ms), cambiarContexto,
+    decirFrase: (f) => void asistente.enviar(f, 'texto'),
+  });
+  simRef.current = sim;
+
   const vencimientos = nucleo.confirmacionesPendientes();
   const pendientes = mensajes.filter((m) => vencimientos.has(m.id)).map((m) => ({ mensaje: m, vence: vencimientos.get(m.id)! }));
   const nuevos = seccion === 'mensajes' ? 0 : mensajes.filter((m) => m.timestamp > vistoHasta && !m.diferido).length;
@@ -478,7 +511,7 @@ export function App() {
 
       <PanelDemo
         abierto={demoAbierta} onCerrar={() => alternarDemo(false)} perfil={nucleo.perfil} contexto={c}
-        onPerfil={cambiarPerfil} onContexto={cambiarContexto} onEscenario={ejecutarEscenario}
+        onPerfil={cambiarPerfil} onContexto={cambiarContexto} onEscenario={(e) => sim.ejecutarEscenario(e)}
       />
     </div>
   );

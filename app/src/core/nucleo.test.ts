@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PERFILES } from '../adaptadores/simulador/perfiles';
+import { validarAcciones } from './acciones';
 import { interpretar } from './conversacion';
 import { NucleoSalud, PLAZO_CONFIRMACION_INCAPACIDAD_MS, PLAZO_CONFIRMACION_MS } from './nucleo';
 import { REGLAS } from './reglas';
@@ -223,6 +224,29 @@ describe('aptitud para tareas críticas', () => {
   it('salir a EVA apto no genera aviso', () => {
     const n = nuevo(NOVATO_PANICO);
     expect(n.actualizarContexto({ ubicacion: 'eva' }, T).some((m) => m.hallazgo.riesgoId.startsWith('tarea.'))).toBe(false);
+  });
+});
+
+describe('precarga silenciosa', () => {
+  it('carga historia y hallazgos sin mensajes ni confirmaciones', () => {
+    const n = nuevo(NOVATO_PANICO);
+    n.precargar([L('spo2', 82), L('animo', 3)], T);
+    expect(n.hallazgo('pulmones.spo2')?.nivel).toBe('alerta');
+    expect(n.confirmacionesPendientes().size).toBe(0);
+    // Ya cuenta como comunicado: la misma lectura no vuelve a hablar.
+    expect(n.registrar(L('spo2', 82, T + 1), T + 1)).toHaveLength(0);
+    // Un cambio de nivel sí.
+    expect(n.registrar(L('spo2', 90, T + 2), T + 2)).toHaveLength(1);
+  });
+});
+
+describe('control del simulador', () => {
+  it('el intérprete local entiende las órdenes y la validación las acepta', () => {
+    const n = nuevo();
+    expect(interpretar('pausa el simulador', n, T).acciones).toEqual([{ tipo: 'control_simulador', orden: 'pausar' }]);
+    expect(interpretar('siguiente paso del escenario', n, T).acciones).toEqual([{ tipo: 'control_simulador', orden: 'siguiente' }]);
+    expect(validarAcciones([{ tipo: 'control_simulador', orden: 'reiniciar' }, { tipo: 'control_simulador', orden: 'borrar' }]))
+      .toEqual([{ tipo: 'control_simulador', orden: 'reiniciar' }]);
   });
 });
 

@@ -32,6 +32,12 @@ export const reglaRadiacion = definirRegla(
         resumenSimple: fuera ? 'Hay una tormenta solar y estás expuesto.' : 'Hay una tormenta solar en curso.',
         accion: fuera ? 'Regresa al hábitat y ve al refugio de inmediato.' : 'Permanece en la zona blindada hasta que termine.',
         accionPorUbicacion: { rover: 'Vuelve al hábitat o activa el blindaje del rover.' },
+        pasos: fuera ? [
+          'Deja la tarea y avisa a tu compañero.',
+          'Regresa a la esclusa por el camino más corto (o activa el blindaje del rover).',
+          'Ya adentro, ve al refugio de radiación y lleva el dosímetro.',
+          'No salgas hasta que el hábitat indique que terminó la tormenta.',
+        ] : undefined,
         ruta: fuera ? 'reporte' : 'autogestion', sensible: false,
       };
     }
@@ -72,6 +78,12 @@ export const reglaRadiacion = definirRegla(
         nivel: 'alerta', titulo: 'Límite de dosis de carrera alcanzado', detalleTecnico: detalle,
         resumenSimple: 'Alcanzaste el máximo de radiación permitido.',
         accion: 'Evita actividades fuera del hábitat. Se notificará al equipo médico.',
+        pasos: [
+          'No salgas a EVA hasta que el equipo médico lo revise.',
+          'Pasa el mayor tiempo posible en las zonas más blindadas del hábitat.',
+          'Higia envía el reporte con tu dosis acumulada.',
+        ],
+        bloquea: ['eva'],
         ruta: 'reporte', sensible: false,
       };
     }

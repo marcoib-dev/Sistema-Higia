@@ -32,7 +32,11 @@ export type Accion =
   | { tipo: 'actualizar_historia'; campo: 'alergias' | 'medicacion' | 'antecedentes' | 'notas'; valor: string }
   /** Controles de la demo (simulador). */
   | { tipo: 'ejecutar_escenario'; escenario: string }
+  | { tipo: 'control_simulador'; orden: OrdenSimulador }
   | { tipo: 'cambiar_astronauta'; astronauta: string };
+
+export const ORDENES_SIMULADOR = ['pausar', 'continuar', 'siguiente', 'reiniciar', 'detener'] as const;
+export type OrdenSimulador = (typeof ORDENES_SIMULADOR)[number];
 
 const esTexto = (v: unknown, max = 500): v is string => typeof v === 'string' && v.trim().length > 0 && v.length <= max;
 const en = <T extends string>(lista: readonly T[], v: unknown): v is T => typeof v === 'string' && (lista as readonly string[]).includes(v);
@@ -72,6 +76,8 @@ export function validarAccion(a: unknown): Accion | null {
         ? { tipo: 'actualizar_historia', campo: o.campo, valor: o.valor } : null;
     case 'ejecutar_escenario':
       return esTexto(o.escenario, 60) ? { tipo: 'ejecutar_escenario', escenario: o.escenario } : null;
+    case 'control_simulador':
+      return en(ORDENES_SIMULADOR, o.orden) ? { tipo: 'control_simulador', orden: o.orden } : null;
     case 'cambiar_astronauta':
       return esTexto(o.astronauta, 60) ? { tipo: 'cambiar_astronauta', astronauta: o.astronauta } : null;
     default:
