@@ -21,8 +21,9 @@ Higia vigila la salud de astronautas que viven en hábitats permanentes (base lu
 6. [Arquitectura](#arquitectura)
 7. [Estructura del código y reparto del trabajo](#estructura-del-código-y-reparto-del-trabajo)
 8. [Cómo extenderlo](#cómo-extenderlo)
-9. [Solución de problemas](#solución-de-problemas)
-10. [Advertencias](#advertencias)
+9. [Estado del plan de riesgos y simulador (traspaso)](#estado-del-plan-de-riesgos-y-simulador-traspaso)
+10. [Solución de problemas](#solución-de-problemas)
+11. [Advertencias](#advertencias)
 
 ---
 
@@ -185,7 +186,7 @@ La elección se recuerda en el dispositivo. Si se pide un sistema que no está e
 
 ### 2. Motor de detección
 
-Once reglas, una por riesgo (`app/src/core/reglas/`). Cada una lee el historial, lo compara con la **línea base personal** cuando aplica y **tiene en cuenta el contexto**. Devuelve un *hallazgo* con: nivel, explicación simple, detalle técnico, acción (que puede variar según la ubicación), guía paso a paso (en alertas), ruta, si es privado, si puede dejar al astronauta incapacitado y de qué anexo sale.
+**36 reglas** (`app/src/core/reglas/`) que cubren los **17 riesgos del HRP** de la NASA más el **tromboembolismo venoso** (catálogo en `app/src/core/riesgosHRP.ts`). Cada regla declara su `fuente` y los riesgos HRP a los que responde (`hrp`). Cada una lee el historial, lo compara con la **línea base personal** cuando aplica y **tiene en cuenta el contexto**. Devuelve un *hallazgo* con: nivel, explicación simple, detalle técnico, acción (que puede variar según la ubicación), guía paso a paso (en alertas), ruta, si es privado, si puede dejar al astronauta incapacitado y de qué anexo sale.
 
 | Riesgo | Sensor | Cómo evalúa (umbrales provisionales) |
 |---|---|---|
@@ -201,7 +202,36 @@ Once reglas, una por riesgo (`app/src/core/reglas/`). Cada una lee el historial,
 | Desorientación y deterioro cognitivo (privado) | `orientacion` (0–10), `cognicion` (0–100, tipo batería Cognition), `tiempoReaccion` (ms, PVT) | Orientación ≤7 → aviso, ≤4 → alerta. Respecto a su línea base: prueba cognitiva −15 % → aviso, −30 % → alerta; tiempo de reacción +25 % → aviso, +50 % → alerta |
 | Posibles síntomas psicóticos (privado) | `marcadoresPsicoticos` (0–10, señales en la conversación) + `horasSueno` + `estres` | ≥3, o ≥1 con sueño <5 h o estrés ≥70 → aviso; ≥6, o ≥4 con sueño bajo **y** estrés alto → alerta (no dejarlo solo, avisar al médico). Sin señales en la conversación no se evalúa: la falta de sueño sola no es psicosis |
 
-Para ahorrar energía, cuando llega una lectura **solo se evalúan las reglas que usan ese sensor**. Cuando cambia el contexto, se reevalúan todas.
+La tabla de arriba son las 11 reglas originales. Las 25 nuevas, por riesgo del HRP (detalle y umbrales en `PLAN_RIESGOS_Y_SIMULADOR.md`, §6):
+
+| Riesgo HRP (§) | Reglas nuevas |
+|---|---|
+| Inmune (7.1.1) | `inmune.fiebre` (fiebre, fiebre sostenida, hipotermia; tolera +0,5 °C en esfuerzo), `inmune.reactivacion` (piel/alergia agravadas por sueño, estrés y radiación) |
+| Sensoriomotor (7.1.2) | `vestibular.cinetosis` (esperable en transición de gravedad; en EVA sube a alerta), `vestibular.equilibrio` |
+| Cardiovascular (7.1.3) | `cardio.arritmia`; `cardio.presion` ahora usa la transición de gravedad (sistólica <100 ya es aviso) |
+| Descompresión (7.1.4) | `descompresion.eva` (ventana de EVA + 24 h, prerrespiración, protocolo textual de regreso) |
+| Microorganismos (7.1.5) | `microbioma.entorno` (tendencia de hisopados + síntomas + fiebre) |
+| Hipoxia (7.1.6) | `hipoxia.cabina` (ppO₂ de cabina y cuadro de dos síntomas de §7.1.6) |
+| Nutrición (7.1.7) | `metabolismo.glucemia`, `nutricion.ingesta`, `nutricion.peso`, `nutricion.hidratacion`, `nutricion.fatigaMenu` |
+| EVA (7.1.8) | `eva.carga` (duración, sobreesfuerzo sostenido, calor en el traje) |
+| Aptitud (7.1.9) | `musculo.adherencia` (6–7 días/semana), `musculo.aptitud` (10 % esperable, 20 % del documento) |
+| SANS (7.1.10) | `sans.vision` (OCT, presión intraocular, agudeza, síntoma) |
+| Óseo (7.1.11) | `hueso.perdida`: **estimación** por día de misión × adherencia a la resistencia; osteopenia baja umbrales; calcio urinario sube un nivel |
+| Conducta (7.2.1) | `mental.animoSostenido` (tendencia de 7 y 14 días; sin enlace con Tierra propone autocuidado) |
+| Equipo (7.2.2) | `equipo.cohesion` (sensible) |
+| Sueño (7.2.3) | `sueno.circadiano`, `trabajo.sobrecarga`, `entorno.ruido` |
+| Cargas dinámicas (7.2.5) | `lesion.cargaDinamica` (dolor de espalda y hueso debilitado agravan) |
+| Radiación (7.3.1) | `radiacion.dosis`: umbral de tasa a la mitad en Luna y Marte, proyección al límite |
+| Trombosis (8.2) | `vascular.trombosis` (flujo yugular, asimetría de pantorrilla; con falta de aire, posible embolia) |
+| Soporte de sistemas (7.2.4) | Garantía de diseño: toda alerta trae `pasos` (lo verifican los tests) y el escenario `autonomia` |
+
+**Aptitud para tareas críticas.** Los hallazgos declaran qué tareas contraindican (`bloquea`: EVA, pilotaje, ejercicio intenso). `NucleoSalud.aptitudTareas()` las agrega y, si el astronauta sale a EVA o sube al rover con una contraindicación, Higia genera el aviso `tarea.eva` / `tarea.pilotaje` (se borra al volver al hábitat).
+
+**Síntomas como datos.** Lo que cuenta el astronauta se registra como lecturas `sx*` (intensidad 0–10: "un poco" 3, por defecto 5, "mucho" 8, "7 de 10") y las reglas lo cruzan con sensores y contexto. Lo urgente (dolor de pecho, no poder respirar, desmayo, golpe en la cabeza, signos de ACV) sigue siendo alerta inmediata sin depender de reglas.
+
+**Caducidad.** Si una regla deja de tener datos vigentes (p. ej. el golpe tiene más de 24 h), su hallazgo se borra; lo contado en la conversación vence a las 24 h.
+
+Para ahorrar energía, cuando llega una lectura **solo se evalúan las reglas que usan ese sensor**. Cuando cambia el contexto, se reevalúan todas. El catálogo de los 50 datos (nombre, unidad, rango, categoría, si se puede decir por voz) está en `app/src/core/sensores.ts`.
 
 **Datos en cada análisis clínico.** Todo hallazgo guarda los datos exactos que usó la regla (sensor, valor, hora, fuente y línea base de la persona). En **Mensajes** cada aviso muestra "Datos usados en este análisis". La IA recibe esos datos, su serie reciente, las líneas base y la historia clínica, y su evaluación debe incluir **"Datos que usó"** (cada dato con su valor) y **"Limitaciones"** (qué falta: por ejemplo, una sola medición o ningún chequeo después de un golpe). Si la IA no cita datos, la app lo advierte.
 
@@ -344,6 +374,8 @@ En la barra superior: **silenciar o activar** la voz, **pausar y reanudar**, **d
 
 ### Escenarios
 
+**40 escenarios** en `app/src/adaptadores/simulador/escenarios/` (uno por archivo de categoría). Cada uno es una **línea de tiempo** de pasos con narración, contexto, lecturas o una frase del astronauta, y el resultado **esperado** de cada paso. El mismo catálogo es la suite `escenarios.test.ts`. Los 15 originales conservan su `id`:
+
 | Escenario | Qué demuestra |
 |---|---|
 | Día normal en el hábitat | Todo en verde; también sirve para volver a la normalidad |
@@ -362,9 +394,13 @@ En la barra superior: **silenciar o activar** la voz, **pausar y reanudar**, **d
 | Desorientación y lentitud | Orientación 6/10, prueba cognitiva y tiempo de reacción peores que la línea base tras noches cortas |
 | Señales de alteración de la percepción | Dice oír voces, con poco sueño y estrés alto → alerta sensible de posibles síntomas psicóticos |
 
+Nuevos (25): `fiebre`, `herpes`, `cinetosis-llegada`, `rover-mareo`, `arritmia`, `aterrizaje-desmayo`, `trombo-yugular`, `descompresion`, `descompresion-tardia`, `hipoxia-cabina`, `fatiga-menu`, `hipoglucemia`, `eva-larga`, `fuerza`, `hueso-dia-150`, `sans`, `animo-sostenido`, `conflicto`, `turnos`, `ruido-noche`, `aterrizaje-brusco`, `agua-contaminada`, `tormenta-marte`, `autonomia`, `dia-200`. Qué demuestra cada uno: tabla de la Parte G de `PLAN_RIESGOS_Y_SIMULADOR.md`.
+
+**Guion del pitch** (`GUION_DEMO`): `base` → `descompresion` → `sans` → `animo-sostenido` → `hueso-dia-150` → `autonomia`.
+
 ### Tests
 
-`npm test` (49 tests sobre el núcleo, el asistente y la voz) verifica:
+`npm test` (200 tests) verifica:
 
 - **Canales:** EVA → auricular; lo privado nunca va a la pantalla compartida; retención durante el sueño; las alertas interrumpen de madrugada.
 - **Cuándo habla:** solo cuando cambia algo; recordatorios según la experiencia.
@@ -372,7 +408,11 @@ En la barra superior: **silenciar o activar** la voz, **pausar y reanudar**, **d
 - **Reportes:** a quién van según haya médico o conexión, y cuándo hay guía paso a paso.
 - **Escalada:** confirmación, plazos, destinos, baliza y retardo según el destino.
 - **Contexto:** ejercicio y tormenta solar.
-- **Conversación:** el intérprete local registra datos y responde consultas.
+- **Conversación:** el intérprete local registra datos (también números en palabras), síntomas con intensidad y responde consultas.
+- **Reglas** (`core/reglas/*.test.ts`): cada umbral, agravante, `bloquea`, `sensible` y `posibleIncapacidad` de las 36 reglas.
+- **Cobertura** (`core/cobertura.test.ts`): los 18 riesgos tienen regla y escenario; todo dato del catálogo lo usa alguna regla.
+- **Escenarios** (`adaptadores/simulador/escenarios.test.ts`): los 40 escenarios corren sobre un núcleo real y cumplen su `esperado`; toda alerta trae pasos.
+- **Reproductor** (`reproductor.test.ts`): orden, pausa, siguiente, velocidad, espera de escalada y guion, con tiempo falso.
 
 ---
 
@@ -408,20 +448,24 @@ app/
 ├── src/
 │   ├── core/                  Núcleo autónomo (sin dependencias de UI)
 │   │   ├── tipos.ts           Contratos de datos
-│   │   ├── reglas/            Una regla por riesgo
+│   │   ├── sensores.ts        Catálogo de los 50 datos (rango, unidad, categoría)
+│   │   ├── riesgosHRP.ts      Los 18 riesgos del HRP (peligros, sistemas, enlaces)
+│   │   ├── numeros.ts         Números en palabras → cifras (intérprete local)
+│   │   ├── reglas/            36 reglas, agrupadas por área
 │   │   ├── nucleo.ts          Orquestación, confirmación y escalada
 │   │   ├── personalizador.ts  Texto según el perfil
 │   │   ├── canales.ts         Elección de canal
 │   │   ├── conversacion.ts    Intérprete local
 │   │   └── nucleo.test.ts     Tests
 │   ├── adaptadores/
-│   │   ├── simulador/         Escenarios y astronautas de ejemplo
+│   │   ├── simulador/         Escenarios (escenarios/), reproductor, registro, tripulación y astronautas
 │   │   ├── voz/               Síntesis y reconocimiento de voz
 │   │   ├── camara/            Captura de imagen
 │   │   ├── ia/                Cliente de la IA y contrato con el servidor
 │   │   └── interop/           Exportación FHIR (ejemplo)
 │   └── ui/
 │       ├── App.tsx            Estado, atajos y estructura
+│       ├── simulador/         useSimulador: escenarios sobre el núcleo real, reinicio, registro
 │       ├── navegacion.ts      Secciones y direcciones (#/…)
 │       ├── iconos.tsx         Íconos SVG
 │       ├── componentes/       Barra superior, navegación, franja de alerta, panel de demo, piezas básicas
@@ -434,7 +478,7 @@ app/
 | Línea | Carpeta | Qué hay | Pendiente |
 |---|---|---|---|
 | — | `app/src/core/tipos.ts` | **Contratos de datos.** Avisen antes de cambiarlos. | |
-| **A. Detección** | `app/src/core/reglas/` | 8 reglas con contexto y guías paso a paso | Validar umbrales con los anexos; agregar huesos, temperatura, glucemia, vestibular |
+| **A. Detección** | `app/src/core/reglas/` | 36 reglas que cubren los 18 riesgos HRP, con contexto, agravantes y guías paso a paso | Validar umbrales con los anexos y kinesiología |
 | **B. Perfil, canales y escalada** | `app/src/core/personalizador.ts`, `canales.ts`, `nucleo.ts` | Texto por perfil, canal, sueño, privacidad, recordatorios, confirmación y escalada | Perfil que aprende del uso |
 | **C. Interfaz** | `app/src/ui/` | Navegación por secciones, figura anatómica, panel de demo, franja de alerta, íconos SVG | Gráficos de tendencia, vistas dedicadas "pantalla del hábitat" y "auricular" |
 | **D. Voz, IA e integración** | `app/src/adaptadores/`, `app/server/` | Web Speech API, IA híbrida (conversación y visión), FHIR de ejemplo | Reconocimiento de voz local (Vosk o whisper.cpp) |
@@ -445,11 +489,12 @@ app/
 
 ### Agregar un riesgo
 
-1. Crea la regla en `app/src/core/reglas/<area>.ts` con `definirRegla(...)`. `respiratorio.ts` es un ejemplo corto.
-2. Indica la `fuente` (anexo o tabla del desafío). Sin fuente no hay regla.
-3. Si la alerta puede dejar al astronauta incapacitado, marca `posibleIncapacidad: true`. Agrega `pasos` para cuando no hay médico a bordo.
-4. Súmala a `REGLAS` en `app/src/core/reglas/index.ts`.
-5. Agrega un escenario en `app/src/adaptadores/simulador/escenarios.ts` y un test en `app/src/core/nucleo.test.ts`.
+1. Si necesitas un dato nuevo, agrégalo a `TipoSensor` e `INFO_SENSOR` en `app/src/core/sensores.ts` (con rango y categoría).
+2. Crea la regla en `app/src/core/reglas/<area>.ts` con `definirRegla(...)`. Los ayudantes (ventanas, `porDia`, `pendiente`, `factor`, `tieneAntecedente`) están en `reglas/util.ts`.
+3. Indica la `fuente` (anexo o tabla del desafío) y los riesgos `hrp`. Sin fuente no hay regla.
+4. Toda alerta lleva `pasos`. Si puede dejar al astronauta incapacitado, `posibleIncapacidad: true`. Si contraindica una tarea, `bloquea`.
+5. Súmala a `REGLAS` en `app/src/core/reglas/index.ts`.
+6. Agrega tests en `app/src/core/reglas/*.test.ts` (ayudantes en `reglas/pruebas.ts`) y un escenario con `esperado` en `app/src/adaptadores/simulador/escenarios/<categoria>.ts`. `cobertura.test.ts` falla si un dato o un riesgo queda sin cubrir.
 
 ### Otros cambios frecuentes
 
@@ -463,6 +508,51 @@ app/
 | Conectar un sistema médico real | Implementar `AdaptadorExterno` en `app/src/adaptadores/interop/` |
 | Agregar una sección | `SECCIONES` en `app/src/ui/navegacion.ts` y una vista en `app/src/ui/vistas/` |
 | Cambiar colores o tipografía | Variables al inicio de `app/src/ui/estilos.css` |
+
+---
+
+## Estado del plan de riesgos y simulador (traspaso)
+
+El plan completo está en [`PLAN_RIESGOS_Y_SIMULADOR.md`](PLAN_RIESGOS_Y_SIMULADOR.md). Se implementó por fases, un commit por fase, con `npm run typecheck` y `npm test` en verde en cada una.
+
+| Fase | Estado | Commit |
+|---|---|---|
+| 1. Cimientos (catálogo HRP, caducidad, aptitud para tareas, utilidades) | Hecha | `Fase 1: …` |
+| 2. Catálogo de datos (50 datos, líneas base, 4.º perfil: comandante Irene Novak) | Hecha | `Fase 2: …` |
+| 3. Reglas con datos existentes (fiebre, reactivación, glucemia, radiación, presión) | Hecha | `Fase 3: …` |
+| 4. Reglas fisiológicas (C2, C3, C4, C6, C8, C10) | Hecha | `Fase 4: …` |
+| 5. Largo plazo y hábitos (C5, C7, C9, C11, C16, C18) | Hecha | `Fase 5: …` |
+| 6. Conducta (C12, C13, C14) | Hecha | `Fase 6: …` |
+| 7. Conversación e IA (síntomas como lecturas, números en palabras, contrato derivado del catálogo) | Hecha | `Fase 7: …` |
+| 8. Motor del simulador (modelo de escenario, reproductor, registro, tripulación, `useSimulador`) | Hecha | `Fase 8: …` |
+| 9. Escenarios nuevos (25, total 40) y `cobertura.test.ts` | Hecha | `Fase 9: …` |
+| **10. Interfaz del simulador (Parte F)** | **Pendiente** | — |
+| **11. Cierre** | **Pendiente** | — |
+
+### Qué falta (para quien sigue)
+
+**Fase 10: interfaz del simulador** (Parte F del plan). El motor ya está listo y conectado; falta la UI:
+
+- Hoy `PanelDemo.tsx` sigue siendo la interfaz: lista los 40 escenarios y al tocar uno llama a `sim.ejecutarEscenario(e)`, que ya corre la línea de tiempo real (reinicia el núcleo, aplica perfil sugerido, contexto inicial y precarga). **No hay todavía barra de reproducción**: los pasos avanzan solos pero no se ve la narración.
+- Todo lo necesario está en el objeto `sim` que devuelve `useSimulador` (`app/src/ui/simulador/useSimulador.ts`), creado en `App.tsx`:
+  - `sim.reproductor`: `estado`, `escenario`, `indicePaso`, `paso`, `siguientePaso`, `msHastaSiguiente`, `esperando` (paso "no respondas"), `velocidad`, `cola`.
+  - `sim.control('pausar' | 'continuar' | 'siguiente' | 'reiniciar' | 'detener')`, `sim.cambiarVelocidad(1 | 2 | 4)`, `sim.ejecutarEscenario(e, { pausado: true })` (modo paso a paso), `sim.reproducirGuion()`.
+  - `sim.conducta` / `sim.cambiarConducta(...)` (pestaña Tripulación), `sim.iaEnSimulador` / `sim.setIaEnSimulador` (interruptor de IA), `sim.reproducidos` (marca "ya reproducido"), `sim.reiniciarSimulacion(perfilId?)` ("Limpiar todo").
+  - El registro de eventos es `registro` en `App.tsx` (`RegistroSimulacion`: `lista()`, `comoTexto()`, `limpiar()`).
+- Datos para las pestañas: `ESCENARIOS`, `GUION_DEMO`, `NOMBRE_CATEGORIA_ESCENARIO`, `duracionMs` y `diaNormal` (botón "Día normal") en `adaptadores/simulador/escenarios`; `INFO_SENSOR`, `CATEGORIAS_SENSOR`, `NOMBRE_CATEGORIA_SENSOR` (pestaña Datos, controles generados del catálogo); `RIESGOS_HRP`, `NOMBRE_PELIGRO` (filtros y pestaña Cobertura); `nucleo.estadoRiesgosHRP()` y `nucleo.aptitudTareas()` (semáforo de tareas y cobertura en vivo); `NOMBRE_TAREA`.
+- Contexto: faltan en la UI `diaMision` y `transicionGravedad` (pestaña Contexto y `VistaEntorno`), y el bloque "Iniciar EVA / Terminar EVA" (emitir `prerrespiracion` y luego `duracionEva`).
+- Cambios menores en la app del astronauta (F3): tarjeta "Aptitud para tareas" en `VistaResumen`, etiqueta del riesgo NASA (`hallazgo.hrp` → `RIESGO_HRP[id].nombre`) en `VistaMensajes`, renombrar "demo" → "simulador".
+- Atajos (F4): `Espacio`, `N`, `R` con el foco en el panel o la barra (respetando `escribiendo(e)`).
+
+**Fase 11: cierre.** Revisar este README con la interfaz nueva (sección "Panel de demo" y "Guion para la demo"), y probar a mano con la app corriendo el guion completo. Prueba manual pendiente señalada por el plan: reproducir un escenario con escalada pendiente (p. ej. `crisis`), reiniciarlo y confirmar que no llega una escalada ni una respuesta fantasma (la app usa un contador de generación para descartar temporizadores del núcleo anterior).
+
+### Decisiones tomadas durante la implementación
+
+- `INFO_SENSOR` se movió a `core/sensores.ts` (se reexporta desde `tipos.ts`, los imports no cambian).
+- El reinicio crea un núcleo nuevo (como pide el plan) y el reproductor espera 400 ms antes del primer paso para que React termine de instalarlo.
+- En el simulador, si un paso produce varios mensajes, solo se lee en voz el de mayor nivel; la evaluación con IA está apagada por defecto.
+- Por seguridad, "no puedo mover el brazo / me cuesta hablar" (signos de ACV) y "no puedo respirar" siguen siendo alertas inmediatas además de registrar su lectura `sx*`.
+- Umbrales: todos provisionales (los que vienen del documento lo indican en la regla). El criterio de OCT de `sans.vision` está pendiente de verificar contra la fuente oficial.
 
 ---
 

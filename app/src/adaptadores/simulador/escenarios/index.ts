@@ -3,6 +3,7 @@
  * Los `id` se conservan entre versiones: los usan la acción `ejecutar_escenario` y la IA.
  */
 import { ESCENARIOS_CONDUCTA } from './conducta';
+import { ESCENARIOS_ENTORNO } from './entorno';
 import { ESCENARIOS_FISIOLOGIA } from './fisiologia';
 import type { Escenario } from './modelo';
 import { ESCENARIOS_RADIACION } from './radiacion';
@@ -15,10 +16,11 @@ export const ESCENARIOS: Escenario[] = [
   ...ESCENARIOS_FISIOLOGIA,
   ...ESCENARIOS_CONDUCTA,
   ...ESCENARIOS_RADIACION,
+  ...ESCENARIOS_ENTORNO,
 ];
 
-/** Orden del guion para el pitch (~5 minutos). Se completa con los escenarios nuevos. */
-export const GUION_DEMO: string[] = ['base', 'eva-estres', 'crisis', 'animo', 'tormenta'];
+/** Orden del guion para el pitch (~5 minutos): recorre los cinco peligros y termina en la pestaña Cobertura. */
+export const GUION_DEMO: string[] = ['base', 'descompresion', 'sans', 'animo-sostenido', 'hueso-dia-150', 'autonomia'];
 
 const normal = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 

@@ -1,4 +1,4 @@
-import { L, noches, type Escenario } from './modelo';
+import { DIA, L, noches, serie, type Escenario } from './modelo';
 
 /** Escenarios de conducta y factores humanos (salud mental, sueño, cognición). */
 export const ESCENARIOS_CONDUCTA: Escenario[] = [
@@ -61,5 +61,43 @@ export const ESCENARIOS_CONDUCTA: Escenario[] = [
       lecturas: (t) => [...noches([4, 3.5, 4], t), L('estres', 82, t), L('marcadoresPsicoticos', 5, t)],
       esperado: [{ riesgoId: 'mental.psicosis', nivel: 'alerta' }],
     }],
+  },
+  {
+    id: 'animo-sostenido', nombre: 'Diez días grises camino a Marte', categoria: 'conducta',
+    descripcion: 'Lleva días con el ánimo bajo, sin enlace con Tierra.',
+    hrp: ['conductual'], peligros: ['aislamiento', 'distancia'], nivelMaximo: 'alerta',
+    queObservar: ['Mira la tendencia de dos semanas, no un día malo.', 'Sin enlace con Tierra no promete una llamada: propone autocuidado a bordo.', 'Nunca va a la pantalla compartida.'],
+    contextoInicial: { destino: 'marte', diaMision: 210, conexionTierra: false },
+    precarga: (t) => serie('animo', Array(9).fill(4), t - DIA),
+    pasos: [{
+      enMs: 0, titulo: 'Otro día gris', narracion: 'La encuesta de hoy vuelve a dar 4 de 10: son diez días.',
+      lecturas: (t) => [L('animo', 4, t)],
+      esperado: [{ riesgoId: 'mental.animoSostenido', nivel: 'alerta' }],
+    }],
+  },
+  {
+    id: 'conflicto', nombre: 'Tensión en la tripulación', categoria: 'conducta',
+    descripcion: 'La encuesta de convivencia baja en tres días.',
+    hrp: ['equipo'], peligros: ['aislamiento', 'distancia'], nivelMaximo: 'alerta',
+    queObservar: ['Es un dato sensible: va por el canal privado.', 'Propone una conversación guiada, no culpables.'],
+    pasos: [
+      { enMs: 0, titulo: 'Convivencia bien', narracion: 'Cohesión 8 de 10.', lecturas: (t) => [L('cohesionEquipo', 8, t)], esperado: [{ riesgoId: 'equipo.cohesion', nivel: 'normal' }] },
+      { enMs: 8_000, titulo: 'Roces', narracion: 'Cohesión 5 de 10.', lecturas: (t) => [L('cohesionEquipo', 5, t)], esperado: [{ riesgoId: 'equipo.cohesion', nivel: 'aviso' }] },
+      { enMs: 16_000, titulo: 'Conflicto abierto', narracion: 'Cohesión 3 de 10.', lecturas: (t) => [L('cohesionEquipo', 3, t)], esperado: [{ riesgoId: 'equipo.cohesion', nivel: 'alerta' }] },
+    ],
+  },
+  {
+    id: 'turnos', nombre: 'Semana de turnos corridos', categoria: 'conducta',
+    descripcion: 'Reloj biológico corrido, jornadas de más de 12 h y poco sueño. Después, sube al rover.',
+    hrp: ['sueno', 'conductual'], peligros: ['aislamiento', 'entorno'], nivelMaximo: 'alerta',
+    queObservar: ['Tres hallazgos de sueño y horarios.', 'Con menos de 5 h de sueño, el pilotaje queda contraindicado.'],
+    perfil: 'AST-03',
+    precarga: (t) => [...serie('horasTrabajo', [12.5, 12.5, 12.5], t - DIA), ...noches([5.5, 5], t - DIA)],
+    pasos: [
+      { enMs: 0, titulo: 'Reloj corrido', narracion: 'La actigrafía muestra el sueño corrido 3 h.', lecturas: (t) => [L('desfaseCircadiano', 3, t)], esperado: [{ riesgoId: 'sueno.circadiano', nivel: 'aviso' }] },
+      { enMs: 8_000, titulo: 'Cuarta jornada larga', narracion: 'Hoy trabajó 12,5 h, como los tres días anteriores.', lecturas: (t) => [L('horasTrabajo', 12.5, t)], esperado: [{ riesgoId: 'trabajo.sobrecarga', nivel: 'alerta' }] },
+      { enMs: 16_000, titulo: 'Durmió cuatro horas', narracion: 'Lo cuenta en la conversación.', frase: 'dormí cuatro horas', esperado: [{ riesgoId: 'sueno.deficit', nivel: 'aviso' }] },
+      { enMs: 24_000, titulo: 'Sube al rover', narracion: 'Va a manejar: el pilotaje está contraindicado.', contexto: { ubicacion: 'rover' }, esperado: [{ riesgoId: 'tarea.pilotaje', nivel: 'aviso' }] },
+    ],
   },
 ];

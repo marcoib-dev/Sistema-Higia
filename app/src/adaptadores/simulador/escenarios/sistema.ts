@@ -1,4 +1,4 @@
-import { diaNormal, L, type Escenario } from './modelo';
+import { diaNormal, L, noches, type Escenario } from './modelo';
 
 /** Escenarios del sistema: día normal, entrega diferida y autonomía. */
 export const ESCENARIOS_SISTEMA: Escenario[] = [
@@ -33,5 +33,41 @@ export const ESCENARIOS_SISTEMA: Escenario[] = [
         esperado: [{ riesgoId: 'cardio.presion', nivel: 'aviso' }],
       },
     ],
+  },
+  {
+    id: 'autonomia', nombre: 'Emergencia sin nadie al alcance', categoria: 'sistema',
+    descripcion: 'En Marte, sin médico, sin enlaces y sin compañero cerca: una arritmia grave y no responde.',
+    hrp: ['sistemas', 'cardiovascular'], peligros: ['distancia', 'aislamiento'], nivelMaximo: 'alerta',
+    queObservar: ['La guía paso a paso es lo único disponible (§7.2.4).', 'Sin nadie al alcance, se activa la baliza.', 'Todo corre en el dispositivo, sin red.'],
+    perfil: 'AST-02',
+    contextoInicial: { destino: 'marte', diaMision: 400, medicoABordo: false, conexionHabitat: false, conexionTierra: false, companeroCercano: false, actividad: 'reposo' },
+    pasos: [
+      {
+        enMs: 0, titulo: 'Arritmia grave', narracion: '18 % de latidos irregulares con pulso de 130.',
+        lecturas: (t) => [L('irregularidadRitmo', 18, t), L('frecuenciaCardiaca', 130, t)],
+        esperado: [{ riesgoId: 'cardio.arritmia', nivel: 'alerta' }],
+      },
+      { enMs: 4_000, titulo: 'No responde', narracion: 'No toques "Estoy bien": no hay nadie a quien avisar, así que activa la baliza.', esperaEscalada: true },
+    ],
+  },
+  {
+    id: 'dia-200', nombre: 'Día 200: todo un poco', categoria: 'sistema',
+    descripcion: 'Muchas señales leves a la vez: los peligros se potencian.',
+    hrp: ['sueno', 'aptitud', 'nutricion', 'oseo', 'hipoxia', 'inmune'], peligros: ['gravedad', 'aislamiento', 'entorno'], nivelMaximo: 'info',
+    queObservar: ['Nada es grave por sí solo: la figura se llena de amarillo claro.', 'Higia no habla por cada uno: es información, no alarma.'],
+    contextoInicial: { destino: 'marte', diaMision: 200, hora: 20 },
+    pasos: [{
+      enMs: 0, titulo: 'Un día cualquiera en el día 200', narracion: 'Sueño algo corto, fuerza y peso un poco más bajos, poca agua, oxígeno y temperatura apenas fuera.',
+      lecturas: (t) => [
+        ...noches([6.5, 6.5, 6.5], t), L('fuerza', 82, t), L('pesoCorporal', 60, t), L('hidratacion', 1300, t),
+        L('spo2', 94, t), L('temperatura', 37.6, t), L('minutosResistencia', 40, t),
+      ],
+      sinHallazgosSobre: 'info',
+      esperado: [
+        { riesgoId: 'sueno.deficit', nivel: 'info' }, { riesgoId: 'musculo.aptitud', nivel: 'info' }, { riesgoId: 'nutricion.peso', nivel: 'info' },
+        { riesgoId: 'nutricion.hidratacion', nivel: 'info' }, { riesgoId: 'pulmones.spo2', nivel: 'info' }, { riesgoId: 'inmune.fiebre', nivel: 'info' },
+        { riesgoId: 'hueso.perdida', nivel: 'info' },
+      ],
+    }],
   },
 ];

@@ -17,4 +17,26 @@ export const ESCENARIOS_RADIACION: Escenario[] = [
       esperado: [{ riesgoId: 'radiacion.dosis', nivel: 'aviso' }],
     }],
   },
+  {
+    id: 'tormenta-marte', nombre: 'Tormenta solar en EVA en Marte', categoria: 'radiacion',
+    descripcion: 'Fuera de la magnetosfera, la dosis sube rápido durante una EVA, sin enlace con Tierra.',
+    hrp: ['radiacion'], peligros: ['radiacion', 'distancia'], nivelMaximo: 'alerta',
+    queObservar: ['En Marte el umbral de la tasa es la mitad que en órbita.', 'Sin Tierra, la guía lleva al refugio por su cuenta.'],
+    contextoInicial: { destino: 'marte', ubicacion: 'eva', conexionTierra: false, diaMision: 300 },
+    pasos: [
+      {
+        enMs: 0, titulo: 'La dosis sube rápido', narracion: '0,7 mSv en una hora: en órbita no alarmaría, en Marte sí.',
+        lecturas: (t, h) => {
+          const base = h.ultima('dosisRadiacion')?.valor ?? 250;
+          return [L('dosisRadiacion', base, t - 60 * MINUTO), L('dosisRadiacion', base + 0.7, t)];
+        },
+        esperado: [{ riesgoId: 'radiacion.dosis', nivel: 'alerta' }],
+      },
+      {
+        enMs: 10_000, titulo: 'Se confirma la tormenta', narracion: 'El hábitat declara un evento de partículas solares.',
+        contexto: { climaEspacial: 'tormentaSolar' },
+        esperado: [{ riesgoId: 'radiacion.dosis', nivel: 'alerta' }],
+      },
+    ],
+  },
 ];
