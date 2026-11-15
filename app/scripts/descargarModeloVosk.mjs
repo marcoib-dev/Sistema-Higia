@@ -13,7 +13,7 @@ import path from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
-const MODELO = 'vosk-model-small-es-0.42';
+const MODELO = 'vosk-model-es-0.42';
 const URL_MODELO = `https://alphacephei.com/vosk/models/${MODELO}.zip`;
 const DESTINO = path.resolve('public/voz', `${MODELO}.tar.gz`);
 const FORZAR = process.argv.includes('--forzar');

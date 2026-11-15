@@ -9,8 +9,8 @@ import { VoskClient, type KaldiRecognizer } from '@lichess-org/vosk-browser';
 import urlTrabajador from '@lichess-org/vosk-browser/dist/vosk.worker.js?url';
 import urlWasm from '@lichess-org/vosk-browser/dist/vosk.wasm?url';
 
-/** El modelo español pequeño (~39 MB) se genera con `npm run voz:modelo`. */
-export const MODELO_POR_DEFECTO = `${import.meta.env.BASE_URL}voz/vosk-model-small-es-0.42.tar.gz`;
+/** El modelo español se genera con `npm run voz:modelo`. */
+export const MODELO_POR_DEFECTO = `${import.meta.env.BASE_URL}voz/vosk-model-es-0.42.tar.gz`;
 
 /** Vosk trabaja con el modelo de 16 kHz: hay que capturar a esa frecuencia. */
 const FRECUENCIA = 16000;
