@@ -54,13 +54,13 @@ Higia vigila la salud de astronautas que viven en hábitats permanentes (base lu
 **Requisitos:** Node.js 18 o superior y un micrófono.
 
 - **Google Chrome o Microsoft Edge:** usan el reconocimiento de voz del navegador (necesita internet).
-- **Brave, Firefox o Chromium:** usan **Vosk local** (funciona sin conexión). Hay que descargar el modelo español una vez con `npm run voz:modelo` (39 MB).
+- **Brave, Firefox o Chromium:** usan **Vosk local** (funciona sin conexión). Hay que descargar el modelo español grande una vez con `npm run voz:modelo` (~1,4 GB).
 - **Voz de Higia:** una **voz neuronal local (Piper)**, natural y sin conexión. Se descarga una vez con `npm run voz:piper` (~80 MB). Sin ella, Higia habla con la voz del navegador.
 
 ```bash
 cd app
 npm install
-npm run voz:modelo  # reconocimiento de voz local en español (39 MB, una sola vez; no se sube a git)
+npm run voz:modelo  # reconocimiento de voz local en español (~1,4 GB, una sola vez; no se sube a git)
 npm run voz:piper   # voz neuronal de Higia (~80 MB, una sola vez; no se sube a git)
 npm run dev         # abre http://localhost:5173
 npm test            # tests del núcleo
@@ -384,7 +384,7 @@ En la barra superior: **silenciar o activar** la voz, **pausar y reanudar**, **d
 - Otra voz: `npm run voz:piper -- es_ES-davefx-medium` y `VITE_PIPER_VOZ=es_ES-davefx-medium` en `app/.env.local` (voces en español: `es_MX-claude-high`, `es_MX-ald-medium`, `es_ES-davefx-medium`, `es_ES-sharvard-medium`). `VITE_PIPER=0` la desactiva.
 - El reconocimiento de voz tiene **dos motores** y la app elige sola:
   - **Navegador (Web Speech API)**: Chrome y Edge. Es más preciso, pero en Chrome usa servidores de Google y **necesita internet**.
-  - **Local (Vosk + WebAssembly)**: Brave, Firefox, Chromium y cualquier navegador compatible. Transcribe **en el dispositivo**, sin enviar el audio a nadie y **sin conexión**. Usa el modelo español pequeño (`vosk-model-small-es-0.42`, 39 MB, licencia Apache 2.0).
+  - **Local (Vosk + WebAssembly)**: Brave, Firefox, Chromium y cualquier navegador compatible. Transcribe **en el dispositivo**, sin enviar el audio a nadie y **sin conexión**. Usa el modelo español grande (`vosk-model-es-0.42`, ~1,4 GB, licencia Apache 2.0).
 - El modelo se descarga una vez con `npm run voz:modelo`, se extrae en la primera carga y queda guardado en IndexedDB; después arranca al instante. Ocupa unos 300 MB de memoria mientras escucha.
 - Para forzar un motor: `VITE_VOSK_MOTOR=local` (Vosk, también en Chrome, para una demo sin conexión) o `VITE_VOSK_MOTOR=navegador`. `VITE_VOSK_MODELO` permite usar otro modelo. Se configuran en `app/.env.local`.
 - Debe abrirse en **localhost o HTTPS**: en una IP de la red local (por ejemplo `http://192.168.1.20:5173`) el navegador bloquea el micrófono.
@@ -598,7 +598,8 @@ El plan completo está en [`PLAN_RIESGOS_Y_SIMULADOR.md`](PLAN_RIESGOS_Y_SIMULAD
 | El asistente dice "IA no disponible (…)" | Error de la API (clave inválida, límite de uso, sin internet) | El mensaje indica el motivo; mientras tanto responde el intérprete local |
 | No aparece el botón del micrófono | El navegador no puede capturar audio o la página no está en localhost/HTTPS | Abrir `http://localhost:5173` (no una IP de la red) y comprobar que el navegador permite micrófono; para Vosk hace falta además el modelo descargado |
 | El botón del micrófono está, pero no transcribe nada en **Brave/Firefox/Chromium** | Falta el modelo de Vosk o no se pudo descargar | Ejecutar `npm run voz:modelo` en `app/`, recargar y aceptar el micrófono. La app muestra el motivo en la sección Higia |
-| "Preparando voz local…" no avanza | El audio está suspendido, el modelo se está extrayendo o faltan permisos | Tocar la pantalla una vez, esperar la primera extracción (39 MB) y revisar la pestaña Red/Consola |
+| "Preparando voz local…" no avanza | El audio está suspendido, el modelo se está extrayendo o faltan permisos | Tocar la pantalla una vez, esperar la primera extracción (~1,4 GB) y revisar la pestaña Red/Consola |
+| Vosk muestra `Aborted()` al cargar el modelo grande | El modelo excede la memoria WebAssembly disponible en el navegador | Usar un navegador con más memoria o ejecutar Vosk fuera del navegador; el modelo grande se mantiene configurado |
 | Quiero Vosk en Chrome o la demo sin internet | Chrome usa el motor del navegador por defecto | Poner `VITE_VOSK_MOTOR=local` en `app/.env.local` y reiniciar `npm run dev` |
 | "Sin micrófono" / Higia no responde a su nombre | Permiso de micrófono denegado, escucha apagada o micrófono no detectado | Revisar el candado de la barra de direcciones, permitir el micrófono para `localhost`, comprobar el micrófono del sistema y encender **Escuchar «Higia»** en la sección Higia |
 | La IA no funciona después de `npm run build` | El build estático no incluye el servidor de IA | Usar `npm run dev` para la demo con IA |
@@ -617,5 +618,5 @@ El plan completo está en [`PLAN_RIESGOS_Y_SIMULADOR.md`](PLAN_RIESGOS_Y_SIMULAD
 - Los plazos de escalada (30 s y 15 s) son cortos para la demo; en un sistema real se definirían con criterio médico.
 - La IA envía a la API de DeepSeek el estado de salud (sin nombre) y las fotos que se analizan. Cada consulta tiene costo según el uso de la clave.
 - El reconocimiento de voz del navegador (Chrome/Edge) usa servidores externos; el motor **Vosk local no envía el audio a ningún lado**. La voz de Higia (Piper) se genera en el dispositivo; la de respaldo usa las voces del sistema.
-- El modelo de Vosk (39 MB) **no se sube a git**: se descarga con `npm run voz:modelo`. Vosk local ocupa unos 300 MB de memoria mientras escucha.
+- El modelo grande de Vosk (~1,4 GB) **no se sube a git**: se descarga con `npm run voz:modelo`. Vosk local requiere bastante memoria mientras escucha.
 - Vosk es Apache 2.0 y el modelo español también; se puede usar en la demo sin restricciones.

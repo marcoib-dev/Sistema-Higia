@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "postinstall": "node scripts/parchearVoskMemoria.mjs",
     "voz:modelo": "node scripts/descargarModeloVosk.mjs",
     "voz:piper": "node scripts/descargarVozPiper.mjs"
   },

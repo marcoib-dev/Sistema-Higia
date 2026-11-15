@@ -10,7 +10,7 @@ import urlTrabajador from '@lichess-org/vosk-browser/dist/vosk.worker.js?url';
 import urlWasm from '@lichess-org/vosk-browser/dist/vosk.wasm?url';
 
 /** El modelo español se genera con `npm run voz:modelo`. */
-export const MODELO_POR_DEFECTO = `${import.meta.env.BASE_URL}voz/vosk-model-es-0.42.tar.gz`;
+export const MODELO_POR_DEFECTO = `${import.meta.env.BASE_URL}voz/vosk-model-es-0.42.tar.gz?v=4gb`;
 
 /** Vosk trabaja con el modelo de 16 kHz: hay que capturar a esa frecuencia. */
 const FRECUENCIA = 16000;
@@ -90,6 +90,9 @@ function mensajeDeError(e: unknown): string {
   if (nombre === 'NotFoundError' || nombre === 'DevicesNotFoundError') return 'No se encontró un micrófono. Conecta uno y vuelve a intentarlo.';
   if (nombre === 'NotReadableError' || nombre === 'TrackStartError') return 'El micrófono está en uso por otra aplicación. Ciérrala y vuelve a intentarlo.';
   const mensaje = e instanceof Error ? e.message : '';
+  if (/aborted\(\)|out of memory|memory growth|cannot enlarge memory/i.test(mensaje)) {
+    return 'El modelo Vosk grande no cabe en la memoria WebAssembly disponible del navegador. Usa un navegador con más memoria o ejecuta el reconocimiento Vosk fuera del navegador; el modelo configurado sigue siendo el grande.';
+  }
   if (/404|fetch|download|failed to load|no such file/i.test(mensaje)) {
     return `No se pudo cargar el modelo de voz local (${mensaje || urlModeloVoz()}). Ejecuta "npm run voz:modelo" en la carpeta app/.`;
   }

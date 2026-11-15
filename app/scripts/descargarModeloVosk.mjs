@@ -1,5 +1,5 @@
 /**
- * Descarga el modelo español pequeño de Vosk y lo empaqueta como tar.gz, que es el formato
+ * Descarga el modelo español grande de Vosk y lo empaqueta como tar.gz, que es el formato
  * que espera vosk-browser. El archivo queda en public/voz/ y no se sube a git.
  *
  *   npm run voz:modelo            # descarga si falta
