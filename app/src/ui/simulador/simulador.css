@@ -59,6 +59,7 @@
 .reproduccion-pasos li.actual { background: linear-gradient(90deg, var(--acento) 50%, var(--superficie-3) 50%); background-size: 200% 100%; animation: avance-paso .6s var(--ease-salida) forwards; }
 @keyframes avance-paso { from { background-position: 100% 0; } to { background-position: 0 0; } }
 .reproduccion-controles { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.reproduccion-siguiente { margin-right: 8px; gap: 6px; white-space: nowrap; }
 .reproduccion-cuenta { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--texto-3); min-width: 38px; text-align: right; margin-right: 6px; }
 .segmentado-mini { margin: 0 6px; padding: 2px; }
 .segmentado-mini button { padding: 4px 8px; font-size: 13px; font-variant-numeric: tabular-nums; }

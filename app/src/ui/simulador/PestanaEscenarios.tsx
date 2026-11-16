@@ -47,7 +47,7 @@ export function PestanaEscenarios({ sim }: { sim: Simulador }) {
       <section className="tarjeta-guion">
         <div>
           <h3>{t('Guion de la demo')}</h3>
-          <p>{t('{n} escenarios que recorren los cinco peligros, unos cinco minutos. Entre uno y otro espera «Siguiente».', { n: GUION.length })}</p>
+          <p>{t('{n} escenarios que recorren los cinco peligros, unos cinco minutos. Entre uno y otro toca «Siguiente escenario».', { n: GUION.length })}</p>
           <ol className="guion-lista">{GUION.map((e) => <li key={e.id}>{t(e.nombre)}</li>)}</ol>
         </div>
         <button className="boton boton-primario" onClick={() => sim.reproducirGuion()}><Icono nombre="reproducir" tamano={16} /> {t('Reproducir guion')}</button>

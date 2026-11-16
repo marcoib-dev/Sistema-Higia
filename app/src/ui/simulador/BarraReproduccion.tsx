@@ -57,7 +57,7 @@ export function BarraReproduccion({ sim }: { sim: Simulador }) {
           </span>
         </p>
         <p className={`reproduccion-narracion ${r.esperando ? 'esperando' : ''}`} aria-live="polite">
-          {terminado && proximo ? t('Sigue en el guion: {x}. Toca «Siguiente».', { x: t(proximo.nombre) }) : terminado ? t('El escenario terminó. Puedes reiniciarlo o elegir otro.') : narracion}
+          {terminado && proximo ? t('Sigue en el guion: {x}. Toca «Siguiente escenario».', { x: t(proximo.nombre) }) : terminado ? t('El escenario terminó. Puedes reiniciarlo o elegir otro.') : narracion}
         </p>
         <ol className="reproduccion-pasos" aria-label={t('Progreso: paso {n} de {total}', { n: Math.max(0, r.indicePaso + 1), total })}>
           {e.pasos.map((p, i) => (
@@ -68,13 +68,22 @@ export function BarraReproduccion({ sim }: { sim: Simulador }) {
 
       <div className="reproduccion-controles">
         {ms !== null && !terminado && <span className="reproduccion-cuenta" title={t('Hasta el siguiente paso')}>{Math.ceil(ms / 1000)} s</span>}
-        <button className="boton-icono" onClick={() => sim.control(r.estado === 'reproduciendo' ? 'pausar' : 'continuar')}
-          aria-label={r.estado === 'reproduciendo' ? t('Pausar (Espacio)') : t('Continuar (Espacio)')} disabled={terminado && !proximo}>
-          <Icono nombre={r.estado === 'reproduciendo' ? 'pausa' : 'reproducir'} />
-        </button>
-        <button className="boton-icono" onClick={() => sim.control('siguiente')} aria-label={t('Siguiente paso (N)')} disabled={terminado && !proximo}>
-          <Icono nombre="siguiente" />
-        </button>
+        {terminado && proximo ? (
+          // Al terminar un escenario del guion: un botón con texto, no solo íconos, para pasar al que sigue.
+          <button className="boton boton-primario reproduccion-siguiente" onClick={() => sim.control('continuar')}>
+            {t('Siguiente escenario')} <Icono nombre="siguiente" tamano={16} />
+          </button>
+        ) : (
+          <>
+            <button className="boton-icono" onClick={() => sim.control(r.estado === 'reproduciendo' ? 'pausar' : 'continuar')}
+              aria-label={r.estado === 'reproduciendo' ? t('Pausar (Espacio)') : t('Continuar (Espacio)')} disabled={terminado}>
+              <Icono nombre={r.estado === 'reproduciendo' ? 'pausa' : 'reproducir'} />
+            </button>
+            <button className="boton-icono" onClick={() => sim.control('siguiente')} aria-label={t('Siguiente paso (N)')} disabled={terminado}>
+              <Icono nombre="siguiente" />
+            </button>
+          </>
+        )}
         <button className="boton-icono" onClick={() => sim.control('reiniciar')} aria-label={t('Reiniciar escenario (R)')}><Icono nombre="reiniciar" /></button>
         <div className="segmentado segmentado-mini" role="radiogroup" aria-label={t('Velocidad')}>
           {([1, 2, 4] as Velocidad[]).map((v) => (
