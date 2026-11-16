@@ -9,7 +9,12 @@ interface ImportMetaEnv {
   readonly VITE_PIPER_VOZ?: string;
   /** '0' desactiva la voz neuronal. */
   readonly VITE_PIPER?: string;
+  /** 'remoto' ignora public/voz/piper/ y baja la voz de internet, como en Vercel. */
+  readonly VITE_PIPER_ORIGEN?: string;
 }
+
+/** Versión instalada de onnxruntime-web (la define vite.config.ts). */
+declare const __ORT_VERSION__: string;
 
 interface ImportMeta {
   readonly env: ImportMetaEnv;

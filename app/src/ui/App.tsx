@@ -138,8 +138,12 @@ export function App() {
   iaRef.current = iaActiva;
 
   useEffect(() => { void consultarEstadoIA().then(setIa); }, []);
-  // Voz neuronal local: se prepara al abrir; mientras tanto (o si falla) habla la voz del navegador.
-  useEffect(() => { void prepararPiper(); }, []);
+  // Voz neuronal local: se prepara en segundo plano unos segundos después de abrir, para no competir
+  // con la carga de la página (la primera vez baja ~63 MB). Mientras tanto habla la voz del navegador.
+  useEffect(() => {
+    const id = setTimeout(() => { void prepararPiper(); }, 4000);
+    return () => clearTimeout(id);
+  }, []);
 
   // Título de la pestaña según la sección.
   useEffect(() => {

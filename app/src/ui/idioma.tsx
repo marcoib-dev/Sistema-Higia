@@ -328,6 +328,7 @@ const INGLES: Record<string, string> = {
   'No apto hoy': 'Not fit today',
   'en curso': 'in progress',
   'Ahora con {nombre}': 'Now with {nombre}',
+  'Voz del navegador: {nombre}': 'Browser voice: {nombre}',
   'Aptitud para tareas': 'Task fitness',
   'Sin contraindicaciones': 'No contraindications',
   'Hoy no se recomienda': 'Not recommended today',

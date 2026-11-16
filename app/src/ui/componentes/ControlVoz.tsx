@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { detener, estadoVoz, fijarVolumen, motorSintesis, pausar, reanudar } from '../../adaptadores/voz/voz';
+import { detener, estadoVoz, fijarVolumen, motorSintesis, nombreVozNavegador, pausar, reanudar } from '../../adaptadores/voz/voz';
 import { Icono } from '../iconos';
 import { useT } from '../idioma';
 
@@ -25,7 +25,10 @@ export function ControlVoz({ vozActiva, onVozActiva }: Props) {
   return (
     <div
       data-tutorial="voz" className={`control-voz ${vozActiva && (estado === 'hablando' || estado === 'pausada') ? 'con-voz' : ''}`} role="group" aria-label={t('Voz de Higia')}
-      title={motor === 'neuronal' ? t('Voz neuronal local (Piper): sin conexión') : motor === 'cargando' ? t('Cargando la voz neuronal local…') : t('Voz del navegador (la voz neuronal no está disponible)')}
+      title={motor === 'neuronal' ? t('Voz neuronal local (Piper): sin conexión')
+        : motor === 'cargando' ? t('Cargando la voz neuronal local…')
+        : nombreVozNavegador() ? t('Voz del navegador: {nombre}', { nombre: nombreVozNavegador()! })
+        : t('Voz del navegador (la voz neuronal no está disponible)')}
     >
       <button
         className="boton-icono" onClick={() => { onVozActiva(!vozActiva); if (vozActiva) detener(); }}

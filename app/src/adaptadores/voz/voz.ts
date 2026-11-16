@@ -6,6 +6,7 @@
  */
 
 import { estadoPiper, sintetizar } from './piper';
+import { esNatural, mejorVozNavegador, type IdiomaVoz } from './vocesNavegador';
 
 let volumen = 1;
 
@@ -13,10 +14,33 @@ export function sintesisDisponible(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window;
 }
 
-/** Qué voz está hablando: la neuronal local (Piper) o la del navegador (respaldo). */
+/** Idioma en que habla Higia: el de la página (lo fija el selector ES/EN). */
+const idiomaVoz = (): IdiomaVoz => (typeof document !== 'undefined' && document.documentElement.lang.startsWith('en') ? 'en' : 'es');
+const enLinea = () => typeof navigator === 'undefined' || navigator.onLine;
+
+/**
+ * Qué motor dice la próxima frase:
+ * - Una voz neuronal del navegador (Edge «Natural», Apple «Premium») con internet: suena mejor que Piper.
+ * - Si no la hay, o no hay internet: Piper, que es neuronal y local (solo habla español).
+ * - Si Piper no está lista: la mejor voz del navegador que haya.
+ */
+function usarPiper(): boolean {
+  if (estadoPiper() !== 'lista' || idiomaVoz() !== 'es') return false;
+  const nav = mejorVozNavegador('es');
+  return !(nav && esNatural(nav) && enLinea());
+}
+
+/** Qué voz está hablando: la neuronal local (Piper) o la del navegador. */
 export function motorSintesis(): 'neuronal' | 'navegador' | 'cargando' {
-  const e = estadoPiper();
-  return e === 'lista' ? 'neuronal' : e === 'error' ? 'navegador' : 'cargando';
+  if (usarPiper()) return 'neuronal';
+  const nav = mejorVozNavegador(idiomaVoz());
+  if (nav && esNatural(nav)) return 'navegador';
+  return estadoPiper() === 'cargando' ? 'cargando' : 'navegador';
+}
+
+/** Nombre de la voz del navegador que se usaría ahora (para mostrarlo). */
+export function nombreVozNavegador(): string | undefined {
+  return mejorVozNavegador(idiomaVoz())?.name;
 }
 
 /** Volumen de 0 a 1. Con la voz neuronal se aplica también a lo que está sonando. */
@@ -92,7 +116,10 @@ function siguiente(): void {
 function hablarNavegador(texto: string, alTerminar?: () => void): void {
   if (!sintesisDisponible()) { alTerminar?.(); return; }
   const u = new SpeechSynthesisUtterance(texto);
-  u.lang = 'es-ES';
+  const idioma = idiomaVoz();
+  const voz = mejorVozNavegador(idioma);
+  if (voz) u.voice = voz;
+  u.lang = voz?.lang ?? (idioma === 'en' ? 'en-US' : 'es-AR');
   u.volume = volumen;
   if (alTerminar) {
     u.onend = () => alTerminar();
@@ -106,7 +133,7 @@ export function hablar(texto: string, alTerminar?: () => void): void {
     alTerminar?.();
     return;
   }
-  if (estadoPiper() === 'lista') encolarNeuronal(texto, alTerminar);
+  if (usarPiper()) encolarNeuronal(texto, alTerminar);
   else hablarNavegador(texto, alTerminar);
 }
 
