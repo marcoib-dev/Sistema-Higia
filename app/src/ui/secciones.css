@@ -4,7 +4,9 @@
    ══════════════════════════════════════════════════════════════════════ */
 
 /* ── Higia: encabezado ───────────────────────────────────────────────── */
-.asistente { display: flex; flex-direction: column; gap: 14px; max-width: 920px; }
+/* Centrada en el espacio libre: el contenedor no la limita a la izquierda en esta sección. */
+.contenido:has(> .asistente) { max-width: none; }
+.asistente { display: flex; flex-direction: column; gap: 14px; max-width: 920px; width: 100%; margin-inline: auto; }
 .asistente-cab { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; }
 .asistente-saludo { min-width: 0; flex: 1 1 320px; }
 .asistente-saludo h1 { font-size: 26px; font-weight: 700; letter-spacing: -.01em; }
