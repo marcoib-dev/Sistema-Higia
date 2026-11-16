@@ -134,6 +134,10 @@
 .semaforo-tareas li.no-apto { background: color-mix(in srgb, var(--aviso) 10%, var(--superficie-2)); border-color: color-mix(in srgb, var(--aviso) 40%, var(--borde)); }
 .semaforo-tareas li.no-apto .icono { color: var(--aviso); margin-top: 2px; }
 .semaforo-tareas li.no-apto small { color: color-mix(in srgb, var(--aviso) 55%, var(--texto-2)); }
+.semaforo-tareas li.no-apto.grave { background: color-mix(in srgb, var(--alerta) 12%, var(--superficie-2)); border-color: color-mix(in srgb, var(--alerta) 50%, var(--borde)); }
+.semaforo-tareas li.no-apto.grave .icono { color: var(--alerta); }
+.semaforo-tareas li.no-apto.grave small { color: color-mix(in srgb, var(--alerta) 60%, var(--texto)); font-weight: 600; }
+.semaforo-tareas .tarea-en-curso { font-weight: 500; color: var(--texto-2); }
 .valor-dia { color: var(--texto); font-variant-numeric: tabular-nums; margin-left: 4px; }
 .campo input[type='range'] { accent-color: var(--acento); }
 .atajos-dia { display: flex; gap: 6px; }

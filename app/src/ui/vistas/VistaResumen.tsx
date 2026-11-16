@@ -2,11 +2,24 @@ import type { Historial } from '../../core/historial';
 import { ID_SENALES_COMBINADAS, senalesQueSeSuman, type AptitudTareas } from '../../core/nucleo';
 import { redactar } from '../../core/personalizador';
 import { RIESGO_HRP } from '../../core/riesgosHRP';
-import { antecedentesDe, NOMBRE_DESTINO, NOMBRE_SISTEMA, NOMBRE_TAREA, ORDEN_NIVEL, SISTEMAS, TAREAS_CRITICAS, type Contexto, type EstadoCorporal, type Hallazgo, type Nivel, type Perfil, type RegionCuerpo, type SistemaCorporal } from '../../core/tipos';
+import { antecedentesDe, NOMBRE_DESTINO, NOMBRE_SISTEMA, NOMBRE_TAREA, ORDEN_NIVEL, SISTEMAS, TAREAS_CRITICAS, type Contexto, type TareaCritica, type EstadoCorporal, type Hallazgo, type Nivel, type Perfil, type RegionCuerpo, type SistemaCorporal } from '../../core/tipos';
 import { EncabezadoSeccion, InsigniaNivel, NOMBRE_NIVEL, Punto, sinTitulo } from '../componentes/basicos';
 import { FiguraCorporal } from '../FiguraCorporal';
 import { Icono } from '../iconos';
 import { useT } from '../idioma';
+
+/** Si el astronauta está haciendo la tarea ahora mismo, según el contexto. */
+const TAREA_EN_CURSO: Record<TareaCritica, (c: Contexto) => boolean> = {
+  eva: (c) => c.ubicacion === 'eva',
+  pilotaje: (c) => c.ubicacion === 'rover',
+  ejercicioIntenso: (c) => c.actividad === 'ejercicio',
+};
+/** Qué hacer ya cuando una alerta contraindica la tarea en curso. */
+const DETENER_TAREA: Record<TareaCritica, string> = {
+  eva: 'Vuelve a la nave ya',
+  pilotaje: 'Detén el vehículo de forma segura',
+  ejercicioIntenso: 'Detén el ejercicio ahora',
+};
 
 interface Props {
   perfil: Perfil;
@@ -117,12 +130,20 @@ export function VistaResumen({ perfil, contexto, estado, regiones, hallazgos, hi
               <ul className="semaforo-tareas">
                 {TAREAS_CRITICAS.map((tarea) => {
                   const { apto, motivos } = aptitud[tarea];
+                  // Con una alerta (no un aviso) el semáforo pasa a rojo; si además la tarea está en curso,
+                  // dice qué hacer ya en vez de "hoy no se recomienda".
+                  const grave = motivos.some((m) => m.nivel === 'alerta');
+                  const enCurso = TAREA_EN_CURSO[tarea](contexto);
+                  const veredicto = apto ? t('Sin contraindicaciones')
+                    : grave && enCurso ? t(DETENER_TAREA[tarea])
+                    : grave ? t('No apto hoy')
+                    : t('Hoy no se recomienda');
                   return (
-                    <li key={tarea} className={apto ? 'apto' : 'no-apto'}>
+                    <li key={tarea} className={apto ? 'apto' : grave ? 'no-apto grave' : 'no-apto'}>
                       <Icono nombre={apto ? 'check' : 'alerta'} tamano={16} />
                       <span>
-                        <strong>{t(NOMBRE_TAREA[tarea])}</strong>
-                        <small>{apto ? t('Sin contraindicaciones') : `${t('Hoy no se recomienda')} · ${motivos.map((m) => t(m.titulo)).join(' · ')}`}</small>
+                        <strong>{t(NOMBRE_TAREA[tarea])}{!apto && enCurso ? <span className="tarea-en-curso"> · {t('en curso')}</span> : null}</strong>
+                        <small>{apto ? veredicto : `${veredicto} · ${motivos.map((m) => t(m.titulo)).join(' · ')}`}</small>
                       </span>
                     </li>
                   );
