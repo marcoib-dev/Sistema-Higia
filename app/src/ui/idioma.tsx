@@ -320,6 +320,8 @@ const INGLES: Record<string, string> = {
   'Todo en orden': 'All clear',
   'No hay avisos ni alertas activas.': 'There are no active notices or alerts.',
   'Todavía no llegan datos de los sensores.': 'No sensor data has arrived yet.',
+  'Esperando datos': 'Waiting for data',
+  'En seguimiento': 'Being monitored',
   'Aptitud para tareas': 'Task fitness',
   'Sin contraindicaciones': 'No contraindications',
   'Hoy no se recomienda': 'Not recommended today',

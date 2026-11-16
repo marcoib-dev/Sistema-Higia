@@ -225,6 +225,8 @@ select, input[type='text'], input[type='number'], input:not([type]) {
 .todo-en-orden { display: flex; align-items: center; gap: 14px; padding: 6px 2px; }
 .todo-en-orden-icono { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
 .todo-en-orden p { color: var(--texto-2); }
+.todo-en-orden.esperando-datos .todo-en-orden-icono { background: var(--superficie-3); color: var(--texto-2); }
+.todo-en-orden .en-seguimiento { font-size: 13px; color: var(--texto-3); margin-top: 2px; }
 
 .lista-atencion { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .lista-atencion li { border-left: 3px solid; border-radius: var(--radio-s); background: var(--superficie-2); }

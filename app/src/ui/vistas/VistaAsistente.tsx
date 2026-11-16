@@ -26,6 +26,8 @@ interface Props {
   iaActiva: boolean;
   perfil: Perfil;
   hallazgos: Hallazgo[];
+  /** Ningún sensor reportó todavía y no hay hallazgos: no se dice "Todo en orden" sin base. */
+  esperandoDatos?: boolean;
   alertasPendientes: number;
   enCurso: EnCurso | null;
   /** Minutos entre preguntas proactivas (0 = apagadas). */
@@ -63,7 +65,7 @@ export const OPCIONES_PROACTIVO = [
 ];
 
 export function VistaAsistente({
-  asistente: a, iaActiva, perfil, hallazgos, alertasPendientes, enCurso, proactivo, onProactivo, onPreguntarAhora, onAbrirSimulador, onTutorial, onIr, onPedirAyuda,
+  asistente: a, iaActiva, perfil, hallazgos, esperandoDatos = false, alertasPendientes, enCurso, proactivo, onProactivo, onPreguntarAhora, onAbrirSimulador, onTutorial, onIr, onPedirAyuda,
 }: Props) {
   const t = useT();
   const [texto, setTexto] = useState('');
@@ -157,9 +159,9 @@ export function VistaAsistente({
       )}
 
       <nav className="estado-rapido" aria-label={t('Accesos rápidos')}>
-        <button className={atencion.length ? 'con-aviso' : 'con-ok'} onClick={() => onIr('resumen')}>
+        <button className={atencion.length ? 'con-aviso' : esperandoDatos ? '' : 'con-ok'} onClick={() => onIr('resumen')}>
           <span className="estado-icono"><Icono nombre="resumen" tamano={20} /></span>
-          <span><strong>{atencion.length ? t('{n} punto(s) a atender', { n: atencion.length }) : t('Todo en orden')}</strong><small>{t('Estado de salud')}</small></span>
+          <span><strong>{atencion.length ? t('{n} punto(s) a atender', { n: atencion.length }) : esperandoDatos ? t('Esperando datos') : t('Todo en orden')}</strong><small>{t('Estado de salud')}</small></span>
           <Icono nombre="flecha" tamano={16} />
         </button>
         <button className={alertasPendientes ? 'con-alerta' : ''} onClick={() => onIr('mensajes')}>

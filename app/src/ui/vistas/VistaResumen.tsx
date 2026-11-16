@@ -32,6 +32,10 @@ export function VistaResumen({ perfil, contexto, estado, regiones, hallazgos, hi
     .filter((h) => ORDEN_NIVEL[h.nivel] >= ORDEN_NIVEL.aviso && h.riesgoId !== ID_SENALES_COMBINADAS)
     .sort((a, b) => ORDEN_NIVEL[b.nivel] - ORDEN_NIVEL[a.nivel]);
   const conDatos = SISTEMAS.filter((s) => estado[s] !== 'sinDatos').length;
+  // Sin sensores todavía, los hallazgos sin aviso (p. ej. la pérdida ósea estimada) se nombran para no
+  // contradecir al chat. Con datos, la lista de sistemas ya los muestra uno por uno.
+  const seguimiento = conDatos ? [] : hallazgos.filter((h) => ORDEN_NIVEL[h.nivel] < ORDEN_NIVEL.aviso && h.riesgoId !== ID_SENALES_COMBINADAS);
+  const esperandoDatos = !conDatos && !seguimiento.length;
   const seleccionado = (s: SistemaCorporal) => !!seleccion?.includes(s);
 
   return (
@@ -83,11 +87,14 @@ export function VistaResumen({ perfil, contexto, estado, regiones, hallazgos, hi
               {atencion.length > 0 && <button className="boton-enlace" onClick={onIrMensajes}>{t('Ver mensajes')} <Icono nombre="flecha" tamano={14} /></button>}
             </div>
             {atencion.length === 0 ? (
-              <div className="todo-en-orden">
-                <span className="todo-en-orden-icono"><Icono nombre="check" tamano={20} /></span>
+              <div className={`todo-en-orden ${esperandoDatos ? 'esperando-datos' : ''}`}>
+                <span className="todo-en-orden-icono"><Icono nombre={esperandoDatos ? 'reloj' : 'check'} tamano={20} /></span>
                 <div>
-                  <strong>{t('Todo en orden')}</strong>
-                  <p>{conDatos ? t('No hay avisos ni alertas activas.') : t('Todavía no llegan datos de los sensores.')}</p>
+                  <strong>{esperandoDatos ? t('Esperando datos') : t('Todo en orden')}</strong>
+                  <p>{esperandoDatos ? t('Todavía no llegan datos de los sensores.') : t('No hay avisos ni alertas activas.')}</p>
+                  {seguimiento.length > 0 && (
+                    <p className="en-seguimiento">{t('En seguimiento')}: {seguimiento.map((h) => t(h.titulo)).join(' · ')}</p>
+                  )}
                 </div>
               </div>
             ) : (

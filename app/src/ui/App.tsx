@@ -712,6 +712,7 @@ export function App() {
           {seccion === 'asistente' && (
             <VistaAsistente
               asistente={asistente} iaActiva={iaActiva} perfil={nucleo.perfil} hallazgos={nucleo.hallazgosActuales()}
+              esperandoDatos={!nucleo.hallazgosActuales().length && Object.values(nucleo.estadoCorporal()).every((n) => n === 'sinDatos')}
               alertasPendientes={pendientes.length} enCurso={enCurso} proactivo={proactivo} onProactivo={cambiarProactivo}
               onPreguntarAhora={() => lanzarProactiva(true)} onAbrirSimulador={() => alternarDemo(true)} onIr={ir} onPedirAyuda={() => pedirAyuda()} onTutorial={() => setTutorial(true)}
             />
