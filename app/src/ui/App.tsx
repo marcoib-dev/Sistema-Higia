@@ -319,6 +319,8 @@ export function App() {
   };
 
   const cambiarPerfil = (id: string) => {
+    // Otro astronauta: la IA no debe seguir la conversación del anterior.
+    if (id !== nucleo.perfil.id) turnos.current = [];
     nucleo.cambiarPerfil(conHistoriaGuardada(PERFILES.find((p) => p.id === id)!));
     nucleo.companeros = PERFILES.filter((p) => p.id !== id).map((p) => p.nombre);
     refrescar();
@@ -602,7 +604,7 @@ export function App() {
     return resultado;
   };
 
-  const asistente = useAsistente(conversar, vozActiva);
+  const asistente = useAsistente(conversar, vozActiva, nucleo.perfil.nombre);
   decirRef.current = asistente.decir;
 
   const sim = useSimulador({

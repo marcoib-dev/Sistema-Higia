@@ -2,7 +2,7 @@
  * HIGIA — la sección de inicio. El asistente es la base de la app: desde aquí (o diciendo «Higia»
  * en cualquier momento) se consulta el estado, se piden cosas, se avisa a otros y se navega.
  */
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import type { Hallazgo, Perfil } from '../../core/tipos';
 import { ORDEN_NIVEL } from '../../core/tipos';
 import { TEXTO_ACTIVIDAD, TEXTO_ESCUCHA, type Asistente } from '../asistente';
@@ -253,8 +253,13 @@ export function VistaAsistente({
               </div>
             </div>
           )}
-          {cronologico.map((i) => (
-            <div key={i.id} className="chat-turno">
+          {cronologico.map((i, n) => (
+            <Fragment key={i.id}>
+            {/* Si el simulador cambió de astronauta, se marca dónde empieza la conversación del nuevo. */}
+            {n > 0 && i.astronauta && cronologico[n - 1].astronauta && i.astronauta !== cronologico[n - 1].astronauta && (
+              <p className="chat-separador" role="separator">{t('Ahora con {nombre}', { nombre: i.astronauta })}</p>
+            )}
+            <div className="chat-turno">
               {i.pregunta && <p className="burbuja burbuja-yo">{i.origen === 'voz' && <Icono nombre="microfono" tamano={13} />} {i.pregunta}</p>}
               <div className={`burbuja burbuja-higia ${i.etiqueta ? 'proactiva' : ''}`}>
                 {i.etiqueta
@@ -274,7 +279,11 @@ export function VistaAsistente({
                 {i.nota && <p className="burbuja-nota">{i.nota}</p>}
               </div>
             </div>
+            </Fragment>
           ))}
+          {cronologico.length > 0 && cronologico[cronologico.length - 1].astronauta && cronologico[cronologico.length - 1].astronauta !== perfil.nombre && (
+            <p className="chat-separador" role="separator">{t('Ahora con {nombre}', { nombre: perfil.nombre })}</p>
+          )}
           {a.pensando && (
             <p className="burbuja burbuja-higia pensando" aria-label={t('Higia está pensando')}>
               <span className="puntos-escribiendo" aria-hidden><span /><span /><span /></span>

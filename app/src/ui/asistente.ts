@@ -20,6 +20,8 @@ export interface Intercambio {
   nota?: string;
   /** Higia habló por iniciativa propia: "Pregunta de Higia", "Evaluación cognitiva 2/6"… */
   etiqueta?: string;
+  /** A quién atendía Higia en ese turno: si el simulador cambia de astronauta, el chat lo marca. */
+  astronauta?: string;
 }
 
 export interface ResultadoConversacion {
@@ -67,7 +69,9 @@ export interface Asistente {
 /** Qué hace Higia ahora: lo que la interfaz muestra con color y animación. */
 export type ActividadHigia = 'inactiva' | 'esperando' | 'escuchando' | 'pensando' | 'hablando';
 
-export function useAsistente(onFrase: (frase: string) => Promise<ResultadoConversacion>, vozActiva: boolean): Asistente {
+export function useAsistente(onFrase: (frase: string) => Promise<ResultadoConversacion>, vozActiva: boolean, astronauta = ''): Asistente {
+  const astronautaRef = useRef(astronauta);
+  astronautaRef.current = astronauta;
   const [historial, setHistorial] = useState<Intercambio[]>([]);
   const [pensando, setPensando] = useState(false);
   const [escuchaActiva, setEscuchaActiva] = useState(leerEscucha);
@@ -101,7 +105,7 @@ export function useAsistente(onFrase: (frase: string) => Promise<ResultadoConver
     setPensando(true);
     try {
       const r = await onFraseRef.current(f);
-      setHistorial((prev) => [{ id: Date.now(), pregunta: f, respuesta: r.texto, fuente: r.fuente, hechos: r.hechos, origen, nota: r.nota, etiqueta: r.etiqueta }, ...prev].slice(0, 40));
+      setHistorial((prev) => [{ id: Date.now(), pregunta: f, respuesta: r.texto, fuente: r.fuente, hechos: r.hechos, origen, nota: r.nota, etiqueta: r.etiqueta, astronauta: astronautaRef.current }, ...prev].slice(0, 40));
       if (origen === 'voz') {
         setProblemaVoz(undefined); // el reconocimiento funcionó
         aceptarRespuestaSinNombre(8000); // deja una ventana corta para seguir hablando sin repetir «Higia»
@@ -150,7 +154,7 @@ export function useAsistente(onFrase: (frase: string) => Promise<ResultadoConver
   }, []);
 
   const decir = useCallback((texto: string, hechos: string[] = [], etiqueta?: string) => {
-    setHistorial((prev) => [{ id: Date.now() + Math.random(), pregunta: '', respuesta: texto, fuente: 'local' as const, hechos, origen: 'voz' as const, etiqueta }, ...prev].slice(0, 40));
+    setHistorial((prev) => [{ id: Date.now() + Math.random(), pregunta: '', respuesta: texto, fuente: 'local' as const, hechos, origen: 'voz' as const, etiqueta, astronauta: astronautaRef.current }, ...prev].slice(0, 40));
     if (vozRef.current) hablar(texto);
   }, []);
 

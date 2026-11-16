@@ -285,3 +285,7 @@
 @media (prefers-reduced-motion: reduce) {
   .chat-turno, .puntos-escribiendo span { animation: none; }
 }
+
+/* Higia: separador cuando el simulador cambia de astronauta */
+.chat-separador { display: flex; align-items: center; gap: 10px; margin: 4px 0; font-size: 12px; color: var(--texto-3); text-transform: uppercase; letter-spacing: .06em; }
+.chat-separador::before, .chat-separador::after { content: ''; flex: 1; height: 1px; background: var(--borde); }
