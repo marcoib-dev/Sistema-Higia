@@ -37,3 +37,6 @@ app/public/voz/piper/
 
 # Vercel (build local y enlace del proyecto)
 .vercel/
+
+# Capturas y registros de las pruebas con Playwright
+.playwright-mcp/
